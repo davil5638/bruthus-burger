@@ -11,6 +11,8 @@ const nav = [
   { href: '/hashtags',   label: 'Hashtags',     icon: '#'  },
   { href: '/anuncios',   label: 'Anúncios',     icon: '📣' },
   { href: '/agendador',  label: 'Agendador',    icon: '📅' },
+  { href: '/stories',    label: 'Stories',      icon: '📱' },
+  { href: '/financeiro', label: 'Financeiro',   icon: '💰' },
 ]
 
 export default function Sidebar() {

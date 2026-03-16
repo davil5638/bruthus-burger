@@ -11,6 +11,8 @@ const { generateReelsScript } = require("./scripts/generateReelsScript");
 const { generateHashtags } = require("./scripts/generateHashtags");
 const { criarCampanhaCompleta, relatorioPerformance } = require("./scripts/createAds");
 const { iniciarAgendador, testarAgora, ESTRATEGIA_SEMANAL } = require("./scheduler/scheduler");
+const { generateStory, STORY_TYPES } = require("./scripts/generateStories");
+const fin = require("./scripts/financeiro");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -257,6 +259,76 @@ app.get("/scheduler/config", (req, res) => {
   }));
 
   res.json({ agendamentos: config });
+});
+
+// ──────────────────────────────────────────────
+// STORIES
+// ──────────────────────────────────────────────
+
+app.post("/stories", async (req, res) => {
+  try {
+    const { tipo, dia } = req.body;
+    const resultado = await generateStory(tipo || "PRODUTO", dia || "quinta");
+    res.json({ sucesso: true, resultado });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+app.get("/stories/tipos", (req, res) => {
+  const tipos = Object.entries(STORY_TYPES).map(([key, val]) => ({
+    id: key, label: val.label, desc: val.desc, cor: val.cor,
+  }));
+  res.json({ tipos });
+});
+
+// ──────────────────────────────────────────────
+// FINANCEIRO
+// ──────────────────────────────────────────────
+
+app.get("/financeiro", (req, res) => {
+  try {
+    const { dataInicio, dataFim, tipo } = req.query;
+    const entradas = fin.listarEntradas({ dataInicio, dataFim, tipo });
+    res.json({ sucesso: true, total: entradas.length, entradas });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+app.get("/financeiro/resumo", (req, res) => {
+  try {
+    const { dias } = req.query;
+    const resumo = fin.calcularResumo(parseInt(dias) || 7);
+    res.json({ sucesso: true, resumo });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+app.get("/financeiro/categorias", (req, res) => {
+  res.json({
+    receita:  fin.CATEGORIAS_RECEITA,
+    despesa: fin.CATEGORIAS_DESPESA,
+  });
+});
+
+app.post("/financeiro", (req, res) => {
+  try {
+    const entrada = fin.adicionarEntrada(req.body);
+    res.json({ sucesso: true, entrada });
+  } catch (error) {
+    res.status(400).json({ erro: error.message });
+  }
+});
+
+app.delete("/financeiro/:id", (req, res) => {
+  try {
+    const resultado = fin.removerEntrada(req.params.id);
+    res.json({ sucesso: true, ...resultado });
+  } catch (error) {
+    res.status(404).json({ erro: error.message });
+  }
 });
 
 // ──────────────────────────────────────────────
