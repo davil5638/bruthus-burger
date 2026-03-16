@@ -7,54 +7,73 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
+const CUPOM_SEXTA = "SEXTAOFF10";
 
-// Tipos de post disponíveis
+// ──────────────────────────────────────────────
+// Bruthus abre: Quinta, Sexta, Sábado e Domingo
+// ──────────────────────────────────────────────
+
 const POST_TYPES = {
-  SMASH: "smash burger artesanal suculento",
-  COMBO: "combo completo com batata e refrigerante",
-  PROMOCAO: "promoção especial do dia",
-  FAMILIA: "combo família para compartilhar",
-  BATATA: "batata frita crocante",
-  SOBREMESA: "sobremesa especial",
+  SMASH:        "smash burger artesanal suculento com carne prensada na chapa",
+  COMBO:        "combo completo com burger, batata crocante e refrigerante gelado",
+  PROMOCAO:     "promoção especial de hoje, imperdível e por tempo limitado",
+  FAMILIA:      "combo família para reunir todo mundo em volta da mesa",
+  BATATA:       "batata frita artesanal crocante por fora e macia por dentro",
+  SOBREMESA:    "sobremesa irresistível para adoçar o fim da refeição",
+  SEXTA_CUPOM:  "smash burger com cupom de 10% OFF exclusivo de hoje",
+  DOMINGO:      "domingo perfeito com burger artesanal para relaxar e aproveitar",
 };
 
-// Gatilhos de conversão para variar nas legendas
+// Contexto de funcionamento — injetado no prompt para a IA não errar o dia
+const CONTEXTO_FUNCIONAMENTO = `
+IMPORTANTE: A ${BUSINESS_NAME} funciona APENAS de Quinta a Domingo.
+- Quinta-feira: promoção "Quinta do Hambúrguer" com preço especial
+- Sexta-feira: cupom de 10% OFF (código: ${CUPOM_SEXTA}) liberado no link de pedido
+- Sábado: sem promoção fixa (exceto eventos especiais do mês)
+- Domingo: dia de reunir família/casal, posts mais aconchegantes
+`.trim();
+
 const GATILHOS = [
   "escassez - poucas unidades disponíveis hoje",
-  "urgência - promoção só hoje",
-  "fome - descrição sensorial detalhada",
+  "urgência - só disponível hoje (qui a dom)",
+  "fome - descrição sensorial: cheiro, textura, sabor",
   "social proof - o mais pedido da semana",
   "novidade - lançamento exclusivo",
-  "exclusividade - edição limitada",
+  "exclusividade - edição de fim de semana",
 ];
 
-/**
- * Gera uma legenda otimizada para conversão no Instagram
- * @param {string} tipo - Tipo de post (SMASH, COMBO, PROMOCAO, etc.)
- * @param {string} gatilho - Gatilho psicológico a usar
- * @returns {Promise<string>} Legenda gerada
- */
+// ──────────────────────────────────────────────
+// GERAR LEGENDA
+// ──────────────────────────────────────────────
+
 async function generateCaption(tipo = "SMASH", gatilho = null) {
   const tipoDescricao = POST_TYPES[tipo] || POST_TYPES.SMASH;
   const gatilhoEscolhido = gatilho || GATILHOS[Math.floor(Math.random() * GATILHOS.length)];
+  const isSexta = tipo === "SEXTA_CUPOM";
 
-  const prompt = `Você é um copywriter especialista em marketing para hamburguerias artesanais brasileiras.
+  const cupomInstrucao = isSexta
+    ? `\nCUPOM DO DIA: "${CUPOM_SEXTA}" — mencione de forma animada que hoje tem 10% OFF com esse cupom no link!`
+    : "";
 
-Crie uma legenda para o Instagram da hamburgueria "${BUSINESS_NAME}" com as seguintes características:
+  const prompt = `Você é copywriter especialista em marketing para hamburguerias artesanais brasileiras.
 
-PRODUTO: ${tipoDescricao}
-GATILHO PSICOLÓGICO: ${gatilhoEscolhido}
+${CONTEXTO_FUNCIONAMENTO}
+
+Crie uma legenda para o Instagram da "${BUSINESS_NAME}":
+
+PRODUTO/TEMA: ${tipoDescricao}
+GATILHO PSICOLÓGICO: ${gatilhoEscolhido}${cupomInstrucao}
 
 REGRAS OBRIGATÓRIAS:
 1. Comece com 1 frase curta e impactante que desperte fome (máx 10 palavras)
-2. Use emojis estrategicamente (🍔🔥😍🤤) - no máximo 8 emojis no total
+2. Use emojis estrategicamente (🍔🔥😍🤤) — no máximo 8 emojis no total
 3. Descreva o produto de forma sensorial (cheiro, textura, sabor)
-4. Inclua o gatilho psicológico de forma natural
-5. CTA FORTE no final apontando para o link de pedido
+4. Aplique o gatilho psicológico de forma natural
+5. CTA FORTE no final apontando APENAS para o link de pedido
 6. Tom: casual, jovem, apetitoso, urgente
 7. Máximo 150 palavras
-8. NÃO mencione WhatsApp - apenas o link direto de pedido
-9. Termine SEMPRE com esta estrutura:
+8. NUNCA mencione WhatsApp — o pedido é 100% pelo site
+9. Termine SEMPRE com:
 
 Peça agora direto no site 👇
 ${ORDER_LINK}
@@ -71,12 +90,11 @@ Retorne APENAS a legenda, sem explicações.`;
 
     const caption = response.choices[0].message.content.trim();
 
-    // Salva a legenda gerada
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const outputPath = path.resolve(__dirname, `../generated/captions/caption_${tipo}_${timestamp}.txt`);
     fs.writeFileSync(outputPath, caption, "utf-8");
 
-    console.log("\n✅ Legenda gerada com sucesso!\n");
+    console.log("\n✅ Legenda gerada!\n");
     console.log("─".repeat(50));
     console.log(caption);
     console.log("─".repeat(50));
@@ -89,13 +107,13 @@ Retorne APENAS a legenda, sem explicações.`;
   }
 }
 
-/**
- * Gera múltiplas legendas de uma vez para estoque
- * @param {number} quantidade - Quantidade de legendas a gerar
- * @returns {Promise<string[]>} Array de legendas geradas
- */
+// ──────────────────────────────────────────────
+// GERAR EM LOTE
+// ──────────────────────────────────────────────
+
 async function generateBatchCaptions(quantidade = 5) {
-  const tipos = Object.keys(POST_TYPES);
+  // Apenas tipos relevantes para Qui–Dom
+  const tipos = ["SMASH", "COMBO", "SEXTA_CUPOM", "FAMILIA", "BATATA", "DOMINGO"];
   const legendas = [];
 
   console.log(`\n🚀 Gerando ${quantidade} legendas em lote...\n`);
@@ -103,16 +121,13 @@ async function generateBatchCaptions(quantidade = 5) {
   for (let i = 0; i < quantidade; i++) {
     const tipo = tipos[i % tipos.length];
     const gatilho = GATILHOS[i % GATILHOS.length];
-
-    console.log(`[${i + 1}/${quantidade}] Gerando legenda tipo: ${tipo}...`);
+    console.log(`[${i + 1}/${quantidade}] Tipo: ${tipo}...`);
     const caption = await generateCaption(tipo, gatilho);
     legendas.push({ tipo, caption });
-
-    // Aguarda 1s entre chamadas para não sobrecarregar a API
     if (i < quantidade - 1) await new Promise((r) => setTimeout(r, 1000));
   }
 
-  console.log(`\n✅ ${quantidade} legendas geradas com sucesso!\n`);
+  console.log(`\n✅ ${quantidade} legendas geradas!\n`);
   return legendas;
 }
 
@@ -128,4 +143,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { generateCaption, generateBatchCaptions, POST_TYPES };
+module.exports = { generateCaption, generateBatchCaptions, POST_TYPES, CUPOM_SEXTA };
