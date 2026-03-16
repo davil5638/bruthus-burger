@@ -83,7 +83,10 @@ export default function FinanceiroPage() {
   const maxGrafico = resumo?.grafico ? Math.max(...resumo.grafico.map(d => Math.max(d.receita, d.despesa)), 1) : 1
 
   // Entradas do período exibido
-  const entradasPeriodo = entradas.slice(0, 50)
+  const entradasPeriodo = periodo === 0 ? entradas : entradas.filter(e => {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (periodo - 1));
+    return new Date(e.data + 'T12:00:00') >= cutoff;
+  })
 
   return (
     <div className="max-w-4xl">
@@ -118,7 +121,7 @@ export default function FinanceiroPage() {
             <p className={`text-xl font-bold ${c.cor}`}>
               {loading ? '…' : (c.custom || fmt(c.valor))}
             </p>
-            <p className="text-[10px] text-[#444] mt-1">últimos {periodo} dias</p>
+            <p className="text-[10px] text-[#444] mt-1">{periodo === 0 ? 'histórico completo' : `últimos ${periodo} dias`}</p>
           </div>
         ))}
       </div>
