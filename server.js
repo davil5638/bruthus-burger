@@ -299,7 +299,8 @@ app.get("/financeiro", (req, res) => {
 app.get("/financeiro/resumo", (req, res) => {
   try {
     const { dias } = req.query;
-    const resumo = fin.calcularResumo(parseInt(dias) || 7);
+    const diasNum = dias !== undefined ? parseInt(dias) : 7;
+    const resumo = fin.calcularResumo(isNaN(diasNum) ? 7 : diasNum);
     res.json({ sucesso: true, resumo });
   } catch (error) {
     res.status(500).json({ erro: error.message });
