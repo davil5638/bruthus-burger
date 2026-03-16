@@ -6,13 +6,14 @@ import ResultBox from '../../components/ResultBox'
 import PageHeader from '../../components/PageHeader'
 import { Toast } from '../../components/Toast'
 
+// Bruthus abre Qui–Dom
 const TIPOS = [
-  { value: 'SMASH',     label: '🍔 Smash Burger',      desc: 'Burger artesanal suculento' },
-  { value: 'COMBO',     label: '🍟 Combo Completo',     desc: 'Burger + batata + bebida'  },
-  { value: 'PROMOCAO',  label: '🎉 Promoção Especial',  desc: 'Oferta com gatilho urgência' },
-  { value: 'FAMILIA',   label: '👨‍👩‍👧‍👦 Combo Família',    desc: 'Para compartilhar'         },
-  { value: 'BATATA',    label: '🍟 Batata Frita',       desc: 'A crocante favorita'        },
-  { value: 'SOBREMESA', label: '🍦 Sobremesa',          desc: 'Doce irresistível'          },
+  { value: 'SMASH',       label: '🍔 Smash Burger',     desc: 'Burger artesanal suculento'       },
+  { value: 'COMBO',       label: '🍟 Combo Completo',   desc: 'Burger + batata + bebida'         },
+  { value: 'SEXTA_CUPOM', label: '🔥 Sexta c/ Cupom',  desc: 'SEXTAOFF10 — 10% OFF no link'     },
+  { value: 'FAMILIA',     label: '👨‍👩‍👧‍👦 Combo Família',  desc: 'Reunião de domingo'               },
+  { value: 'BATATA',      label: '🍟 Batata Frita',     desc: 'Batata crocante (sábado especial)' },
+  { value: 'DOMINGO',     label: '❤️ Domingo',          desc: 'Post aconchegante família/casal'  },
 ]
 
 const GATILHOS = [

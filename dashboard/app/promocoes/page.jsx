@@ -2,17 +2,73 @@
 import { useState } from 'react'
 import { api } from '../../lib/api'
 import Button from '../../components/Button'
-import ResultBox from '../../components/ResultBox'
 import PageHeader from '../../components/PageHeader'
 import { Toast } from '../../components/Toast'
 
-const PROMOCOES = [
-  { id: 'QUINTA_BURGER',   emoji: '🍔', nome: 'Quinta do Hambúrguer', itens: '2 Smash + Batata + 2 Refrigerantes', preco: 'R$47,99', dia: 'Quinta',  cor: 'from-orange-600/20', borda: 'border-orange-500/30' },
-  { id: 'COMBO_CASAL',     emoji: '❤️', nome: 'Combo Casal',          itens: '2 Burgers + 2 Batatas + 2 Bebidas', preco: 'R$59,99', dia: 'Qualquer', cor: 'from-pink-600/20',   borda: 'border-pink-500/30'   },
-  { id: 'SMASH_DIA',       emoji: '🔥', nome: 'Smash do Dia',         itens: 'Smash duplo + Batata média',        preco: 'R$32,99', dia: 'Qualquer', cor: 'from-red-600/20',    borda: 'border-red-500/30'    },
-  { id: 'COMBO_FAMILIA',   emoji: '👨‍👩‍👧‍👦', nome: 'Combo Família',       itens: '4 Burgers + 2 Batatas + 4 Refri',   preco: 'R$99,99', dia: 'Domingo', cor: 'from-blue-600/20',   borda: 'border-blue-500/30'   },
-  { id: 'SEXTA_SMASH',     emoji: '🍟', nome: 'Sexta do Smash',       itens: 'Smash + Batata + Bebida',           preco: 'R$38,99', dia: 'Sexta',   cor: 'from-yellow-600/20', borda: 'border-yellow-500/30' },
-  { id: 'SEGUNDA_ESPECIAL',emoji: '⚡', nome: 'Segunda Especial',     itens: 'Burger clássico + Batata',         preco: 'R$28,99', dia: 'Segunda', cor: 'from-purple-600/20', borda: 'border-purple-500/30' },
+const CUPOM_SEXTA = 'SEXTAOFF10'
+
+const GRUPOS = [
+  {
+    label: '🍔 Quinta-feira — Promoção Fixa',
+    cor: 'border-orange-500/20 bg-orange-500/5',
+    itens: [
+      {
+        id: 'QUINTA_BURGER', emoji: '🍔', nome: 'Quinta do Hambúrguer',
+        itens: '2 Smash + Batata + 2 Refrigerantes', preco: 'R$47,99',
+        tag: 'Toda quinta!', tagCor: 'text-orange-400 bg-orange-500/10',
+      },
+    ],
+  },
+  {
+    label: '🔥 Sexta-feira — Cupom 10% OFF',
+    cor: 'border-red-500/20 bg-red-500/5',
+    itens: [
+      {
+        id: 'SEXTA_CUPOM', emoji: '🔥', nome: 'Sexta com Desconto',
+        itens: `Qualquer combo com 10% OFF — cupom ${CUPOM_SEXTA}`, preco: '10% de desconto',
+        tag: CUPOM_SEXTA, tagCor: 'text-red-400 bg-red-500/10', cupom: true,
+      },
+    ],
+  },
+  {
+    label: '🎉 Sábado — Promoção Rotativa (2× por mês)',
+    cor: 'border-purple-500/20 bg-purple-500/5',
+    sub: '1ª e 3ª semana do mês — alterne entre as opções abaixo',
+    itens: [
+      {
+        id: 'SABADO_BATATA_GRATIS', emoji: '🍟', nome: 'Batata Grátis',
+        itens: 'Qualquer burger + Batata GRÁTIS', preco: 'Batata grátis!',
+        tag: '1ª semana', tagCor: 'text-purple-400 bg-purple-500/10',
+      },
+      {
+        id: 'SABADO_SMASH_PROMO', emoji: '💥', nome: 'Smash Promocional',
+        itens: 'Smash artesanal por preço especial de sábado', preco: 'Preço surpresa!',
+        tag: '2ª semana', tagCor: 'text-purple-400 bg-purple-500/10',
+      },
+      {
+        id: 'SABADO_REFRI_GRATIS', emoji: '🥤', nome: 'Refri Grátis',
+        itens: 'Qualquer burger + Refrigerante GRÁTIS', preco: 'Refri grátis!',
+        tag: '3ª semana', tagCor: 'text-purple-400 bg-purple-500/10',
+      },
+    ],
+  },
+  {
+    label: '❤️ Domingo — Post Aconchegante',
+    cor: 'border-blue-500/20 bg-blue-500/5',
+    sub: 'Sem promoção fixa — posts de família e casal para engajar',
+    itens: [
+      {
+        id: 'DOMINGO_FAMILIA', emoji: '👨‍👩‍👧‍👦', nome: 'Domingo em Família',
+        itens: '4 Burgers + 2 Batatas grandes + 4 Refrigerantes', preco: 'R$99,99',
+        tag: 'Família', tagCor: 'text-blue-400 bg-blue-500/10',
+      },
+      {
+        id: 'DOMINGO_CASAL', emoji: '❤️', nome: 'Combo Casal de Domingo',
+        itens: '2 Burgers + 2 Batatas + 2 Bebidas', preco: 'R$59,99',
+        tag: 'Casal', tagCor: 'text-blue-400 bg-blue-500/10',
+      },
+    ],
+  },
 ]
 
 export default function PromocoesPage() {
@@ -26,11 +82,15 @@ export default function PromocoesPage() {
     try {
       const data = await api.post('/promotion', { tipo: promo.id })
       const r = data.resultado
+      const linhaExtra = r.promocao.cupom
+        ? `\n🏷️ CUPOM: ${r.promocao.cupom} → 10% OFF no pedido`
+        : ''
       const texto = [
         `${r.promocao.emoji} ${r.promocao.nome.toUpperCase()} ${r.promocao.emoji}`,
         ``,
         `📦 ITENS: ${r.promocao.descricao}`,
-        `💰 PREÇO: ${r.promocao.preco}`,
+        `💰 BENEFÍCIO: ${r.promocao.preco}`,
+        linhaExtra,
         ``,
         `━━━━━━ LEGENDA DO POST ━━━━━━`,
         ``,
@@ -39,9 +99,9 @@ export default function PromocoesPage() {
         `━━━━━━ COMENTÁRIO FIXADO ━━━━━━`,
         ``,
         r.comentarioFixado,
-      ].join('\n')
+      ].filter(l => l !== undefined).join('\n')
       setResult(texto)
-      setToast({ message: `Promoção "${r.promocao.nome}" gerada!`, type: 'success' })
+      setToast({ message: `"${r.promocao.nome}" gerada com sucesso!`, type: 'success' })
     } catch (e) {
       setToast({ message: e.message, type: 'error' })
     } finally { setLoadingId(null) }
@@ -51,46 +111,61 @@ export default function PromocoesPage() {
     <div className="max-w-4xl">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
-      <PageHeader emoji="🎉" title="Gerador de Promoções" description="Clique em uma promoção para gerar a legenda + comentário fixado automaticamente" />
+      <PageHeader emoji="🎉" title="Gerador de Promoções" description="Bruthus abre Qui–Dom · Clique em qualquer promoção para gerar legenda + comentário fixado" />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        {PROMOCOES.map(p => (
-          <button key={p.id} onClick={() => gerar(p)} disabled={!!loadingId}
-            className={`text-left rounded-xl border ${p.borda} bg-gradient-to-br ${p.cor} to-transparent p-5
-              hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-wait
-              ${activePromo?.id === p.id && result ? 'ring-2 ring-[#f97316]' : ''}`}>
-
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-2xl">{p.emoji}</span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#1a1a1a] text-[#888]">{p.dia}</span>
+      <div className="space-y-6">
+        {GRUPOS.map(grupo => (
+          <div key={grupo.label} className={`rounded-xl border ${grupo.cor} p-5`}>
+            <div className="mb-4">
+              <p className="font-bold text-white text-sm">{grupo.label}</p>
+              {grupo.sub && <p className="text-xs text-[#666] mt-0.5">{grupo.sub}</p>}
             </div>
+            <div className={`grid gap-3 ${grupo.itens.length > 1 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+              {grupo.itens.map(p => (
+                <button key={p.id} onClick={() => gerar(p)} disabled={!!loadingId}
+                  className={`text-left rounded-xl border border-white/5 bg-[#0f0f0f] p-4 hover:bg-[#1a1a1a] hover:border-[#f97316]/30 transition-all disabled:opacity-50
+                    ${activePromo?.id === p.id && result ? 'ring-2 ring-[#f97316] border-[#f97316]/30' : ''}`}>
 
-            <p className="font-bold text-white text-sm mb-1">{p.nome}</p>
-            <p className="text-[11px] text-[#666] mb-3 leading-snug">{p.itens}</p>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="text-xl">{p.emoji}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.tagCor}`}>{p.tag}</span>
+                  </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-[#f97316] font-bold text-sm">{p.preco}</span>
-              {loadingId === p.id ? (
-                <span className="text-xs text-[#888] flex items-center gap-1">
-                  <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/>
-                    <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8v8H4z"/>
-                  </svg>
-                  Gerando…
-                </span>
-              ) : (
-                <span className="text-xs text-[#f97316] font-semibold">Gerar →</span>
-              )}
+                  <p className="font-bold text-white text-sm mb-1">{p.nome}</p>
+                  <p className="text-[11px] text-[#666] mb-3 leading-snug">{p.itens}</p>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#f97316] font-bold text-xs">{p.preco}</span>
+                    {p.cupom && (
+                      <span className="text-[10px] bg-[#f97316]/10 text-[#f97316] px-2 py-0.5 rounded font-mono font-bold">
+                        {CUPOM_SEXTA}
+                      </span>
+                    )}
+                    {loadingId === p.id ? (
+                      <span className="text-xs text-[#888] flex items-center gap-1">
+                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/>
+                          <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8v8H4z"/>
+                        </svg>
+                        Gerando…
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[#f97316] font-semibold">Gerar →</span>
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
-          </button>
+          </div>
         ))}
       </div>
 
+      {/* Resultado */}
       {result && activePromo && (
-        <div className="rounded-xl border border-[#2a2a2a] bg-[#111] overflow-hidden animate-slide-up">
+        <div className="mt-6 rounded-xl border border-[#2a2a2a] bg-[#111] overflow-hidden animate-slide-up">
           <div className="px-5 py-3 border-b border-[#222] bg-[#161616] flex items-center justify-between">
             <span className="font-semibold text-white">{activePromo.emoji} {activePromo.nome}</span>
-            <button onClick={async () => { await navigator.clipboard.writeText(result) }}
+            <button onClick={() => navigator.clipboard.writeText(result)}
               className="text-xs px-3 py-1 rounded-md bg-[#222] hover:bg-[#f97316] text-[#aaa] hover:text-white transition-all">
               📋 Copiar tudo
             </button>

@@ -1,70 +1,65 @@
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 const cron = require("node-cron");
 const { publicarPost } = require("../scripts/postInstagram");
-const { generatePromotion, getPromocaoDoDia, PROMOCOES } = require("../scripts/generatePromotion");
+const { generatePromotion, isSabadoPromo, getSabadoPromoTipo } = require("../scripts/generatePromotion");
 const { generateCaption } = require("../scripts/generateCaption");
 const { generateRotatingHashtags } = require("../scripts/generateHashtags");
 
 // ──────────────────────────────────────────────
-// CONFIGURAÇÃO DA ESTRATÉGIA SEMANAL
+// Bruthus Burger — abre Quinta a Domingo
+//
+// Qui 18h  → Quinta do Hambúrguer (promo fixa)
+// Sex 18h  → Cupom SEXTAOFF10 (10% OFF no link)
+// Sáb 18h  → Promoção rotativa 2x/mês (sem. 1 e 3)
+// Dom 17h  → Post aconchegante família/casal
+// Qui 09h  → Relatório semanal automático
 // ──────────────────────────────────────────────
-// Para cada dia: tipo de conteúdo, horário, tipo de legenda
-// Substitua imageUrl com URLs públicas das suas fotos
 
 const ESTRATEGIA_SEMANAL = {
-  // Segunda-feira 18h → burger clássico
-  segunda: {
-    cron: "0 18 * * 1",
-    descricao: "Segunda 18h - Burger Clássico",
-    tipoCaptions: "SMASH",
-    tipoPromo: null,
-    tipoHashtag: "produto",
-    imageUrl: process.env.IMG_SEGUNDA || null,
-  },
-
-  // Quarta-feira 18h → batata ou combo
-  quarta: {
-    cron: "0 18 * * 3",
-    descricao: "Quarta 18h - Batata ou Combo",
-    tipoCaptions: "COMBO",
-    tipoPromo: null,
-    tipoHashtag: "produto",
-    imageUrl: process.env.IMG_QUARTA || null,
-  },
-
-  // Quinta-feira 18h → promoção Quinta do Hambúrguer
   quinta: {
     cron: "0 18 * * 4",
-    descricao: "Quinta 18h - Promoção Quinta do Hambúrguer",
+    descricao: "Quinta 18h — Quinta do Hambúrguer 🍔",
     tipoCaptions: "PROMOCAO",
     tipoPromo: "QUINTA_BURGER",
     tipoHashtag: "promo",
     imageUrl: process.env.IMG_QUINTA || null,
+    ativo: true,
   },
 
-  // Sexta-feira 19h → smash burger
   sexta: {
-    cron: "0 19 * * 5",
-    descricao: "Sexta 19h - Smash Burger",
-    tipoCaptions: "SMASH",
-    tipoPromo: null,
-    tipoHashtag: "produto",
+    cron: "0 18 * * 5",
+    descricao: "Sexta 18h — Cupom SEXTAOFF10 🔥",
+    tipoCaptions: "SEXTA_CUPOM",
+    tipoPromo: "SEXTA_CUPOM",
+    tipoHashtag: "promo",
     imageUrl: process.env.IMG_SEXTA || null,
+    ativo: true,
   },
 
-  // Domingo 17h → combo família
+  // Sábado roda todo sábado mas só publica nas semanas 1 e 3 do mês
+  sabado: {
+    cron: "0 18 * * 6",
+    descricao: "Sábado 18h — Promoção Rotativa (2x/mês) 🎉",
+    tipoCaptions: "SMASH",
+    tipoPromo: null, // definido dinamicamente em executarSabado()
+    tipoHashtag: "promo",
+    imageUrl: process.env.IMG_SABADO || null,
+    ativo: true,
+  },
+
   domingo: {
     cron: "0 17 * * 0",
-    descricao: "Domingo 17h - Combo Família",
-    tipoCaptions: "FAMILIA",
-    tipoPromo: "COMBO_FAMILIA",
-    tipoHashtag: "promo",
+    descricao: "Domingo 17h — Post Família/Casal ❤️",
+    tipoCaptions: "DOMINGO",
+    tipoPromo: null,
+    tipoHashtag: "produto",
     imageUrl: process.env.IMG_DOMINGO || null,
+    ativo: true,
   },
 };
 
 // ──────────────────────────────────────────────
-// FUNÇÃO DE PUBLICAÇÃO AGENDADA
+// PUBLICAÇÃO AGENDADA GENÉRICA
 // ──────────────────────────────────────────────
 
 async function executarPostAgendado(config) {
@@ -72,22 +67,20 @@ async function executarPostAgendado(config) {
   console.log(`\n⏰ [${agora}] Executando: ${config.descricao}`);
 
   try {
+    const hashtags = generateRotatingHashtags(config.tipoHashtag);
     let legenda;
-    let hashtags = generateRotatingHashtags(config.tipoHashtag);
 
     if (config.tipoPromo) {
-      // Post de promoção
       const promo = await generatePromotion(config.tipoPromo);
       legenda = promo.legenda + "\n\n" + hashtags;
     } else {
-      // Post de produto normal
       const legendaGerada = await generateCaption(config.tipoCaptions);
       legenda = legendaGerada + "\n\n" + hashtags;
     }
 
     if (!config.imageUrl) {
-      console.warn(`⚠️ imageUrl não configurada para ${config.descricao}. Adicione no .env!`);
-      console.log("📝 Legenda que seria publicada:");
+      console.warn(`⚠️ imageUrl não configurada para ${config.descricao}`);
+      console.log("📝 Legenda gerada (sem publicar):");
       console.log(legenda);
       return;
     }
@@ -95,86 +88,103 @@ async function executarPostAgendado(config) {
     await publicarPost({
       imageUrl: config.imageUrl,
       legendaCustom: legenda,
-      incluirHashtags: false, // já incluídas na legenda acima
+      incluirHashtags: false,
       comentarLink: true,
     });
 
-    console.log(`✅ Post agendado publicado: ${config.descricao}`);
+    console.log(`✅ Publicado: ${config.descricao}`);
   } catch (error) {
-    console.error(`❌ Erro no post agendado [${config.descricao}]:`, error.message);
+    console.error(`❌ Erro [${config.descricao}]:`, error.message);
   }
 }
 
 // ──────────────────────────────────────────────
-// REGISTRAR TODOS OS AGENDAMENTOS
+// SÁBADO — só publica nas semanas 1 e 3 do mês
+// ──────────────────────────────────────────────
+
+async function executarSabado() {
+  if (!isSabadoPromo()) {
+    const semana = Math.ceil(new Date().getDate() / 7);
+    console.log(`\n📅 Sábado semana ${semana} — sem promoção programada. Pulando.`);
+    return;
+  }
+
+  const tipoPromo = getSabadoPromoTipo();
+  const config = {
+    ...ESTRATEGIA_SEMANAL.sabado,
+    tipoPromo,
+    descricao: `Sábado Promoção: ${tipoPromo}`,
+  };
+
+  await executarPostAgendado(config);
+}
+
+// ──────────────────────────────────────────────
+// INICIAR AGENDADOR
 // ──────────────────────────────────────────────
 
 function iniciarAgendador() {
   console.log("\n" + "═".repeat(55));
-  console.log("🍔 BRUTHUS BURGER - AGENDADOR DE POSTS INSTAGRAM");
+  console.log("🍔 BRUTHUS BURGER — AGENDADOR (Qui a Dom)");
   console.log("═".repeat(55));
-  console.log(`📅 Iniciado em: ${new Date().toLocaleString("pt-BR")}`);
-  console.log("\n📋 Agendamentos ativos:\n");
+  console.log(`📅 Iniciado: ${new Date().toLocaleString("pt-BR")}`);
+  console.log("\n📋 Agendamentos:\n");
 
-  Object.entries(ESTRATEGIA_SEMANAL).forEach(([dia, config]) => {
-    const tarefaValida = cron.validate(config.cron);
+  const tz = { timezone: "America/Fortaleza" };
 
-    if (!tarefaValida) {
-      console.error(`❌ Cron inválido para ${dia}: ${config.cron}`);
-      return;
+  // Quinta
+  cron.schedule(ESTRATEGIA_SEMANAL.quinta.cron, () => executarPostAgendado(ESTRATEGIA_SEMANAL.quinta), tz);
+  console.log(`  ✅ ${ESTRATEGIA_SEMANAL.quinta.descricao}`);
+
+  // Sexta
+  cron.schedule(ESTRATEGIA_SEMANAL.sexta.cron, () => executarPostAgendado(ESTRATEGIA_SEMANAL.sexta), tz);
+  console.log(`  ✅ ${ESTRATEGIA_SEMANAL.sexta.descricao}`);
+
+  // Sábado (condicional)
+  cron.schedule(ESTRATEGIA_SEMANAL.sabado.cron, executarSabado, tz);
+  console.log(`  ✅ ${ESTRATEGIA_SEMANAL.sabado.descricao}`);
+
+  // Domingo
+  cron.schedule(ESTRATEGIA_SEMANAL.domingo.cron, () => executarPostAgendado(ESTRATEGIA_SEMANAL.domingo), tz);
+  console.log(`  ✅ ${ESTRATEGIA_SEMANAL.domingo.descricao}`);
+
+  // Relatório toda quinta às 9h
+  cron.schedule("0 9 * * 4", async () => {
+    console.log("\n📊 Gerando relatório semanal...");
+    try {
+      const { relatorioPerformance } = require("../scripts/createAds");
+      await relatorioPerformance(7);
+    } catch (e) {
+      console.error("❌ Erro no relatório:", e.message);
     }
-
-    cron.schedule(
-      config.cron,
-      () => executarPostAgendado(config),
-      {
-        timezone: "America/Fortaleza", // Fuso horário de Fortaleza/CE
-      }
-    );
-
-    console.log(`  ✅ ${config.descricao}`);
-    console.log(`     Cron: ${config.cron}`);
-    console.log(`     Conteúdo: ${config.tipoPromo || config.tipoCaptions}\n`);
-  });
-
-  // Agendamento extra: Relatório semanal toda segunda às 9h
-  cron.schedule(
-    "0 9 * * 1",
-    async () => {
-      console.log("\n📊 Gerando relatório semanal...");
-      try {
-        const { relatorioPerformance } = require("../scripts/createAds");
-        await relatorioPerformance(7);
-      } catch (error) {
-        console.error("❌ Erro no relatório:", error.message);
-      }
-    },
-    { timezone: "America/Fortaleza" }
-  );
-  console.log("  📊 Relatório semanal: Segunda 9h\n");
+  }, tz);
+  console.log("  📊 Relatório: Quinta 9h\n");
 
   console.log("═".repeat(55));
-  console.log("🚀 Agendador rodando! Pressione Ctrl+C para parar.\n");
+  console.log("🚀 Rodando! Pressione Ctrl+C para parar.\n");
 }
 
 // ──────────────────────────────────────────────
-// TESTAR AGENDADOR (postar agora)
+// TESTAR MANUALMENTE
 // ──────────────────────────────────────────────
 
 async function testarAgora(dia = "quinta") {
-  const config = ESTRATEGIA_SEMANAL[dia];
-  if (!config) {
-    console.error(`❌ Dia "${dia}" não encontrado. Opções: ${Object.keys(ESTRATEGIA_SEMANAL).join(", ")}`);
+  if (dia === "sabado") {
+    await executarSabado();
     return;
   }
-  console.log(`\n🧪 TESTANDO agendamento de: ${config.descricao}`);
+  const config = ESTRATEGIA_SEMANAL[dia];
+  if (!config) {
+    console.error(`❌ Dia "${dia}" não encontrado. Opções: quinta, sexta, sabado, domingo`);
+    return;
+  }
+  console.log(`\n🧪 TESTANDO: ${config.descricao}`);
   await executarPostAgendado(config);
 }
 
 // Execução direta
 if (require.main === module) {
   const comando = process.argv[2];
-
   if (comando === "testar") {
     const dia = process.argv[3] || "quinta";
     testarAgora(dia).then(() => process.exit(0)).catch(console.error);
@@ -183,4 +193,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { iniciarAgendador, testarAgora, ESTRATEGIA_SEMANAL };
+module.exports = { iniciarAgendador, testarAgora, executarSabado, ESTRATEGIA_SEMANAL };

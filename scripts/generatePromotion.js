@@ -7,88 +7,124 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
+const CUPOM_SEXTA = "SEXTAOFF10";
 
-// Promoções fixas da hamburgueria
+// ──────────────────────────────────────────────
+// PROMOÇÕES — Bruthus abre Quinta a Domingo
+// ──────────────────────────────────────────────
 const PROMOCOES = {
+  // ── QUINTA ──────────────────────────────────
   QUINTA_BURGER: {
     nome: "Quinta do Hambúrguer",
     descricao: "2 Smash Burgers + Batata + 2 Refrigerantes",
     preco: "R$47,99",
     emoji: "🍔",
     dia: "quinta-feira",
+    destaque: "Preço promocional toda quinta!",
+    cupom: null,
   },
-  COMBO_CASAL: {
-    nome: "Combo Casal",
-    descricao: "2 Burgers + 2 Batatas + 2 Bebidas",
-    preco: "R$59,99",
-    emoji: "❤️",
-    dia: null,
-  },
-  SMASH_DIA: {
-    nome: "Smash do Dia",
-    descricao: "Smash duplo + Batata média",
-    preco: "R$32,99",
+
+  // ── SEXTA ────────────────────────────────────
+  SEXTA_CUPOM: {
+    nome: "Sexta com Desconto",
+    descricao: "Qualquer combo com 10% OFF usando o cupom",
+    preco: "10% de desconto",
     emoji: "🔥",
-    dia: null,
+    dia: "sexta-feira",
+    destaque: `Use o cupom ${CUPOM_SEXTA} no link e pague menos hoje!`,
+    cupom: CUPOM_SEXTA,
   },
-  COMBO_FAMILIA: {
-    nome: "Combo Família",
+
+  // ── SÁBADO (2x por mês — rotativo) ──────────
+  SABADO_BATATA_GRATIS: {
+    nome: "Sábado da Batata Grátis",
+    descricao: "Qualquer burger + Batata GRÁTIS",
+    preco: "Batata grátis no combo!",
+    emoji: "🍟",
+    dia: "sábado",
+    destaque: "Só hoje: peça qualquer burger e ganhe a batata!",
+    cupom: null,
+  },
+  SABADO_SMASH_PROMO: {
+    nome: "Sábado do Smash Promocional",
+    descricao: "Smash artesanal por preço especial",
+    preco: "Preço surpresa no site!",
+    emoji: "💥",
+    dia: "sábado",
+    destaque: "Smash com preço de sábado — corre antes de acabar!",
+    cupom: null,
+  },
+  SABADO_REFRI_GRATIS: {
+    nome: "Sábado do Refri Grátis",
+    descricao: "Qualquer burger + Refrigerante GRÁTIS",
+    preco: "Refri grátis no combo!",
+    emoji: "🥤",
+    dia: "sábado",
+    destaque: "Sábado gelado: refri por conta da casa!",
+    cupom: null,
+  },
+
+  // ── DOMINGO ──────────────────────────────────
+  DOMINGO_FAMILIA: {
+    nome: "Domingo em Família",
     descricao: "4 Burgers + 2 Batatas grandes + 4 Refrigerantes",
     preco: "R$99,99",
     emoji: "👨‍👩‍👧‍👦",
     dia: "domingo",
+    destaque: "Domingo é dia de reunir a família!",
+    cupom: null,
   },
-  SEXTA_SMASH: {
-    nome: "Sexta do Smash",
-    descricao: "Smash artesanal + Batata + Bebida",
-    preco: "R$38,99",
-    emoji: "🍟",
-    dia: "sexta-feira",
-  },
-  SEGUNDA_ESPECIAL: {
-    nome: "Segunda Especial",
-    descricao: "Burger clássico + Batata",
-    preco: "R$28,99",
-    emoji: "⚡",
-    dia: "segunda-feira",
+  DOMINGO_CASAL: {
+    nome: "Combo Casal de Domingo",
+    descricao: "2 Burgers + 2 Batatas + 2 Bebidas",
+    preco: "R$59,99",
+    emoji: "❤️",
+    dia: "domingo",
+    destaque: "Domingo perfeito pra dois!",
+    cupom: null,
   },
 };
 
-/**
- * Gera post de promoção com legenda e artes de texto formatados
- * @param {string} tipoPromocao - Chave da promoção (QUINTA_BURGER, COMBO_CASAL, etc.)
- * @returns {Promise<object>} Post completo da promoção
- */
+// ──────────────────────────────────────────────
+// GERAR PROMOÇÃO
+// ──────────────────────────────────────────────
+
 async function generatePromotion(tipoPromocao = "QUINTA_BURGER") {
   const promo = PROMOCOES[tipoPromocao];
 
   if (!promo) {
-    throw new Error(`Promoção "${tipoPromocao}" não encontrada. Opções: ${Object.keys(PROMOCOES).join(", ")}`);
+    throw new Error(
+      `Promoção "${tipoPromocao}" não encontrada. Opções: ${Object.keys(PROMOCOES).join(", ")}`
+    );
   }
 
-  // Gera o texto artístico da promoção (para usar no Story/Post)
   const textoArtistico = formatarTextoPromocao(promo);
 
-  // Gera a legenda com IA
+  const cupomInfo = promo.cupom
+    ? `\nCUPOM DE DESCONTO: Use "${promo.cupom}" no link para 10% OFF — mencione isso na legenda de forma animada!`
+    : "";
+
   const prompt = `Você é copywriter especialista em hamburguerias brasileiras.
 
 Crie uma legenda URGENTE para o Instagram da "${BUSINESS_NAME}" para a promoção:
 
 PROMOÇÃO: ${promo.nome}
 ITENS: ${promo.descricao}
-PREÇO: ${promo.preco}
-EMOJI DA PROMO: ${promo.emoji}
+PREÇO/BENEFÍCIO: ${promo.preco}
+DESTAQUE: ${promo.destaque}
+DIA DA SEMANA: ${promo.dia}${cupomInfo}
 
 REGRAS:
-1. Primeira linha: título impactante da promoção em MAIÚSCULAS
-2. Liste os itens do combo com emojis
-3. Destaque o preço de forma chamativa
-4. Use gatilho de escassez ou urgência
-5. CTA direto para o link de pedido - SEM mencionar WhatsApp
-6. Máx 120 palavras
+1. Primeira linha: título impactante em MAIÚSCULAS (máx 8 palavras)
+2. Liste os itens com emojis
+3. Destaque o benefício/preço de forma animada
+4. Use gatilho de urgência — só disponível hoje!
+5. Jamais mencione WhatsApp — o pedido é SOMENTE pelo link
+6. Máx 130 palavras
 7. Termine com:
 
-${promo.emoji} Peça agora: ${ORDER_LINK}
+${promo.emoji} Peça agora no site 👇
+${ORDER_LINK}
 
 Retorne APENAS a legenda.`;
 
@@ -96,20 +132,18 @@ Retorne APENAS a legenda.`;
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 250,
-      temperature: 0.8,
+      max_tokens: 280,
+      temperature: 0.85,
     });
 
     const legenda = response.choices[0].message.content.trim();
 
-    const resultado = {
-      promocao: promo,
-      textoArtistico,
-      legenda,
-      comentarioFixado: `${promo.emoji} ${promo.nome} por apenas ${promo.preco}! Peça aqui 👇\n${ORDER_LINK}`,
-    };
+    const comentarioFixado = promo.cupom
+      ? `${promo.emoji} Use o cupom ${promo.cupom} e ganhe 10% OFF! 👇\n${ORDER_LINK}`
+      : `${promo.emoji} ${promo.nome}! Peça aqui 👇\n${ORDER_LINK}`;
 
-    // Salva o resultado
+    const resultado = { promocao: promo, textoArtistico, legenda, comentarioFixado };
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const outputPath = path.resolve(
       __dirname,
@@ -124,8 +158,7 @@ Retorne APENAS a legenda.`;
     console.log("\n📝 LEGENDA:\n");
     console.log(legenda);
     console.log("\n📌 COMENTÁRIO FIXADO:\n");
-    console.log(resultado.comentarioFixado);
-    console.log("\n" + "═".repeat(50));
+    console.log(comentarioFixado);
     console.log(`\n📁 Salvo em: ${outputPath}\n`);
 
     return resultado;
@@ -135,57 +168,97 @@ Retorne APENAS a legenda.`;
   }
 }
 
-/**
- * Formata o texto artístico da promoção para usar em posts/stories
- */
+// ──────────────────────────────────────────────
+// TEXTO ARTÍSTICO
+// ──────────────────────────────────────────────
+
 function formatarTextoPromocao(promo) {
+  const linhaExtra = promo.cupom ? `\n🏷️ CUPOM: ${promo.cupom}\n` : "";
   return `
 ${promo.emoji} ${promo.nome.toUpperCase()} ${promo.emoji}
 
 ${promo.descricao}
 
-POR APENAS
 ${promo.preco}
-
+${linhaExtra}
 Peça agora ${promo.emoji}
 ${ORDER_LINK}
 `.trim();
 }
 
-/**
- * Retorna a promoção do dia baseada no dia da semana
- */
+// ──────────────────────────────────────────────
+// PROMOÇÃO DO DIA (automático)
+// ──────────────────────────────────────────────
+
 function getPromocaoDoDia() {
-  const diasSemana = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+  const diasSemana = [
+    "domingo", "segunda-feira", "terça-feira", "quarta-feira",
+    "quinta-feira", "sexta-feira", "sábado",
+  ];
   const hoje = diasSemana[new Date().getDay()];
 
-  const promosDia = Object.entries(PROMOCOES).filter(([, promo]) => promo.dia === hoje);
+  // Quinta: sempre Quinta do Hambúrguer
+  if (hoje === "quinta-feira") return "QUINTA_BURGER";
 
-  if (promosDia.length > 0) {
-    return promosDia[0][0];
+  // Sexta: cupom
+  if (hoje === "sexta-feira") return "SEXTA_CUPOM";
+
+  // Sábado: rotativo (1ª e 3ª semana do mês)
+  if (hoje === "sábado") return getSabadoPromoTipo();
+
+  // Domingo: alterna casal e família
+  if (hoje === "domingo") {
+    const semana = Math.ceil(new Date().getDate() / 7);
+    return semana % 2 === 0 ? "DOMINGO_CASAL" : "DOMINGO_FAMILIA";
   }
 
-  // Promoção padrão se não houver do dia
-  return "SMASH_DIA";
+  return "QUINTA_BURGER"; // fallback
 }
 
 /**
- * Gera todas as promoções da semana
+ * Retorna qual promoção de sábado usar com base na semana do mês
+ * 1ª semana → batata grátis | 2ª → smash promo | 3ª → refri grátis | 4ª → batata grátis
  */
+function getSabadoPromoTipo() {
+  const semana = Math.ceil(new Date().getDate() / 7);
+  const tipos = ["SABADO_BATATA_GRATIS", "SABADO_SMASH_PROMO", "SABADO_REFRI_GRATIS", "SABADO_BATATA_GRATIS"];
+  return tipos[(semana - 1) % tipos.length];
+}
+
+/**
+ * Verifica se o sábado atual é um dos 2 sábados promocionais do mês (1ª e 3ª semana)
+ */
+function isSabadoPromo() {
+  const semana = Math.ceil(new Date().getDate() / 7);
+  return semana === 1 || semana === 3;
+}
+
+// ──────────────────────────────────────────────
+// GERAR SEMANA COMPLETA (Qui–Dom)
+// ──────────────────────────────────────────────
+
 async function generateWeeklyPromotions() {
-  const promosParaGerar = ["SEGUNDA_ESPECIAL", "QUINTA_BURGER", "SEXTA_SMASH", "COMBO_FAMILIA", "COMBO_CASAL", "SMASH_DIA"];
+  const promosParaGerar = [
+    "QUINTA_BURGER",
+    "SEXTA_CUPOM",
+    "SABADO_BATATA_GRATIS",
+    "SABADO_SMASH_PROMO",
+    "SABADO_REFRI_GRATIS",
+    "DOMINGO_FAMILIA",
+    "DOMINGO_CASAL",
+  ];
   const resultados = [];
 
-  console.log("\n🚀 Gerando promoções da semana...\n");
+  console.log("\n🚀 Gerando promoções da semana (Qui–Dom)...\n");
 
-  for (const tipoPromo of promosParaGerar) {
-    console.log(`Gerando: ${PROMOCOES[tipoPromo].nome}...`);
-    const resultado = await generatePromotion(tipoPromo);
+  for (const tipo of promosParaGerar) {
+    console.log(`Gerando: ${PROMOCOES[tipo].nome}...`);
+    const resultado = await generatePromotion(tipo);
     resultados.push(resultado);
     await new Promise((r) => setTimeout(r, 1000));
   }
 
-  console.log("\n✅ Todas as promoções da semana geradas!\n");
+  console.log("\n✅ Todas as promoções geradas!\n");
   return resultados;
 }
 
@@ -202,4 +275,12 @@ if (require.main === module) {
   }
 }
 
-module.exports = { generatePromotion, generateWeeklyPromotions, getPromocaoDoDia, PROMOCOES };
+module.exports = {
+  generatePromotion,
+  generateWeeklyPromotions,
+  getPromocaoDoDia,
+  getSabadoPromoTipo,
+  isSabadoPromo,
+  PROMOCOES,
+  CUPOM_SEXTA,
+};
