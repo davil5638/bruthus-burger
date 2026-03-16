@@ -1,5 +1,6 @@
-const fs   = require("fs");
-const path = require("path");
+const fs     = require("fs");
+const path   = require("path");
+const { execSync } = require("child_process");
 
 const DATA_FILE = path.resolve(__dirname, "../data/financeiro.json");
 
@@ -32,6 +33,19 @@ function lerDados() {
 
 function salvarDados(dados) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(dados, null, 2));
+  autoCommit();
+}
+
+function autoCommit() {
+  try {
+    const root = path.resolve(__dirname, "..");
+    execSync("git add data/financeiro.json", { cwd: root, stdio: "ignore" });
+    const msg = `chore: atualiza financeiro [${new Date().toLocaleString("pt-BR", { timeZone: "America/Fortaleza" })}]`;
+    execSync(`git commit -m "${msg}"`, { cwd: root, stdio: "ignore" });
+    execSync("git push origin main", { cwd: root, stdio: "ignore" });
+  } catch {
+    // silencia erros de git (ex: "nothing to commit")
+  }
 }
 
 // ──────────────────────────────────────────────
