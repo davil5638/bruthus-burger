@@ -9,6 +9,7 @@ const PERIODOS = [
   { valor: 7,  label: '7 dias'  },
   { valor: 14, label: '14 dias' },
   { valor: 30, label: '30 dias' },
+  { valor: 0,  label: 'Todos'   },
 ]
 
 const CAT_RECEITA = ['Vendas no local', 'Delivery', 'Ifood', 'Outros']
@@ -121,7 +122,7 @@ export default function FinanceiroPage() {
             <p className={`text-xl font-bold ${c.cor}`}>
               {loading ? '…' : (c.custom || fmt(c.valor))}
             </p>
-            <p className="text-[10px] text-[#444] mt-1">{periodo === 0 ? 'histórico completo' : `últimos ${periodo} dias`}</p>
+            <p className="text-[10px] text-[#444] mt-1">{periodo === 0 ? 'desde a abertura' : `últimos ${periodo} dias`}</p>
           </div>
         ))}
       </div>
@@ -191,7 +192,7 @@ export default function FinanceiroPage() {
       {resumo?.grafico && resumo.grafico.length > 0 && (
         <div className="mb-6 rounded-xl border border-[#1e1e1e] bg-[#111] p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-white">📊 Receita vs Gastos por Dia</h3>
+            <h3 className="text-sm font-bold text-white">📊 Receita vs Gastos {periodo === 0 ? 'por Semana' : 'por Dia'}</h3>
             <div className="flex items-center gap-4 text-[11px] text-[#888]">
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-green-500" /> Receita</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-500" /> Gastos</span>
