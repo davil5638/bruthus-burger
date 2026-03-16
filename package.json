@@ -1,0 +1,27 @@
+{
+  "name": "bruthus-marketing",
+  "version": "1.0.0",
+  "description": "Sistema de automação de marketing do Instagram para Bruthus Burger",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "post": "node scripts/postInstagram.js",
+    "caption": "node scripts/generateCaption.js",
+    "promotion": "node scripts/generatePromotion.js",
+    "reels": "node scripts/generateReelsScript.js",
+    "ads": "node scripts/createAds.js",
+    "scheduler": "node scheduler/scheduler.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "form-data": "^4.0.0",
+    "node-cron": "^3.0.3",
+    "openai": "^4.20.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
