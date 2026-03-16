@@ -40,8 +40,8 @@ const SEGMENTACAO_PADRAO = {
   geo_locations: {
     custom_locations: [
       {
-        latitude:  parseFloat(process.env.LAT  || "-3.7172"),
-        longitude: parseFloat(process.env.LNG  || "-38.5434"),
+        latitude:  parseFloat(process.env.LAT  || "-4.353948748936734"),
+        longitude: parseFloat(process.env.LNG  || "-39.30777728465837"),
         radius: 3,
         distance_unit: "kilometer",
       },
