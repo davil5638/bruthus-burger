@@ -1,7 +1,0 @@
-{
-  "/page": "app/page.js",
-  "/promocoes/page": "app/promocoes/page.js",
-  "/agendador/page": "app/agendador/page.js",
-  "/legendas/page": "app/legendas/page.js",
-  "/posts/page": "app/posts/page.js"
-}

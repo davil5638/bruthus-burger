@@ -14,6 +14,8 @@ const quickActions = [
   { href: '/hashtags',  emoji: '#',  label: 'Hashtags',         desc: 'Anti-shadowban rotativas',      color: 'from-green-600/20 to-green-600/5',    border: 'border-green-600/30'  },
   { href: '/anuncios',  emoji: '📣', label: 'Criar Anúncio',    desc: 'Meta Ads R$10/dia',             color: 'from-yellow-600/20 to-yellow-600/5',  border: 'border-yellow-600/30' },
   { href: '/agendador', emoji: '📅', label: 'Agendador',        desc: 'Posts automáticos Qui–Dom',     color: 'from-cyan-600/20 to-cyan-600/5',      border: 'border-cyan-600/30'   },
+  { href: '/stories',   emoji: '📱', label: 'Stories',          desc: 'Conteúdo pronto para o Mlabs',  color: 'from-rose-600/20 to-rose-600/5',      border: 'border-rose-600/30'   },
+  { href: '/financeiro',emoji: '💰', label: 'Financeiro',       desc: 'Faturamento, gastos e lucro',   color: 'from-emerald-600/20 to-emerald-600/5', border: 'border-emerald-600/30'},
 ]
 
 const schedule = [
