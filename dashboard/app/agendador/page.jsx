@@ -1,12 +1,9 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../../lib/api'
 import Button from '../../components/Button'
 import PageHeader from '../../components/PageHeader'
 import { Toast } from '../../components/Toast'
-
-const CLOUD_NAME    = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME    || 'duchjjeaw'
-const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'bruthus_unsigned'
 
 const STORIES = [
   {
@@ -37,44 +34,12 @@ const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const hoje = new Date().getDay()
 const diasAtivos = [0, 4, 5, 6] // Dom, Qui, Sex, Sáb
 
-async function uploadCloudinary(file) {
-  const form = new FormData()
-  form.append('file', file)
-  form.append('upload_preset', UPLOAD_PRESET)
-  form.append('folder', 'bruthus/stories')
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: 'POST', body: form })
-  if (!res.ok) throw new Error('Falha no upload para Cloudinary')
-  return res.json()
-}
 
 function StoryCard({ story, pausado }) {
-  const [uploading, setUploading]   = useState(false)
-  const [testando, setTestando]     = useState(false)
-  const [publicId, setPublicId]     = useState(null)
-  const [previewUrl, setPreviewUrl] = useState(null)
-  const [toast, setToast]           = useState(null)
-  const fileRef = useRef()
-
-  async function handleFile(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      const data = await uploadCloudinary(file)
-      setPublicId(data.public_id)
-
-      const prev = await api.get(`/scheduler/story-preview/${story.id}?publicId=${data.public_id}`)
-      setPreviewUrl(prev.url)
-
-      await api.post('/scheduler/story-config', { tipo: story.id, publicId: data.public_id })
-      setToast({ message: `${story.label} configurado! ✅`, type: 'success' })
-    } catch (err) {
-      setToast({ message: err.message, type: 'error' })
-    } finally { setUploading(false) }
-  }
+  const [testando, setTestando] = useState(false)
+  const [toast, setToast]       = useState(null)
 
   async function handleTestar() {
-    if (!publicId) { setToast({ message: 'Configure a imagem de fundo primeiro.', type: 'error' }); return }
     setTestando(true)
     try {
       await api.post('/scheduler/testar-story', { tipo: story.id })
@@ -93,8 +58,8 @@ function StoryCard({ story, pausado }) {
         <div className="shrink-0 flex flex-col items-center gap-2">
           <div className="text-3xl">{story.emoji}</div>
           <div className="flex items-center gap-1">
-            <span className={`w-1.5 h-1.5 rounded-full ${pausado ? 'bg-[#555]' : publicId ? story.corPulse + ' animate-pulse' : 'bg-[#333]'}`} />
-            <span className="text-[9px] text-[#555]">{pausado ? 'pausado' : publicId ? 'pronto' : 'aguarda'}</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${pausado ? 'bg-[#555]' : story.corPulse + ' animate-pulse'}`} />
+            <span className="text-[9px] text-[#555]">{pausado ? 'pausado' : 'automático'}</span>
           </div>
         </div>
 
@@ -106,29 +71,12 @@ function StoryCard({ story, pausado }) {
             <span className="text-[10px] text-[#555] font-mono">Qui · Sex · Sáb · Dom</span>
           </div>
           <p className="text-xs text-[#777] mb-1">{story.descricao}</p>
-          <p className="text-[11px] text-[#444] italic leading-relaxed">{story.textoOverlay}</p>
-          <p className="text-[10px] text-[#333] mt-1">O texto é adicionado automaticamente pela Cloudinary em cima da sua foto.</p>
-
-          {previewUrl && (
-            <div className="mt-3">
-              <p className="text-[10px] text-[#555] mb-1.5">Preview com texto overlay:</p>
-              <img src={previewUrl} alt="Preview" className="w-20 rounded-lg border border-[#333] object-cover" />
-            </div>
-          )}
-
-          {publicId && (
-            <p className="text-[10px] text-[#444] font-mono mt-2 truncate">id: {publicId}</p>
-          )}
+          <p className="text-[11px] text-[#555] mt-1">📸 Foto sorteada automaticamente da pasta do Cloudinary · ✍️ Texto gerado por IA a cada post</p>
         </div>
 
         {/* Ações */}
-        <div className="flex flex-col gap-2 shrink-0">
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-          <button onClick={() => fileRef.current?.click()} disabled={uploading}
-            className="text-xs bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] text-white px-3 py-2 rounded-lg transition disabled:opacity-50 whitespace-nowrap">
-            {uploading ? '⏳ Enviando...' : '📷 Imagem de fundo'}
-          </button>
-          <Button onClick={handleTestar} loading={testando} variant="secondary" size="sm" disabled={!publicId || pausado}>
+        <div className="shrink-0">
+          <Button onClick={handleTestar} loading={testando} variant="secondary" size="sm" disabled={pausado}>
             ▶️ Testar agora
           </Button>
         </div>
@@ -256,8 +204,8 @@ export default function AgendadorPage() {
       {/* Como funciona */}
       <div className="mb-6 p-4 rounded-xl bg-[#0f0f0f] border border-[#1e1e1e] text-xs text-[#666] space-y-1.5">
         <p className="text-[#888] font-semibold mb-2">Como funciona:</p>
-        <p>1. Você sobe <strong className="text-[#aaa]">1 foto de fundo</strong> para cada story (uma para 16h, outra para 18h30)</p>
-        <p>2. O <strong className="text-[#aaa]">Cloudinary adiciona o texto</strong> automaticamente em cima da foto</p>
+        <p>1. O sistema sorteia <strong className="text-[#aaa]">uma foto aleatória</strong> da pasta "midias bruthus geral" no Cloudinary</p>
+        <p>2. A <strong className="text-[#aaa]">IA gera o texto</strong> automaticamente — diferente a cada post, com cor e estilo variados</p>
         <p>3. O servidor publica nos horários certos — <strong className="text-[#aaa]">você não precisa fazer nada</strong></p>
         <p>4. Para pausar temporariamente, use o botão <strong className="text-[#aaa]">"⏸️ Pausar"</strong> acima</p>
       </div>

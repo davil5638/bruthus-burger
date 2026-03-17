@@ -508,8 +508,8 @@ app.get("/scheduler/story-preview/:tipo", (req, res) => {
 app.post("/scheduler/testar-story", async (req, res) => {
   try {
     const { tipo } = req.body;
-    await testarStory(tipo || "teaser");
-    res.json({ sucesso: true, mensagem: `Story "${tipo}" publicado para teste` });
+    const resultado = await testarStory(tipo || "teaser");
+    res.json({ sucesso: true, mensagem: `Story "${tipo}" publicado para teste`, ...resultado });
   } catch (error) {
     res.status(500).json({ erro: error.message });
   }

@@ -108,23 +108,31 @@ function iniciarAgendador() {
 async function testarStory(tipo = "teaser") {
   console.log(`\n🧪 TESTANDO STORY: ${tipo}`);
 
-  if (tipo === "teaser") {
-    const id = process.env.CLOUDINARY_STORY_TEASER_ID;
-    if (!id) { console.warn("⚠️ CLOUDINARY_STORY_TEASER_ID não configurado."); return; }
-    const url = storyTeaser(id);
-    console.log("🔗 URL gerada:", url);
-    await publicarStory(url);
-    console.log("✅ Story teaser publicado!");
-  } else if (tipo === "abertura") {
-    const id = process.env.CLOUDINARY_STORY_ABERTO_ID;
-    if (!id) { console.warn("⚠️ CLOUDINARY_STORY_ABERTO_ID não configurado."); return; }
-    const url = storyAbertura(id);
-    console.log("🔗 URL gerada:", url);
-    await publicarStory(url);
-    console.log("✅ Story abertura publicado!");
-  } else {
-    console.error(`❌ Tipo "${tipo}" inválido. Use: teaser ou abertura`);
+  if (tipo !== "teaser" && tipo !== "abertura") {
+    throw new Error(`Tipo "${tipo}" inválido. Use: teaser ou abertura`);
   }
+
+  const fallbackId = tipo === "teaser"
+    ? process.env.CLOUDINARY_STORY_TEASER_ID
+    : process.env.CLOUDINARY_STORY_ABERTO_ID;
+
+  const [fotoId, texto] = await Promise.all([
+    sortearFotoStory(fallbackId),
+    gerarTextoStory(tipo, getDiaAtual()),
+  ]);
+
+  if (!fotoId) throw new Error("Nenhuma foto disponível. Configure CLOUDINARY_STORY_TEASER_ID ou adicione fotos na pasta.");
+
+  console.log(`✍️  Texto gerado: "${texto.principal}" | "${texto.secundario}"`);
+
+  const linkOpts = tipo === "abertura" ? { link: ORDER_LINK } : {};
+  const url = buildStoryImageUrl(fotoId, { principal: texto.principal, secundario: texto.secundario, cor: texto.cor, ...linkOpts });
+
+  console.log("🔗 URL gerada:", url);
+  await publicarStory(url, tipo === "abertura" ? ORDER_LINK : null);
+  console.log(`✅ Story ${tipo} publicado!`);
+
+  return { url, texto };
 }
 
 // Execução direta
