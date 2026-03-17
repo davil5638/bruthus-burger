@@ -4,8 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 const client = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
@@ -133,7 +132,7 @@ Retorne APENAS a legenda.`;
 
   try {
     const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 280,
       temperature: 0.85,

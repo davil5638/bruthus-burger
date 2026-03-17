@@ -700,6 +700,13 @@ app.delete("/financeiro/:id", (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// PING — keep-alive para Render free tier
+// ──────────────────────────────────────────────
+app.get("/ping", (req, res) => {
+  res.json({ status: "ok", ts: new Date().toISOString() });
+});
+
+// ──────────────────────────────────────────────
 // INICIALIZAÇÃO
 // ──────────────────────────────────────────────
 
@@ -714,6 +721,21 @@ app.listen(PORT, () => {
 
   // Inicia o agendador automático
   iniciarAgendador();
+
+  // Keep-alive: auto-ping a cada 10 minutos para não dormir no Render free tier
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL;
+  if (SELF_URL) {
+    const axios = require("axios");
+    setInterval(async () => {
+      try {
+        await axios.get(`${SELF_URL}/ping`);
+        console.log(`[keep-alive] ping → ok`);
+      } catch (e) {
+        console.warn(`[keep-alive] falhou: ${e.message}`);
+      }
+    }, 10 * 60 * 1000); // 10 minutos
+    console.log(`🔁 Keep-alive ativo → ${SELF_URL}/ping`);
+  }
 });
 
 module.exports = app;
