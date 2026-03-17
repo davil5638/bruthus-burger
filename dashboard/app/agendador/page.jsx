@@ -150,7 +150,7 @@ export default function AgendadorPage() {
       />
 
       {/* Status */}
-      <div className="mb-6 p-4 rounded-xl bg-[#111] border border-[#1e1e1e] flex items-center justify-between">
+      <div className="mb-6 p-4 rounded-xl bg-[#111] border border-[#1e1e1e] flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
           <div>
@@ -168,7 +168,8 @@ export default function AgendadorPage() {
         <div className="px-5 py-3 border-b border-[#1e1e1e]">
           <p className="text-xs font-semibold text-[#888] uppercase tracking-wider">Agenda Semanal</p>
         </div>
-        <div className="grid grid-cols-7 divide-x divide-[#1e1e1e]">
+        <div className="overflow-x-auto">
+        <div className="grid grid-cols-7 divide-x divide-[#1e1e1e] min-w-[320px]">
           {diasSemana.map((d, i) => {
             const ativo  = diasAtivos.includes(i)
             const isHoje = i === hoje
@@ -187,6 +188,7 @@ export default function AgendadorPage() {
             )
           })}
         </div>
+        </div>{/* overflow-x-auto */}
         <div className="px-5 py-2 border-t border-[#1e1e1e]">
           <p className="text-[10px] text-[#444]">Seg · Ter · Qua: fechado — sem stories</p>
         </div>

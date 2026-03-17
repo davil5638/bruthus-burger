@@ -122,7 +122,7 @@ app.get("/status", (req, res) => {
     status: "✅ Online",
     configuracoes: config,
     conteudo: { fotosNaFila: totalFotos },
-    agendamentos: Object.keys(ESTRATEGIA_SEMANAL).length,
+    agendamentos: 2, // Story teaser (16h) + Story abertura (18h30)
     horario: new Date().toLocaleString("pt-BR", { timeZone: "America/Fortaleza" }),
   });
 });
@@ -425,15 +425,6 @@ app.post("/scheduler/testar", async (req, res) => {
 });
 
 app.get("/scheduler/config", (req, res) => {
-  const config = Object.entries(ESTRATEGIA_SEMANAL).map(([dia, cfg]) => ({
-    dia,
-    descricao: cfg.descricao,
-    cron: cfg.cron,
-    tipoCaptions: cfg.tipoCaptions,
-    tipoPromo: cfg.tipoPromo,
-    imagemConfigurada: !!cfg.imageUrl,
-  }));
-
   const stories = {
     teaser: {
       horario: "16:00",
@@ -453,7 +444,7 @@ app.get("/scheduler/config", (req, res) => {
     },
   };
 
-  res.json({ agendamentos: config, stories });
+  res.json({ agendamentos: [], stories });
 });
 
 // Salva o public_id das imagens de story (vem do upload via Cloudinary no dashboard)

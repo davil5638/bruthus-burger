@@ -249,7 +249,7 @@ export default function AnunciosPage() {
       <PageHeader emoji="📣" title="Tráfego Pago" description="Meta Ads — 3km · 19h–23h · Qui a Dom" />
 
       {/* Saldo + info */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         {/* Adicionar saldo */}
         <a
           href="https://business.facebook.com/billing/payment_methods"
@@ -298,7 +298,7 @@ export default function AnunciosPage() {
       {abaAtiva === 'criar' && (
         <div className="space-y-4">
           {/* Info segmentação */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[['📍','Raio','3km'],['🕖','Horário','19h–23h'],['📅','Dias','Qui-Dom'],['🎯','Objetivo','Cliques']].map(([e,l,v]) => (
               <div key={l} className="p-3 rounded-xl bg-[#111] border border-[#1e1e1e] text-center">
                 <div className="text-lg mb-1">{e}</div>
@@ -402,7 +402,7 @@ export default function AnunciosPage() {
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${resultado ? 'bg-[#f97316] text-black' : 'bg-[#222] text-[#666]'}`}>3</span>
               <span className="text-sm font-bold text-white">Orçamento</span>
             </div>
-            <div className="grid grid-cols-4 gap-2 mb-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
               {ORCAMENTOS.map(o => (
                 <button key={o.valor} onClick={() => setOrcamento(o.valor)}
                   className={`p-3 rounded-xl border text-center transition-all ${orcamento === o.valor ? 'border-[#f97316] bg-[#f97316]/10 text-white' : 'border-[#222] bg-[#1a1a1a] text-[#666] hover:border-[#333] hover:text-white'}`}>
@@ -429,7 +429,7 @@ export default function AnunciosPage() {
                   {resultado.registradoFinanceiro && <p className="text-[11px] text-[#666]">💰 Gasto registrado no financeiro</p>}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mb-3">
                 {[['📣 Campanha', resultado.campanhaId],['🎯 Ad Set', resultado.adSetId],['🎨 Criativo', resultado.creativoId],['📱 Anúncio', resultado.anuncioId]].map(([k,v]) => (
                   <div key={k} className="p-2 rounded-lg bg-[#0f0f0f]">
                     <p className="text-[#555]">{k}</p>
@@ -508,7 +508,7 @@ export default function AnunciosPage() {
                 return (
                   <div key={i} className="p-4 rounded-xl bg-[#111] border border-[#222]">
                     <p className="text-xs font-semibold text-white mb-3 truncate">{camp.campaign_name}</p>
-                    <div className="grid grid-cols-5 gap-2 text-center">
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center">
                       {[['👁️','Impressões',parseInt(camp.impressions||0).toLocaleString('pt-BR')],['🖱️','Cliques',cliques.toLocaleString('pt-BR')],['📈','CTR',`${parseFloat(camp.ctr||0).toFixed(2)}%`],['💰','Gasto',`R$${gasto.toFixed(2)}`],['💵','CPC',`R$${cpc}`]].map(([e,l,v]) => (
                         <div key={l} className="p-2 rounded-lg bg-[#0f0f0f]">
                           <div className="text-base">{e}</div>
