@@ -17,7 +17,26 @@ const fin = require("./scripts/financeiro");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors({ origin: ["http://localhost:3001", "http://127.0.0.1:3001"] }));
+const allowedOrigins = [
+  "http://localhost:3001",
+  "http://127.0.0.1:3001",
+  "http://localhost:3000",
+  ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : []),
+];
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true); // curl / Postman
+      if (
+        allowedOrigins.includes(origin) ||
+        /\.vercel\.app$/.test(origin)
+      )
+        return cb(null, true);
+      cb(new Error(`CORS: origem não permitida — ${origin}`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
