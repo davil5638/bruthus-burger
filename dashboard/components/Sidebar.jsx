@@ -13,6 +13,7 @@ const nav = [
   { href: '/anuncios',   label: 'Anúncios',     icon: '📣' },
   { href: '/agendador',  label: 'Agendador',    icon: '📅' },
   { href: '/stories',    label: 'Stories',      icon: '📱' },
+  { href: '/mensagens',  label: 'Transmissão',  icon: '💬' },
   { href: '/financeiro', label: 'Financeiro',   icon: '💰' },
 ]
 

@@ -537,6 +537,114 @@ app.get("/stories/tipos", (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// MENSAGENS — LISTA DE TRANSMISSÃO WHATSAPP
+// ──────────────────────────────────────────────
+
+const DIAS_CONFIG = {
+  quinta: {
+    nome: "Quinta-feira",
+    emoji: "🎉",
+    contexto: "É quinta-feira, começo do fim de semana gastronômico da Bruthus. Gere empolgação para o primeiro dia da semana deles.",
+    tom: "animado e convidativo",
+  },
+  sexta: {
+    nome: "Sexta-feira",
+    emoji: "🔥",
+    contexto: "É sexta-feira, o dia mais aguardado da semana. Explore o clima de TGIF, fim de semana chegando, merecido relaxo.",
+    tom: "energético e descontraído",
+  },
+  sabado: {
+    nome: "Sábado",
+    emoji: "🍔",
+    contexto: "É sábado, dia de família, amigos, lazer. Explore o clima de fim de semana gostoso, reunião com pessoas queridas.",
+    tom: "caloroso e familiar",
+  },
+  domingo: {
+    nome: "Domingo",
+    emoji: "😍",
+    contexto: "É domingo, último dia da semana que a Bruthus abre. Crie senso de urgência suave — última chance dessa semana.",
+    tom: "aconchegante com urgência leve",
+  },
+};
+
+app.post("/mensagens/gerar", async (req, res) => {
+  try {
+    const Anthropic = require("@anthropic-ai/sdk");
+    const client = new Anthropic.default({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+
+    const { dia = "quinta", quantidade = 3 } = req.body;
+    const cfg = DIAS_CONFIG[dia];
+
+    if (!cfg) {
+      return res.status(400).json({ erro: "dia inválido. Use: quinta, sexta, sabado ou domingo" });
+    }
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(500).json({ erro: "ANTHROPIC_API_KEY não configurada no servidor" });
+    }
+
+    const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
+    const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
+    const qtd = Math.min(Math.max(parseInt(quantidade) || 3, 1), 5);
+
+    const prompt = `Você é o responsável pelo marketing do ${BUSINESS_NAME}, uma hamburgueria artesanal em Fortaleza, CE.
+
+Crie ${qtd} opções de mensagem para a lista de transmissão do WhatsApp para ${cfg.nome}.
+
+Contexto do dia: ${cfg.contexto}
+
+Informações fixas:
+- Abre hoje às 18h30
+- Delivery e Retirada
+- Link para pedido: ${ORDER_LINK}
+- Cidade: Fortaleza, CE
+
+Diretrizes para cada mensagem:
+- Tom: ${cfg.tom}
+- Estilo informal, como se fosse um amigo falando
+- Máximo 5 linhas por mensagem
+- Usar emojis com moderação (não exagerar)
+- Incluir o horário de abertura (18h30)
+- Incluir o link de pedido na última linha
+- NÃO usar asteriscos para negrito nem outros markdowns
+- Variar bastante entre as ${qtd} opções (diferentes aberturas, ângulos, estilos)
+- Uma das opções pode ter formato mais curto e direto
+
+Retorne APENAS um JSON válido, sem explicações:
+{
+  "mensagens": [
+    { "texto": "mensagem aqui" },
+    { "texto": "mensagem aqui" }
+  ]
+}`;
+
+    const response = await client.messages.create({
+      model: "claude-3-5-haiku-20241022",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const content = response.content[0].text.trim();
+    const match = content.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("Resposta inválida da IA");
+
+    const data = JSON.parse(match[0]);
+
+    res.json({
+      sucesso: true,
+      dia: cfg.nome,
+      emoji: cfg.emoji,
+      mensagens: data.mensagens || [],
+    });
+  } catch (error) {
+    console.error("Erro ao gerar mensagens:", error.message);
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 // FINANCEIRO
 // ──────────────────────────────────────────────
 
