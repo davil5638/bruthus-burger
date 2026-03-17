@@ -29,6 +29,12 @@ export default function StoriesPage() {
   const [copied, setCopied] = useState(false)
   const [toast, setToast]   = useState(null)
 
+  // Preview automático (Cloudinary foto real)
+  const [previewTipo, setPreviewTipo] = useState('teaser')
+  const [previewDia, setPreviewDia]   = useState('quinta')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [preview, setPreview] = useState(null)
+
   const tipoAtivo = TIPOS.find(t => t.id === tipo)
 
   async function gerar() {
@@ -40,6 +46,17 @@ export default function StoriesPage() {
     } catch (e) {
       setToast({ message: e.message, type: 'error' })
     } finally { setLoading(false) }
+  }
+
+  async function gerarPreview() {
+    setPreviewLoading(true); setPreview(null)
+    try {
+      const data = await api.post('/stories/preview-automatico', { tipo: previewTipo, dia: previewDia })
+      setPreview(data)
+      setToast({ message: 'Preview gerado com foto real do Cloudinary!', type: 'success' })
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally { setPreviewLoading(false) }
   }
 
   function textoParaCopiar(c) {
@@ -75,6 +92,123 @@ export default function StoriesPage() {
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       <PageHeader emoji="📱" title="Gerador de Stories" description="Conteúdo pronto para copiar e colar no Mlabs — sem WhatsApp, 100% link de pedido" />
+
+      {/* ─── SEÇÃO: PREVIEW DO STORY AUTOMÁTICO ─── */}
+      <div className="mb-8 rounded-xl border border-[#f97316]/30 bg-[#f97316]/5 overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#f97316]/20 flex items-center gap-3">
+          <span className="text-2xl">🧪</span>
+          <div>
+            <p className="font-bold text-white text-sm">Testar Story Automático</p>
+            <p className="text-xs text-[#888] mt-0.5">Veja como vai ficar com foto real do Cloudinary + texto gerado por IA</p>
+          </div>
+        </div>
+
+        <div className="p-5">
+          {/* Controles do preview */}
+          <div className="flex gap-3 mb-4 flex-wrap">
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-[10px] font-semibold text-[#888] uppercase tracking-wider mb-2">Tipo</label>
+              <div className="flex gap-2">
+                {['teaser', 'abertura'].map(t => (
+                  <button key={t} onClick={() => setPreviewTipo(t)}
+                    className={`flex-1 py-2 rounded-lg border text-xs font-semibold capitalize transition-all ${
+                      previewTipo === t
+                        ? 'border-[#f97316] bg-[#f97316]/20 text-[#f97316]'
+                        : 'border-[#222] bg-[#111] text-[#666] hover:border-[#333] hover:text-white'
+                    }`}>
+                    {t === 'teaser' ? '⏰ Teaser (16h)' : '🚪 Abertura (18h30)'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-[10px] font-semibold text-[#888] uppercase tracking-wider mb-2">Dia</label>
+              <div className="flex gap-1">
+                {DIAS.map(d => (
+                  <button key={d} onClick={() => setPreviewDia(d)}
+                    className={`flex-1 py-2 rounded-lg border text-[10px] font-semibold capitalize transition-all ${
+                      previewDia === d
+                        ? 'border-[#f97316] bg-[#f97316]/20 text-[#f97316]'
+                        : 'border-[#222] bg-[#111] text-[#666] hover:border-[#333] hover:text-white'
+                    }`}>
+                    {d.charAt(0).toUpperCase() + d.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <button onClick={gerarPreview} disabled={previewLoading}
+            className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
+              bg-[#f97316] hover:bg-[#ea6d0a] text-white disabled:opacity-50 disabled:cursor-not-allowed">
+            {previewLoading
+              ? <><span className="animate-spin">⟳</span> Gerando preview...</>
+              : <>🧪 Gerar Preview com Foto Real</>}
+          </button>
+
+          {/* Resultado do preview */}
+          {preview && (
+            <div className="mt-5 animate-slide-up">
+              <div className="flex gap-4 flex-wrap">
+                {/* Imagem real do Cloudinary */}
+                <div className="shrink-0">
+                  <p className="text-[10px] text-[#555] uppercase tracking-wider mb-2">📸 Story Real (foto do Cloudinary)</p>
+                  <div className="relative w-32 h-56 rounded-xl overflow-hidden border border-[#333] bg-[#111]">
+                    <img
+                      src={preview.url}
+                      alt="Preview do story"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none'
+                        e.target.nextSibling.style.display = 'flex'
+                      }}
+                    />
+                    <div className="absolute inset-0 hidden items-center justify-center flex-col gap-2 text-center p-3">
+                      <span className="text-2xl">🖼️</span>
+                      <p className="text-[9px] text-[#666]">Imagem carregando ou foto não configurada</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detalhes do texto gerado */}
+                <div className="flex-1 min-w-[180px] space-y-2">
+                  <div className="p-3 rounded-lg bg-[#1a1a1a]">
+                    <p className="text-[9px] text-[#555] uppercase tracking-wider mb-1">Texto Principal</p>
+                    <p className="text-white font-bold text-sm">{preview.texto?.principal}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-[#1a1a1a]">
+                    <p className="text-[9px] text-[#555] uppercase tracking-wider mb-1">Texto Secundário</p>
+                    <p className="text-[#aaa] text-xs">{preview.texto?.secundario}</p>
+                  </div>
+                  {preview.temLink && (
+                    <div className="p-2 rounded-lg bg-[#f97316]/10 border border-[#f97316]/20">
+                      <p className="text-[9px] text-[#f97316] uppercase tracking-wider mb-0.5">Link clicável</p>
+                      <p className="text-[#f97316] text-[10px] font-bold">🔗 Sticker de pedido ativado</p>
+                    </div>
+                  )}
+                  <div className="p-2 rounded-lg bg-[#1a1a1a]">
+                    <p className="text-[9px] text-[#555] uppercase tracking-wider mb-0.5">Foto usada</p>
+                    <p className="text-[#666] text-[9px] truncate">{preview.fotoId}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* URL completa */}
+              <div className="mt-3 p-3 rounded-lg bg-[#111] border border-[#222]">
+                <p className="text-[9px] text-[#555] uppercase tracking-wider mb-1">URL gerada (Cloudinary)</p>
+                <a href={preview.url} target="_blank" rel="noopener noreferrer"
+                  className="text-[10px] text-[#f97316] hover:text-[#fb923c] break-all leading-relaxed underline underline-offset-2">
+                  {preview.url}
+                </a>
+              </div>
+
+              <p className="text-[10px] text-[#555] mt-3 text-center">
+                ✨ Cada clique gera um story diferente — foto aleatória + texto com IA + cor variada
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Info Mlabs */}
       <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">

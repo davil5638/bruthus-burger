@@ -14,7 +14,7 @@ const {
   listarCampanhas, listarAdSets, pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
 } = require("./scripts/createAds");
 const { iniciarAgendador, testarStory } = require("./scheduler/scheduler");
-const { storyTeaser, storyAbertura } = require("./scripts/storyImage");
+const { storyTeaser, storyAbertura, buildStoryImageUrl, gerarTextoStory, sortearFotoStory } = require("./scripts/storyImage");
 const { generateStory, STORY_TYPES } = require("./scripts/generateStories");
 const fin = require("./scripts/financeiro");
 
@@ -534,6 +534,54 @@ app.get("/stories/tipos", (req, res) => {
     id: key, label: val.label, desc: val.desc, cor: val.cor,
   }));
   res.json({ tipos });
+});
+
+// Gera preview do story automático (foto aleatória + texto IA + URL Cloudinary)
+app.post("/stories/preview-automatico", async (req, res) => {
+  try {
+    const { tipo = "teaser", dia } = req.body;
+
+    const diasValidos = ["quinta", "sexta", "sabado", "domingo"];
+    const dias = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+    const diaAtual = dias[new Date(new Date().toLocaleString("en-US", { timeZone: "America/Fortaleza" })).getDay()];
+    const diaUsar = diasValidos.includes(dia) ? dia : (diasValidos.includes(diaAtual) ? diaAtual : "quinta");
+
+    const fallbackId = tipo === "teaser"
+      ? process.env.CLOUDINARY_STORY_TEASER_ID
+      : process.env.CLOUDINARY_STORY_ABERTO_ID;
+
+    const [fotoId, texto] = await Promise.all([
+      sortearFotoStory(fallbackId),
+      gerarTextoStory(tipo, diaUsar),
+    ]);
+
+    if (!fotoId) {
+      return res.status(400).json({ erro: "Nenhuma foto disponível. Configure CLOUDINARY_STORY_FOLDER ou CLOUDINARY_STORY_TEASER_ID." });
+    }
+
+    const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
+    const link = tipo === "abertura" ? ORDER_LINK : null;
+
+    const url = buildStoryImageUrl(fotoId, {
+      principal: texto.principal,
+      secundario: texto.secundario,
+      cor: texto.cor,
+      link,
+    });
+
+    res.json({
+      sucesso: true,
+      tipo,
+      dia: diaUsar,
+      fotoId,
+      texto,
+      url,
+      temLink: !!link,
+    });
+  } catch (error) {
+    console.error("Erro no preview-automatico:", error.message);
+    res.status(500).json({ erro: error.message });
+  }
 });
 
 // ──────────────────────────────────────────────
