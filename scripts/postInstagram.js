@@ -325,7 +325,7 @@ if (require.main === module) {
  *
  * @param {string} imageUrl — URL pública da imagem do story
  */
-async function publicarStory(imageUrl) {
+async function publicarStory(imageUrl, linkPedido = null) {
   validarConfig();
 
   if (!imageUrl) {
@@ -337,15 +337,21 @@ async function publicarStory(imageUrl) {
     console.log("📱 BRUTHUS BURGER - PUBLICANDO STORY");
     console.log("═".repeat(50));
     console.log(`🖼️  URL: ${imageUrl.substring(0, 80)}...`);
+    if (linkPedido) console.log(`🔗 Link sticker: ${linkPedido}`);
 
     // Passo 1: Criar container de story
-    const containerRes = await axios.post(`${GRAPH_API}/${IG_USER_ID}/media`, null, {
-      params: {
-        image_url: imageUrl,
-        media_type: "STORIES",
-        access_token: ACCESS_TOKEN,
-      },
-    });
+    const params = {
+      image_url: imageUrl,
+      media_type: "STORIES",
+      access_token: ACCESS_TOKEN,
+    };
+
+    // Link sticker clicável — aparece no story para o cliente clicar
+    if (linkPedido) {
+      params.story_links = JSON.stringify([{ url: linkPedido }]);
+    }
+
+    const containerRes = await axios.post(`${GRAPH_API}/${IG_USER_ID}/media`, null, { params });
 
     const containerId = containerRes.data.id;
     if (!containerId) {

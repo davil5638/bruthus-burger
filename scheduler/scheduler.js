@@ -1,7 +1,9 @@
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 const cron = require("node-cron");
 const { publicarStory } = require("../scripts/postInstagram");
-const { storyTeaser, storyAbertura } = require("../scripts/storyImage");
+const { storyTeaser, storyAbertura, sortearFotoStory } = require("../scripts/storyImage");
+
+const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 
 // ──────────────────────────────────────────────
 // Bruthus Burger — Stories automáticos
@@ -27,13 +29,11 @@ function iniciarAgendador() {
     const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Fortaleza" });
     console.log(`\n📱 [${agora}] Publicando story teaser das 16h...`);
 
-    const teaserId = process.env.CLOUDINARY_STORY_TEASER_ID;
-    if (!teaserId) {
-      console.warn("⚠️ CLOUDINARY_STORY_TEASER_ID não configurado. Configure no dashboard.");
-      return;
-    }
+    const fallbackId = process.env.CLOUDINARY_STORY_TEASER_ID;
     try {
-      await publicarStory(storyTeaser(teaserId));
+      const fotoId = await sortearFotoStory(fallbackId);
+      if (!fotoId) { console.warn("⚠️ Nenhuma foto disponível para o story das 16h."); return; }
+      await publicarStory(storyTeaser(fotoId), null);
       console.log("✅ Story teaser (16h) publicado!");
     } catch (e) {
       console.error("❌ Erro no story das 16h:", e.message);
@@ -46,13 +46,12 @@ function iniciarAgendador() {
     const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Fortaleza" });
     console.log(`\n📱 [${agora}] Publicando story de abertura das 18h30...`);
 
-    const aberturaId = process.env.CLOUDINARY_STORY_ABERTO_ID;
-    if (!aberturaId) {
-      console.warn("⚠️ CLOUDINARY_STORY_ABERTO_ID não configurado. Configure no dashboard.");
-      return;
-    }
+    const fallbackAberturaId = process.env.CLOUDINARY_STORY_ABERTO_ID;
     try {
-      await publicarStory(storyAbertura(aberturaId));
+      const fotoId = await sortearFotoStory(fallbackAberturaId);
+      if (!fotoId) { console.warn("⚠️ Nenhuma foto disponível para o story das 18h30."); return; }
+      // Story das 18h30 tem link clicável para pedido
+      await publicarStory(storyAbertura(fotoId), ORDER_LINK);
       console.log("✅ Story abertura (18h30) publicado!");
     } catch (e) {
       console.error("❌ Erro no story das 18h30:", e.message);
