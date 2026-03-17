@@ -1,5 +1,5 @@
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
-const Anthropic = require("@anthropic-ai/sdk");
+const OpenAI = require("openai");
 const fs = require("fs");
 const path = require("path");
 
@@ -80,14 +80,15 @@ ${ORDER_LINK}
 Retorne APENAS a legenda, sem explicações.`;
 
   try {
-    const client = new Anthropic.default({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await client.messages.create({
-      model: "claude-3-5-haiku-20241022",
-      max_tokens: 400,
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
+      max_tokens: 400,
+      temperature: 0.85,
     });
 
-    const caption = response.content[0].text.trim();
+    const caption = response.choices[0].message.content.trim();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const outputPath = path.resolve(__dirname, `../generated/captions/caption_${tipo}_${timestamp}.txt`);

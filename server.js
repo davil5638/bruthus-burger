@@ -571,10 +571,8 @@ const DIAS_CONFIG = {
 
 app.post("/mensagens/gerar", async (req, res) => {
   try {
-    const Anthropic = require("@anthropic-ai/sdk");
-    const client = new Anthropic.default({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    const OpenAI = require("openai");
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const { dia = "quinta", quantidade = 3, comPromocao = true } = req.body;
     const cfg = DIAS_CONFIG[dia];
@@ -583,8 +581,8 @@ app.post("/mensagens/gerar", async (req, res) => {
       return res.status(400).json({ erro: "dia inválido. Use: quinta, sexta, sabado ou domingo" });
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return res.status(500).json({ erro: "ANTHROPIC_API_KEY não configurada no servidor" });
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ erro: "OPENAI_API_KEY não configurada no servidor" });
     }
 
     const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
@@ -626,13 +624,14 @@ Retorne APENAS um JSON válido, sem explicações:
   ]
 }`;
 
-    const response = await client.messages.create({
-      model: "claude-3-5-haiku-20241022",
-      max_tokens: 1024,
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
+      max_tokens: 1024,
+      temperature: 0.85,
     });
 
-    const content = response.content[0].text.trim();
+    const content = response.choices[0].message.content.trim();
     const match = content.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("Resposta inválida da IA");
 
