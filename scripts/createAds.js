@@ -4,7 +4,11 @@ const fs = require("fs");
 const path = require("path");
 
 const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
-const AD_ACCOUNT_ID = process.env.AD_ACCOUNT_ID;
+// Meta exige formato act_XXXXXXXXX
+const _RAW_AD_ACCOUNT_ID = process.env.AD_ACCOUNT_ID || "";
+const AD_ACCOUNT_ID = _RAW_AD_ACCOUNT_ID.startsWith("act_")
+  ? _RAW_AD_ACCOUNT_ID
+  : _RAW_AD_ACCOUNT_ID ? `act_${_RAW_AD_ACCOUNT_ID}` : "";
 const IG_USER_ID = process.env.IG_USER_ID;
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
@@ -346,13 +350,18 @@ async function relatorioPerformance(diasAtras = 7) {
 /** Lista todas as campanhas da conta com status e gasto */
 async function listarCampanhas() {
   validarConfig();
-  const response = await axios.get(`${GRAPH_API}/${AD_ACCOUNT_ID}/campaigns`, {
-    params: {
-      fields: "id,name,status,created_time,daily_budget,spend_cap",
-      access_token: ACCESS_TOKEN,
-    },
-  });
-  return response.data.data || [];
+  try {
+    const response = await axios.get(`${GRAPH_API}/${AD_ACCOUNT_ID}/campaigns`, {
+      params: {
+        fields: "id,name,status,created_time,daily_budget,spend_cap",
+        access_token: ACCESS_TOKEN,
+      },
+    });
+    return response.data.data || [];
+  } catch (e) {
+    const msg = e.response?.data?.error?.message || e.message;
+    throw new Error(`Meta API: ${msg}`);
+  }
 }
 
 /** Lista ad sets de uma campanha (para pegar o orçamento diário) */
