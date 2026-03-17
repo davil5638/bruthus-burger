@@ -339,6 +339,77 @@ async function relatorioPerformance(diasAtras = 7) {
   return dados;
 }
 
+// ──────────────────────────────────────────────
+// GESTÃO DE CAMPANHAS
+// ──────────────────────────────────────────────
+
+/** Lista todas as campanhas da conta com status e gasto */
+async function listarCampanhas() {
+  validarConfig();
+  const response = await axios.get(`${GRAPH_API}/${AD_ACCOUNT_ID}/campaigns`, {
+    params: {
+      fields: "id,name,status,created_time,daily_budget,spend_cap",
+      access_token: ACCESS_TOKEN,
+    },
+  });
+  return response.data.data || [];
+}
+
+/** Lista ad sets de uma campanha (para pegar o orçamento diário) */
+async function listarAdSets(campanhaId) {
+  validarConfig();
+  const response = await axios.get(`${GRAPH_API}/${campanhaId}/adsets`, {
+    params: {
+      fields: "id,name,daily_budget,status",
+      access_token: ACCESS_TOKEN,
+    },
+  });
+  return response.data.data || [];
+}
+
+/** Pausa uma campanha */
+async function pausarCampanha(campanhaId) {
+  validarConfig();
+  const response = await axios.post(`${GRAPH_API}/${campanhaId}`, null, {
+    params: { status: "PAUSED", access_token: ACCESS_TOKEN },
+  });
+  console.log(`⏸️  Campanha ${campanhaId} pausada`);
+  return response.data;
+}
+
+/** Ativa uma campanha pausada */
+async function ativarCampanha(campanhaId) {
+  validarConfig();
+  const response = await axios.post(`${GRAPH_API}/${campanhaId}`, null, {
+    params: { status: "ACTIVE", access_token: ACCESS_TOKEN },
+  });
+  console.log(`▶️  Campanha ${campanhaId} ativada`);
+  return response.data;
+}
+
+/** Exclui uma campanha (irreversível) */
+async function excluirCampanha(campanhaId) {
+  validarConfig();
+  const response = await axios.delete(`${GRAPH_API}/${campanhaId}`, {
+    params: { access_token: ACCESS_TOKEN },
+  });
+  console.log(`🗑️  Campanha ${campanhaId} excluída`);
+  return response.data;
+}
+
+/** Atualiza o orçamento diário de um ad set */
+async function atualizarOrcamento(adSetId, novoOrcamentoCentavos) {
+  validarConfig();
+  const response = await axios.post(`${GRAPH_API}/${adSetId}`, null, {
+    params: {
+      daily_budget: novoOrcamentoCentavos,
+      access_token: ACCESS_TOKEN,
+    },
+  });
+  console.log(`💰 Orçamento do Ad Set ${adSetId} atualizado: R$${(novoOrcamentoCentavos / 100).toFixed(2)}/dia`);
+  return response.data;
+}
+
 // Execução direta
 if (require.main === module) {
   const comando = process.argv[2];
@@ -351,4 +422,7 @@ if (require.main === module) {
   }
 }
 
-module.exports = { criarCampanhaCompleta, relatorioPerformance, criarCampanha, criarAdSet };
+module.exports = {
+  criarCampanhaCompleta, relatorioPerformance, criarCampanha, criarAdSet,
+  listarCampanhas, listarAdSets, pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
+};

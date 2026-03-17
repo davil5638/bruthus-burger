@@ -9,8 +9,11 @@ const { generateCaption, generateBatchCaptions } = require("./scripts/generateCa
 const { generatePromotion, generateWeeklyPromotions, getPromocaoDoDia, PROMOCOES } = require("./scripts/generatePromotion");
 const { generateReelsScript } = require("./scripts/generateReelsScript");
 const { generateHashtags } = require("./scripts/generateHashtags");
-const { criarCampanhaCompleta, relatorioPerformance } = require("./scripts/createAds");
-const { iniciarAgendador, testarAgora, testarStory, ESTRATEGIA_SEMANAL } = require("./scheduler/scheduler");
+const {
+  criarCampanhaCompleta, relatorioPerformance,
+  listarCampanhas, listarAdSets, pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
+} = require("./scripts/createAds");
+const { iniciarAgendador, testarStory } = require("./scheduler/scheduler");
 const { storyTeaser, storyAbertura } = require("./scripts/storyImage");
 const { generateStory, STORY_TYPES } = require("./scripts/generateStories");
 const fin = require("./scripts/financeiro");
@@ -339,6 +342,69 @@ app.get("/ads/relatorio", async (req, res) => {
     const { dias } = req.query;
     const dados = await relatorioPerformance(parseInt(dias) || 7);
     res.json({ sucesso: true, dados });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Lista campanhas com status atual
+app.get("/ads/campanhas", async (req, res) => {
+  try {
+    const campanhas = await listarCampanhas();
+    // Para cada campanha, busca os ad sets (para pegar orçamento diário)
+    const campanhasComAdSets = await Promise.all(
+      campanhas.map(async (c) => {
+        try {
+          const adSets = await listarAdSets(c.id);
+          return { ...c, adSets };
+        } catch {
+          return { ...c, adSets: [] };
+        }
+      })
+    );
+    res.json({ sucesso: true, campanhas: campanhasComAdSets });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Pausar campanha
+app.post("/ads/:id/pausar", async (req, res) => {
+  try {
+    await pausarCampanha(req.params.id);
+    res.json({ sucesso: true, mensagem: "Campanha pausada" });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Ativar campanha
+app.post("/ads/:id/ativar", async (req, res) => {
+  try {
+    await ativarCampanha(req.params.id);
+    res.json({ sucesso: true, mensagem: "Campanha ativada" });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Excluir campanha
+app.delete("/ads/:id", async (req, res) => {
+  try {
+    await excluirCampanha(req.params.id);
+    res.json({ sucesso: true, mensagem: "Campanha excluída" });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Atualizar orçamento de um ad set
+app.patch("/ads/adset/:id/orcamento", async (req, res) => {
+  try {
+    const { orcamentoDiario } = req.body;
+    if (!orcamentoDiario) return res.status(400).json({ erro: "orcamentoDiario é obrigatório (em centavos)" });
+    await atualizarOrcamento(req.params.id, orcamentoDiario);
+    res.json({ sucesso: true, mensagem: `Orçamento atualizado: R$${(orcamentoDiario / 100).toFixed(2)}/dia` });
   } catch (error) {
     res.status(500).json({ erro: error.message });
   }
