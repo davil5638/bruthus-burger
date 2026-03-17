@@ -4,13 +4,14 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 
-const { publicarPost, listarPostsPublicados } = require("./scripts/postInstagram");
+const { publicarPost, publicarStory, listarPostsPublicados } = require("./scripts/postInstagram");
 const { generateCaption, generateBatchCaptions } = require("./scripts/generateCaption");
 const { generatePromotion, generateWeeklyPromotions, getPromocaoDoDia, PROMOCOES } = require("./scripts/generatePromotion");
 const { generateReelsScript } = require("./scripts/generateReelsScript");
 const { generateHashtags } = require("./scripts/generateHashtags");
 const { criarCampanhaCompleta, relatorioPerformance } = require("./scripts/createAds");
-const { iniciarAgendador, testarAgora, ESTRATEGIA_SEMANAL } = require("./scheduler/scheduler");
+const { iniciarAgendador, testarAgora, testarStory, ESTRATEGIA_SEMANAL } = require("./scheduler/scheduler");
+const { storyTeaser, storyAbertura } = require("./scripts/storyImage");
 const { generateStory, STORY_TYPES } = require("./scripts/generateStories");
 const fin = require("./scripts/financeiro");
 
@@ -277,7 +278,94 @@ app.get("/scheduler/config", (req, res) => {
     imagemConfigurada: !!cfg.imageUrl,
   }));
 
-  res.json({ agendamentos: config });
+  const stories = {
+    teaser: {
+      horario: "16:00",
+      dias: "Qui, Sex, Sáb, Dom",
+      cron: "0 16 * * 4,5,6,0",
+      descricao: "Avisa que hoje tem Bruthus às 18h30",
+      imagemConfigurada: !!process.env.CLOUDINARY_STORY_TEASER_ID,
+      publicId: process.env.CLOUDINARY_STORY_TEASER_ID || null,
+    },
+    abertura: {
+      horario: "18:30",
+      dias: "Qui, Sex, Sáb, Dom",
+      cron: "30 18 * * 4,5,6,0",
+      descricao: "Avisa que já estão entregando + link do pedido",
+      imagemConfigurada: !!process.env.CLOUDINARY_STORY_ABERTO_ID,
+      publicId: process.env.CLOUDINARY_STORY_ABERTO_ID || null,
+    },
+  };
+
+  res.json({ agendamentos: config, stories });
+});
+
+// Salva o public_id das imagens de story (vem do upload via Cloudinary no dashboard)
+const schedulerConfigPath = path.resolve(__dirname, "data/scheduler-config.json");
+
+function lerSchedulerConfig() {
+  if (!fs.existsSync(schedulerConfigPath)) return {};
+  try { return JSON.parse(fs.readFileSync(schedulerConfigPath, "utf-8")); }
+  catch { return {}; }
+}
+
+app.post("/scheduler/story-config", (req, res) => {
+  try {
+    const { tipo, publicId } = req.body;
+
+    if (!tipo || !publicId) {
+      return res.status(400).json({ erro: "tipo e publicId são obrigatórios" });
+    }
+    if (!["teaser", "abertura"].includes(tipo)) {
+      return res.status(400).json({ erro: "tipo deve ser 'teaser' ou 'abertura'" });
+    }
+
+    const config = lerSchedulerConfig();
+    config[tipo] = publicId;
+    fs.writeFileSync(schedulerConfigPath, JSON.stringify(config, null, 2));
+
+    // Atualiza process.env em tempo de execução (sem precisar reiniciar)
+    const envKey = tipo === "teaser" ? "CLOUDINARY_STORY_TEASER_ID" : "CLOUDINARY_STORY_ABERTO_ID";
+    process.env[envKey] = publicId;
+
+    res.json({
+      sucesso: true,
+      mensagem: `Imagem de story ${tipo} configurada com sucesso`,
+      publicId,
+    });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Preview da URL de story que será usada
+app.get("/scheduler/story-preview/:tipo", (req, res) => {
+  try {
+    const { tipo } = req.params;
+    const { publicId } = req.query;
+
+    if (!publicId) return res.status(400).json({ erro: "publicId é obrigatório" });
+
+    let url;
+    if (tipo === "teaser") url = storyTeaser(publicId);
+    else if (tipo === "abertura") url = storyAbertura(publicId);
+    else return res.status(400).json({ erro: "tipo inválido. Use: teaser ou abertura" });
+
+    res.json({ sucesso: true, url });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Testar story manualmente (publica agora)
+app.post("/scheduler/testar-story", async (req, res) => {
+  try {
+    const { tipo } = req.body;
+    await testarStory(tipo || "teaser");
+    res.json({ sucesso: true, mensagem: `Story "${tipo}" publicado para teste` });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
 });
 
 // ──────────────────────────────────────────────

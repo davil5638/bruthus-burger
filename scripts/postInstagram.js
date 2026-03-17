@@ -314,4 +314,78 @@ if (require.main === module) {
   }
 }
 
-module.exports = { publicarPost, listarPostsPublicados, selecionarImagem };
+// ──────────────────────────────────────────────
+// PUBLICAR STORY
+// ──────────────────────────────────────────────
+
+/**
+ * Publica uma imagem como Story no Instagram.
+ * A imagem deve ser 1080x1920 (9:16) — ideal via Cloudinary.
+ * Stories não têm legenda — o texto já vem baked na imagem.
+ *
+ * @param {string} imageUrl — URL pública da imagem do story
+ */
+async function publicarStory(imageUrl) {
+  validarConfig();
+
+  if (!imageUrl) {
+    throw new Error("❌ imageUrl é obrigatório para publicar story.");
+  }
+
+  try {
+    console.log("\n" + "═".repeat(50));
+    console.log("📱 BRUTHUS BURGER - PUBLICANDO STORY");
+    console.log("═".repeat(50));
+    console.log(`🖼️  URL: ${imageUrl.substring(0, 80)}...`);
+
+    // Passo 1: Criar container de story
+    const containerRes = await axios.post(`${GRAPH_API}/${IG_USER_ID}/media`, null, {
+      params: {
+        image_url: imageUrl,
+        media_type: "STORIES",
+        access_token: ACCESS_TOKEN,
+      },
+    });
+
+    const containerId = containerRes.data.id;
+    if (!containerId) {
+      throw new Error("❌ Falha ao criar container de story: " + JSON.stringify(containerRes.data));
+    }
+    console.log(`✅ Container de story criado: ${containerId}`);
+
+    // Passo 2: Aguarda processamento
+    await verificarStatusContainer(containerId);
+
+    // Passo 3: Publicar
+    const publishRes = await axios.post(`${GRAPH_API}/${IG_USER_ID}/media_publish`, null, {
+      params: {
+        creation_id: containerId,
+        access_token: ACCESS_TOKEN,
+      },
+    });
+
+    const storyId = publishRes.data.id;
+    if (!storyId) {
+      throw new Error("❌ Falha ao publicar story: " + JSON.stringify(publishRes.data));
+    }
+
+    const resultado = {
+      storyId,
+      imageUrl,
+      publicadoEm: new Date().toISOString(),
+    };
+
+    console.log("\n" + "═".repeat(50));
+    console.log("✅ STORY PUBLICADO COM SUCESSO!");
+    console.log(`🆔 Story ID: ${storyId}`);
+    console.log(`🕐 Publicado em: ${resultado.publicadoEm}`);
+    console.log("═".repeat(50) + "\n");
+
+    return resultado;
+  } catch (error) {
+    console.error("\n❌ ERRO AO PUBLICAR STORY:", error.message);
+    throw error;
+  }
+}
+
+module.exports = { publicarPost, publicarStory, listarPostsPublicados, selecionarImagem };
