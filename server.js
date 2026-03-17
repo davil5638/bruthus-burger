@@ -544,14 +544,16 @@ const DIAS_CONFIG = {
   quinta: {
     nome: "Quinta-feira",
     emoji: "🎉",
-    contexto: "É quinta-feira, começo do fim de semana gastronômico da Bruthus. Gere empolgação para o primeiro dia da semana deles.",
-    tom: "animado e convidativo",
+    contexto: "É quinta-feira, o famoso Dia do Hambúrguer. A Bruthus tem um combo especial de quinta chamado 'Combo Quinta do Hambúrguer'. Destaque essa promoção especial do dia, crie empolgação em torno da data comemorativa.",
+    tom: "animado e convidativo, celebrando o Dia do Hambúrguer",
+    promocao: "Combo Quinta do Hambúrguer — oferta especial só nesta quinta",
   },
   sexta: {
     nome: "Sexta-feira",
     emoji: "🔥",
-    contexto: "É sexta-feira, o dia mais aguardado da semana. Explore o clima de TGIF, fim de semana chegando, merecido relaxo.",
-    tom: "energético e descontraído",
+    contexto: "É sexta-feira. A Bruthus tem um cupom exclusivo de 10% de desconto para sexta chamado SEXTAOFF10. Destaque o cupom de desconto, explore o clima de TGIF e fim de semana chegando.",
+    tom: "energético e descontraído, focado no desconto exclusivo",
+    promocao: "Cupom SEXTAOFF10 — 10% OFF em todo o cardápio nesta sexta",
   },
   sabado: {
     nome: "Sábado",
@@ -589,12 +591,16 @@ app.post("/mensagens/gerar", async (req, res) => {
     const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
     const qtd = Math.min(Math.max(parseInt(quantidade) || 3, 1), 5);
 
+    const promocaoInfo = cfg.promocao
+      ? `\nPROMOÇÃO DO DIA (OBRIGATÓRIO mencionar em todas as mensagens):\n- ${cfg.promocao}\n`
+      : "";
+
     const prompt = `Você é o responsável pelo marketing do ${BUSINESS_NAME}, uma hamburgueria artesanal em Fortaleza, CE.
 
 Crie ${qtd} opções de mensagem para a lista de transmissão do WhatsApp para ${cfg.nome}.
 
 Contexto do dia: ${cfg.contexto}
-
+${promocaoInfo}
 Informações fixas:
 - Abre hoje às 18h30
 - Delivery e Retirada

@@ -10,41 +10,41 @@ const DIAS = [
     id: 'quinta',
     label: 'Quinta',
     emoji: '🎉',
-    horario: '16h00',
+    promocao: 'Combo Quinta do Hambúrguer',
     cor: 'border-purple-500/30 bg-purple-500/5',
     corAtiva: 'border-purple-500 bg-purple-500/15',
     corBadge: 'text-purple-400',
-    corBtn: 'bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20',
+    corPromo: 'bg-purple-500/10 text-purple-300 border-purple-500/20',
   },
   {
     id: 'sexta',
     label: 'Sexta',
     emoji: '🔥',
-    horario: '16h00',
+    promocao: 'Cupom SEXTAOFF10 — 10% OFF',
     cor: 'border-orange-500/30 bg-orange-500/5',
     corAtiva: 'border-orange-500 bg-orange-500/15',
     corBadge: 'text-orange-400',
-    corBtn: 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20',
+    corPromo: 'bg-orange-500/10 text-orange-300 border-orange-500/20',
   },
   {
     id: 'sabado',
     label: 'Sábado',
     emoji: '🍔',
-    horario: '16h00',
+    promocao: null,
     cor: 'border-yellow-500/30 bg-yellow-500/5',
     corAtiva: 'border-yellow-500 bg-yellow-500/15',
     corBadge: 'text-yellow-400',
-    corBtn: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20',
+    corPromo: 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20',
   },
   {
     id: 'domingo',
     label: 'Domingo',
     emoji: '😍',
-    horario: '16h00',
+    promocao: null,
     cor: 'border-green-500/30 bg-green-500/5',
     corAtiva: 'border-green-500 bg-green-500/15',
     corBadge: 'text-green-400',
-    corBtn: 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20',
+    corPromo: 'bg-green-500/10 text-green-300 border-green-500/20',
   },
 ]
 
@@ -173,13 +173,31 @@ export default function MensagensPage() {
               }`}
             >
               <div className="text-xl mb-1">{d.emoji}</div>
-              <div className={`text-xs font-bold ${diaAtivo === d.id ? d.corBadge : 'text-[#666]'}`}>
+              <div className={`text-xs font-bold mb-1 ${diaAtivo === d.id ? d.corBadge : 'text-[#666]'}`}>
                 {d.label}
               </div>
+              {d.promocao ? (
+                <div className={`text-[9px] px-1.5 py-0.5 rounded-full border ${d.corPromo} leading-tight`}>
+                  🏷️ promo
+                </div>
+              ) : (
+                <div className="text-[9px] text-[#333]">normal</div>
+              )}
             </button>
           ))}
         </div>
       </div>
+
+      {/* Badge de promoção ativa */}
+      {diaConfig?.promocao && (
+        <div className={`mb-4 px-4 py-2.5 rounded-xl border ${diaConfig.corPromo} flex items-center gap-2`}>
+          <span className="text-base">🏷️</span>
+          <div>
+            <p className="text-xs font-bold">Promoção do dia incluída automaticamente</p>
+            <p className="text-[11px] opacity-80">{diaConfig.promocao}</p>
+          </div>
+        </div>
+      )}
 
       {/* Quantidade + botão gerar */}
       <div className="flex flex-wrap items-center gap-3 mb-6 p-4 rounded-xl bg-[#111] border border-[#1e1e1e]">
