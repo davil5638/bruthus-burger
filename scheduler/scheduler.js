@@ -1,7 +1,7 @@
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 const cron = require("node-cron");
 const { publicarStory } = require("../scripts/postInstagram");
-const { storyTeaser, storyAbertura, sortearFotoStory } = require("../scripts/storyImage");
+const { buildStoryImageUrl, gerarTextoStory, sortearFotoStory } = require("../scripts/storyImage");
 
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 
@@ -9,11 +9,16 @@ const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/p
 // Bruthus Burger — Stories automáticos
 //
 // Qui a Dom:
-//   16h00 → Story teaser "Hoje tem Bruthus! Das 18h30..."
-//   18h30 → Story abertura "Estamos abertos! [link]"
+//   16h00 → Story teaser com texto gerado por IA (variado)
+//   18h30 → Story abertura com texto gerado por IA + link clicável
 //
 // Quinta 9h → Relatório semanal de anúncios
 // ──────────────────────────────────────────────
+
+function getDiaAtual() {
+  const dias = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+  return dias[new Date(new Date().toLocaleString("en-US", { timeZone: "America/Fortaleza" })).getDay()];
+}
 
 function iniciarAgendador() {
   console.log("\n" + "═".repeat(55));
@@ -31,9 +36,14 @@ function iniciarAgendador() {
 
     const fallbackId = process.env.CLOUDINARY_STORY_TEASER_ID;
     try {
-      const fotoId = await sortearFotoStory(fallbackId);
+      const [fotoId, texto] = await Promise.all([
+        sortearFotoStory(fallbackId),
+        gerarTextoStory("teaser", getDiaAtual()),
+      ]);
       if (!fotoId) { console.warn("⚠️ Nenhuma foto disponível para o story das 16h."); return; }
-      await publicarStory(storyTeaser(fotoId), null);
+      console.log(`✍️  Texto gerado: "${texto.principal}" | "${texto.secundario}"`);
+      const url = buildStoryImageUrl(fotoId, { principal: texto.principal, secundario: texto.secundario, cor: texto.cor });
+      await publicarStory(url, null);
       console.log("✅ Story teaser (16h) publicado!");
     } catch (e) {
       console.error("❌ Erro no story das 16h:", e.message);
@@ -48,10 +58,15 @@ function iniciarAgendador() {
 
     const fallbackAberturaId = process.env.CLOUDINARY_STORY_ABERTO_ID;
     try {
-      const fotoId = await sortearFotoStory(fallbackAberturaId);
+      const [fotoId, texto] = await Promise.all([
+        sortearFotoStory(fallbackAberturaId),
+        gerarTextoStory("abertura", getDiaAtual()),
+      ]);
       if (!fotoId) { console.warn("⚠️ Nenhuma foto disponível para o story das 18h30."); return; }
+      console.log(`✍️  Texto gerado: "${texto.principal}" | "${texto.secundario}"`);
+      const url = buildStoryImageUrl(fotoId, { principal: texto.principal, secundario: texto.secundario, cor: texto.cor, link: ORDER_LINK });
       // Story das 18h30 tem link clicável para pedido
-      await publicarStory(storyAbertura(fotoId), ORDER_LINK);
+      await publicarStory(url, ORDER_LINK);
       console.log("✅ Story abertura (18h30) publicado!");
     } catch (e) {
       console.error("❌ Erro no story das 18h30:", e.message);

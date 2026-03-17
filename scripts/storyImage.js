@@ -65,6 +65,89 @@ async function sortearFotoStory(fallbackId) {
   return fotos[Math.floor(Math.random() * fotos.length)];
 }
 
+// Paleta de cores para variar o texto principal a cada story
+const CORES_TEXTO = ["white", "rgb:f97316", "rgb:fbbf24", "rgb:fb923c", "rgb:fdba74"];
+
+/**
+ * Gera texto criativo e variado para o story usando OpenAI.
+ * Cada chamada retorna textos diferentes — estilos, tons e abordagens distintas.
+ *
+ * @param {"teaser"|"abertura"} tipo
+ * @param {"quinta"|"sexta"|"sabado"|"domingo"} dia
+ */
+async function gerarTextoStory(tipo, dia) {
+  const OpenAI = require("openai");
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  const DIAS_INFO = {
+    quinta:  { label: "quinta-feira", promo: "Quinta do Hambúrguer — promoção especial de hoje" },
+    sexta:   { label: "sexta-feira",  promo: "10% OFF com cupom SEXTAOFF10 no site" },
+    sabado:  { label: "sábado",       promo: "" },
+    domingo: { label: "domingo",      promo: "" },
+  };
+  const cfg = DIAS_INFO[dia] || DIAS_INFO.quinta;
+  const promoTexto = cfg.promo ? `\nPromoção do dia: ${cfg.promo}` : "";
+
+  const instrucaoTipo = tipo === "teaser"
+    ? "Avise que hoje tem Bruthus Burger e que abrimos às 18h30. Gere curiosidade, fome, expectativa."
+    : "Avise que JÁ ESTAMOS ABERTOS e entregando agora. Tom urgente e animado para o cliente pedir logo.";
+
+  const estilosDisponiveis = [
+    "pergunta provocativa curta",
+    "exclamação animada e energética",
+    "tom quente e acolhedor",
+    "humor leve e descontraído",
+    "urgência e escassez",
+    "descrição sensorial que dá fome",
+    "direto e objetivo sem frescura",
+  ];
+  const estiloEscolhido = estilosDisponiveis[Math.floor(Math.random() * estilosDisponiveis.length)];
+
+  const prompt = `Você cria conteúdo para Instagram Stories de hamburguerias brasileiras. Inspire-se em hamburguerias conhecidas como Madero, Bullguer, Black Skull, Sal Grosso — textos variados, modernos e criativos.
+
+Hamburguria: Bruthus Burger (Fortaleza, CE)
+Dia: ${cfg.label}${promoTexto}
+
+Objetivo: ${instrucaoTipo}
+Estilo desta vez: ${estiloEscolhido}
+
+REGRAS:
+- texto_principal: MÁXIMO 5 palavras — impactante, em maiúsculas, que chame atenção
+- texto_secundario: MÁXIMO 12 palavras — complementa o principal com info prática
+- Varie bastante: não use sempre "HOJE TEM" ou "ESTAMOS ABERTOS" — seja criativo
+- NÃO mencione WhatsApp, só o site
+- NÃO use hashtags
+
+Retorne APENAS JSON:
+{"texto_principal": "...", "texto_secundario": "..."}`;
+
+  try {
+    const res = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 120,
+      temperature: 1.0,
+    });
+    const content = res.choices[0].message.content.trim();
+    const match = content.match(/\{[\s\S]*\}/);
+    if (match) {
+      const data = JSON.parse(match[0]);
+      // Cor aleatória da paleta para o texto principal
+      const cor = CORES_TEXTO[Math.floor(Math.random() * CORES_TEXTO.length)];
+      return { principal: data.texto_principal, secundario: data.texto_secundario, cor };
+    }
+  } catch (e) {
+    console.error("❌ Erro ao gerar texto do story:", e.message);
+  }
+
+  // Fallback caso a IA falhe
+  const fallbacks = {
+    teaser:   { principal: "HOJE TEM BRUTHUS!", secundario: "Das 18h30 — Delivery e Retirada" },
+    abertura: { principal: "ESTAMOS ABERTOS!", secundario: "Já entregando agora — peça no site" },
+  };
+  return { ...fallbacks[tipo], cor: "white" };
+}
+
 /**
  * Encode texto para usar em URL do Cloudinary.
  * O Cloudinary usa underscore no lugar de espaço
@@ -92,10 +175,9 @@ function encodeTexto(text) {
  *   link         {string} — URL de pedido, embaixo em laranja
  */
 function buildStoryImageUrl(publicId, opts = {}) {
-  const { principal, secundario, link } = opts;
+  const { principal, secundario, link, cor = "white" } = opts;
 
   const base = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload`;
-
   const layers = [];
 
   // Redimensiona para formato story 9:16 — foto visível no topo
@@ -104,14 +186,14 @@ function buildStoryImageUrl(publicId, opts = {}) {
   // Faixa escura na PARTE INFERIOR — foto do burger fica limpa em cima
   layers.push("l_fetch:aHR0cHM6Ly9yZXMuY2xvdWRpbmFyeS5jb20vc2FtcGxlcy9ibGFja3BuZy5wbmc/dj0x,w_1080,h_620,g_south,o_80,fl_layer_apply");
 
-  // Texto principal — grande, na faixa inferior
+  // Texto principal — grande, cor variável
   if (principal) {
     layers.push(
-      `l_text:Impact_88_bold_center:${encodeTexto(principal)},co_white,g_south,y_400,w_960,fl_layer_apply`
+      `l_text:Impact_88_bold_center:${encodeTexto(principal)},co_${cor},g_south,y_400,w_960,fl_layer_apply`
     );
   }
 
-  // Texto secundário — menor, abaixo do principal
+  // Texto secundário — branco sempre (legibilidade)
   if (secundario) {
     layers.push(
       `l_text:Arial_52_center:${encodeTexto(secundario)},co_white,g_south,y_260,w_920,fl_layer_apply`
@@ -163,4 +245,4 @@ if (require.main === module) {
   console.log(storyAbertura(publicId));
 }
 
-module.exports = { buildStoryImageUrl, storyTeaser, storyAbertura };
+module.exports = { buildStoryImageUrl, storyTeaser, storyAbertura, gerarTextoStory, sortearFotoStory };
