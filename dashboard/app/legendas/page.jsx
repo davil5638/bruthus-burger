@@ -8,7 +8,8 @@ import { Toast } from '../../components/Toast'
 
 // Bruthus abre Qui–Dom
 const TIPOS = [
-  { value: 'SMASH',       label: '🍔 Smash Burger',     desc: 'Burger artesanal suculento'       },
+  { value: 'SMASH',       label: '🍔 Smash Burger',     desc: 'Burger artesanal 80g prensado'    },
+  { value: 'NORMAL',      label: '🍔 Normal 150g',      desc: 'Hamburguer artesanal 150g'        },
   { value: 'COMBO',       label: '🍟 Combo Completo',   desc: 'Burger + batata + bebida'         },
   { value: 'SEXTA_CUPOM', label: '🔥 Sexta c/ Cupom',  desc: 'SEXTAOFF10 — 10% OFF no link'     },
   { value: 'FAMILIA',     label: '👨‍👩‍👧‍👦 Combo Família',  desc: 'Reunião de domingo'               },

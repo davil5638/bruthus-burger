@@ -1,12 +1,7 @@
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
-const OpenAI = require("openai");
+const Anthropic = require("@anthropic-ai/sdk");
 const fs = require("fs");
 const path = require("path");
-
-const client = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
-});
 
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
@@ -17,7 +12,8 @@ const CUPOM_SEXTA = "SEXTAOFF10";
 // ──────────────────────────────────────────────
 
 const POST_TYPES = {
-  SMASH:        "smash burger artesanal suculento com carne prensada na chapa",
+  SMASH:        "smash burger artesanal 80g suculento com carne prensada na chapa",
+  NORMAL:       "hamburguer artesanal 150g com blend especial de carne, suculento e caprichado",
   COMBO:        "combo completo com burger, batata crocante e refrigerante gelado",
   PROMOCAO:     "promoção especial de hoje, imperdível e por tempo limitado",
   FAMILIA:      "combo família para reunir todo mundo em volta da mesa",
@@ -84,14 +80,14 @@ ${ORDER_LINK}
 Retorne APENAS a legenda, sem explicações.`;
 
   try {
-    const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+    const client = new Anthropic.default({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const response = await client.messages.create({
+      model: "claude-3-5-haiku-20241022",
+      max_tokens: 400,
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 300,
-      temperature: 0.85,
     });
 
-    const caption = response.choices[0].message.content.trim();
+    const caption = response.content[0].text.trim();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const outputPath = path.resolve(__dirname, `../generated/captions/caption_${tipo}_${timestamp}.txt`);
