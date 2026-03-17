@@ -18,6 +18,26 @@ const fin = require("./scripts/financeiro");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ──────────────────────────────────────────────
+// CRIAR PASTAS NECESSÁRIAS (Render não persiste filesystem)
+// Garante que as pastas existam antes de qualquer script tentar escrever
+// ──────────────────────────────────────────────
+const PASTAS = [
+  "generated/captions",
+  "generated/hashtags",
+  "generated/promotions",
+  "content/fotos",
+  "content/fotos_usadas",
+  "data",
+];
+PASTAS.forEach(p => {
+  const fullPath = path.resolve(__dirname, p);
+  if (!fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true });
+    console.log(`📁 Pasta criada: ${p}`);
+  }
+});
+
 const allowedOrigins = [
   "http://localhost:3001",
   "http://127.0.0.1:3001",
@@ -223,20 +243,90 @@ app.get("/posts", async (req, res) => {
 // META ADS
 // ──────────────────────────────────────────────
 
+// Gera título e corpo do anúncio com IA
+app.post("/ads/gerar-texto", async (req, res) => {
+  try {
+    const OpenAI = require("openai");
+    const client = new OpenAI({
+      apiKey: process.env.GROQ_API_KEY,
+      baseURL: "https://api.groq.com/openai/v1",
+    });
+
+    const { tipo = "SMASH" } = req.body;
+    const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
+    const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
+
+    const tiposDesc = {
+      SMASH:    "Smash Burger artesanal prensado na chapa",
+      COMBO:    "Combo completo (burger + batata + refri)",
+      FAMILIA:  "Combo família para o final de semana",
+      QUINTA:   "Promoção especial da Quinta do Hambúrguer",
+      SEXTA:    "Cupom SEXTAOFF10 — 10% OFF sexta-feira",
+    };
+
+    const prompt = `Crie um anúncio de Meta Ads para uma hamburgueria artesanal brasileira chamada "${BUSINESS_NAME}".
+
+Produto/Tema: ${tiposDesc[tipo] || tipo}
+Link de destino: ${ORDER_LINK}
+
+Retorne um JSON com:
+{
+  "titulo": "título do anúncio — máx 40 caracteres, impactante, com emoji",
+  "corpo": "texto do anúncio — máx 125 caracteres, apetitoso e urgente, termina com CTA"
+}
+
+Sem explicações. Só o JSON.`;
+
+    const response = await client.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 200,
+      temperature: 0.85,
+    });
+
+    const content = response.choices[0].message.content.trim();
+    const match = content.match(/\{[\s\S]*\}/);
+    const data = match ? JSON.parse(match[0]) : { titulo: "", corpo: content };
+
+    res.json({ sucesso: true, ...data });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
 app.post("/ads", async (req, res) => {
   try {
-    const { imageUrl, titulo, corpo, orcamentoDiario } = req.body;
+    const { imageUrl, titulo, corpo, orcamentoDiario, registrarFinanceiro } = req.body;
 
     if (!imageUrl) {
       return res.status(400).json({ erro: "imageUrl é obrigatório" });
     }
 
+    const orcamento = orcamentoDiario || 1000;
+
     const resultado = await criarCampanhaCompleta({
       imageUrl,
       titulo,
       corpo,
-      orcamentoDiario: orcamentoDiario || 1000,
+      orcamentoDiario: orcamento,
     });
+
+    // Registra o gasto no sistema financeiro automaticamente
+    if (registrarFinanceiro !== false) {
+      try {
+        const valorDiario = orcamento / 100; // converte centavos para reais
+        fin.adicionarEntrada({
+          tipo: "despesa",
+          valor: valorDiario,
+          categoria: "Marketing/Anúncios",
+          descricao: `Meta Ads — campanha criada (R$${valorDiario.toFixed(2)}/dia) ID: ${resultado.campanhaId}`,
+        });
+        resultado.registradoFinanceiro = true;
+      } catch (finErr) {
+        console.warn("⚠️ Não registrou no financeiro:", finErr.message);
+        resultado.registradoFinanceiro = false;
+      }
+    }
 
     res.json({ sucesso: true, resultado });
   } catch (error) {
