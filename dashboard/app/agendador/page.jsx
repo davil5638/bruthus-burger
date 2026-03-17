@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { api } from '../../lib/api'
 import Button from '../../components/Button'
 import PageHeader from '../../components/PageHeader'
@@ -47,7 +47,7 @@ async function uploadCloudinary(file) {
   return res.json()
 }
 
-function StoryCard({ story }) {
+function StoryCard({ story, pausado }) {
   const [uploading, setUploading]   = useState(false)
   const [testando, setTestando]     = useState(false)
   const [publicId, setPublicId]     = useState(null)
@@ -63,11 +63,9 @@ function StoryCard({ story }) {
       const data = await uploadCloudinary(file)
       setPublicId(data.public_id)
 
-      // Pede preview ao backend com texto overlay gerado pelo Cloudinary
       const prev = await api.get(`/scheduler/story-preview/${story.id}?publicId=${data.public_id}`)
       setPreviewUrl(prev.url)
 
-      // Salva no servidor
       await api.post('/scheduler/story-config', { tipo: story.id, publicId: data.public_id })
       setToast({ message: `${story.label} configurado! ✅`, type: 'success' })
     } catch (err) {
@@ -87,7 +85,7 @@ function StoryCard({ story }) {
   }
 
   return (
-    <div className={`rounded-xl border ${story.cor} p-5`}>
+    <div className={`rounded-xl border ${pausado ? 'opacity-50 grayscale' : ''} ${story.cor} p-5 transition-all`}>
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       <div className="flex items-start gap-4">
@@ -95,8 +93,8 @@ function StoryCard({ story }) {
         <div className="shrink-0 flex flex-col items-center gap-2">
           <div className="text-3xl">{story.emoji}</div>
           <div className="flex items-center gap-1">
-            <span className={`w-1.5 h-1.5 rounded-full ${publicId ? story.corPulse + ' animate-pulse' : 'bg-[#333]'}`} />
-            <span className="text-[9px] text-[#555]">{publicId ? 'pronto' : 'aguarda'}</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${pausado ? 'bg-[#555]' : publicId ? story.corPulse + ' animate-pulse' : 'bg-[#333]'}`} />
+            <span className="text-[9px] text-[#555]">{pausado ? 'pausado' : publicId ? 'pronto' : 'aguarda'}</span>
           </div>
         </div>
 
@@ -111,7 +109,6 @@ function StoryCard({ story }) {
           <p className="text-[11px] text-[#444] italic leading-relaxed">{story.textoOverlay}</p>
           <p className="text-[10px] text-[#333] mt-1">O texto é adicionado automaticamente pela Cloudinary em cima da sua foto.</p>
 
-          {/* Preview */}
           {previewUrl && (
             <div className="mt-3">
               <p className="text-[10px] text-[#555] mb-1.5">Preview com texto overlay:</p>
@@ -131,7 +128,7 @@ function StoryCard({ story }) {
             className="text-xs bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] text-white px-3 py-2 rounded-lg transition disabled:opacity-50 whitespace-nowrap">
             {uploading ? '⏳ Enviando...' : '📷 Imagem de fundo'}
           </button>
-          <Button onClick={handleTestar} loading={testando} variant="secondary" size="sm" disabled={!publicId}>
+          <Button onClick={handleTestar} loading={testando} variant="secondary" size="sm" disabled={!publicId || pausado}>
             ▶️ Testar agora
           </Button>
         </div>
@@ -141,27 +138,89 @@ function StoryCard({ story }) {
 }
 
 export default function AgendadorPage() {
+  const [pausado, setPausado]       = useState(false)
+  const [toggling, setToggling]     = useState(false)
+  const [statusLoaded, setStatusLoaded] = useState(false)
+  const [toast, setToast]           = useState(null)
+
+  // Carrega o status atual do agendador ao abrir a página
+  useEffect(() => {
+    api.get('/scheduler/status')
+      .then(d => { setPausado(d.pausado); setStatusLoaded(true) })
+      .catch(() => setStatusLoaded(true))
+  }, [])
+
+  async function toggleAgendador() {
+    setToggling(true)
+    try {
+      if (pausado) {
+        await api.post('/scheduler/retomar')
+        setPausado(false)
+        setToast({ message: '▶️ Agendador retomado! Stories voltarão a ser postados automaticamente.', type: 'success' })
+      } else {
+        await api.post('/scheduler/pausar')
+        setPausado(true)
+        setToast({ message: '⏸️ Agendador pausado. Nenhum story automático será postado.', type: 'success' })
+      }
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally { setToggling(false) }
+  }
+
   return (
     <div className="max-w-3xl">
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+
       <PageHeader
         emoji="📅"
         title="Stories Automáticos"
         description="Publicados automaticamente de Quinta a Domingo — sem precisar fazer nada"
       />
 
-      {/* Status */}
-      <div className="mb-6 p-4 rounded-xl bg-[#111] border border-[#1e1e1e] flex flex-wrap items-center justify-between gap-2">
+      {/* ─── STATUS + TOGGLE PAUSAR/RETOMAR ─── */}
+      <div className={`mb-6 p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 transition-all ${
+        pausado ? 'border-red-500/30 bg-red-500/5' : 'border-[#1e1e1e] bg-[#111]'
+      }`}>
         <div className="flex items-center gap-3">
-          <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+          <span className={`w-2.5 h-2.5 rounded-full transition-all ${pausado ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`} />
           <div>
-            <p className="text-sm font-semibold text-white">Agendador Ativo</p>
-            <p className="text-xs text-[#555]">node-cron · America/Fortaleza · 2 stories/dia</p>
+            <p className={`text-sm font-semibold ${pausado ? 'text-red-400' : 'text-white'}`}>
+              {!statusLoaded ? 'Carregando...' : pausado ? '⏸️ Agendador Pausado' : '▶️ Agendador Ativo'}
+            </p>
+            <p className="text-xs text-[#555]">
+              {pausado
+                ? 'Nenhum story será postado até você retomar'
+                : 'node-cron · America/Fortaleza · 2 stories/dia'}
+            </p>
           </div>
         </div>
-        <span className="text-xs text-[#555] bg-[#1a1a1a] px-3 py-1.5 rounded-lg">
-          {new Date().toLocaleDateString('pt-BR', { weekday: 'long' })} · {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-        </span>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-[#555] bg-[#1a1a1a] px-3 py-1.5 rounded-lg">
+            {new Date().toLocaleDateString('pt-BR', { weekday: 'long' })} · {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+
+          <button onClick={toggleAgendador} disabled={toggling || !statusLoaded}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center gap-2 ${
+              pausado
+                ? 'bg-green-600 hover:bg-green-500 text-white'
+                : 'bg-red-600/20 hover:bg-red-600 border border-red-500/40 text-red-400 hover:text-white'
+            }`}>
+            {toggling
+              ? <span className="animate-spin">⟳</span>
+              : pausado ? '▶️ Retomar' : '⏸️ Pausar'}
+          </button>
+        </div>
       </div>
+
+      {pausado && (
+        <div className="mb-6 p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+          <span className="text-xl">⚠️</span>
+          <p className="text-xs text-red-400">
+            O agendador está pausado. Os stories das <strong>16h e 18h30</strong> não serão postados até você clicar em <strong>"Retomar"</strong>.
+          </p>
+        </div>
+      )}
 
       {/* Calendário */}
       <div className="mb-6 rounded-xl border border-[#1e1e1e] bg-[#111] overflow-hidden">
@@ -174,12 +233,12 @@ export default function AgendadorPage() {
             const ativo  = diasAtivos.includes(i)
             const isHoje = i === hoje
             return (
-              <div key={d} className={`p-3 text-center ${isHoje ? 'bg-[#f97316]/10' : ''} ${!ativo ? 'opacity-25' : ''}`}>
+              <div key={d} className={`p-3 text-center ${isHoje ? 'bg-[#f97316]/10' : ''} ${!ativo ? 'opacity-25' : ''} ${pausado && ativo ? 'opacity-30' : ''}`}>
                 <div className={`text-[11px] font-semibold mb-2 ${isHoje ? 'text-[#f97316]' : 'text-[#555]'}`}>{d}</div>
                 {ativo ? (
                   <div className="space-y-1">
-                    <div className="text-[9px] font-bold text-yellow-400 bg-yellow-500/10 rounded px-1 py-0.5">⏰ 16h</div>
-                    <div className="text-[9px] font-bold text-green-400 bg-green-500/10 rounded px-1 py-0.5">🚪 18h30</div>
+                    <div className={`text-[9px] font-bold rounded px-1 py-0.5 ${pausado ? 'text-[#555] bg-[#1a1a1a]' : 'text-yellow-400 bg-yellow-500/10'}`}>⏰ 16h</div>
+                    <div className={`text-[9px] font-bold rounded px-1 py-0.5 ${pausado ? 'text-[#555] bg-[#1a1a1a]' : 'text-green-400 bg-green-500/10'}`}>🚪 18h30</div>
                   </div>
                 ) : (
                   <div className="text-[10px] text-[#333]">—</div>
@@ -188,7 +247,7 @@ export default function AgendadorPage() {
             )
           })}
         </div>
-        </div>{/* overflow-x-auto */}
+        </div>
         <div className="px-5 py-2 border-t border-[#1e1e1e]">
           <p className="text-[10px] text-[#444]">Seg · Ter · Qua: fechado — sem stories</p>
         </div>
@@ -200,11 +259,12 @@ export default function AgendadorPage() {
         <p>1. Você sobe <strong className="text-[#aaa]">1 foto de fundo</strong> para cada story (uma para 16h, outra para 18h30)</p>
         <p>2. O <strong className="text-[#aaa]">Cloudinary adiciona o texto</strong> automaticamente em cima da foto</p>
         <p>3. O servidor publica nos horários certos — <strong className="text-[#aaa]">você não precisa fazer nada</strong></p>
+        <p>4. Para pausar temporariamente, use o botão <strong className="text-[#aaa]">"⏸️ Pausar"</strong> acima</p>
       </div>
 
       {/* Cards de story */}
       <div className="space-y-4 mb-6">
-        {STORIES.map(s => <StoryCard key={s.id} story={s} />)}
+        {STORIES.map(s => <StoryCard key={s.id} story={s} pausado={pausado} />)}
       </div>
 
       {/* Aviso Render */}

@@ -6,6 +6,15 @@ const { buildStoryImageUrl, gerarTextoStory, sortearFotoStory } = require("../sc
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 
 // ──────────────────────────────────────────────
+// FLAG DE PAUSA — controlada pelo dashboard
+// ──────────────────────────────────────────────
+let _pausado = false;
+
+function pausarAgendador()  { _pausado = true;  console.log("⏸️  Agendador de stories PAUSADO."); }
+function retomarAgendador() { _pausado = false; console.log("▶️  Agendador de stories RETOMADO."); }
+function isAgendadorPausado() { return _pausado; }
+
+// ──────────────────────────────────────────────
 // Bruthus Burger — Stories automáticos
 //
 // Qui a Dom:
@@ -31,6 +40,7 @@ function iniciarAgendador() {
 
   // ── Story das 16h — Teaser ──
   cron.schedule("0 16 * * 4,5,6,0", async () => {
+    if (_pausado) { console.log("⏸️  Story das 16h ignorado — agendador pausado."); return; }
     const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Fortaleza" });
     console.log(`\n📱 [${agora}] Publicando story teaser das 16h...`);
 
@@ -53,6 +63,7 @@ function iniciarAgendador() {
 
   // ── Story das 18h30 — Abertura ──
   cron.schedule("30 18 * * 4,5,6,0", async () => {
+    if (_pausado) { console.log("⏸️  Story das 18h30 ignorado — agendador pausado."); return; }
     const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Fortaleza" });
     console.log(`\n📱 [${agora}] Publicando story de abertura das 18h30...`);
 
@@ -127,4 +138,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { iniciarAgendador, testarStory };
+module.exports = { iniciarAgendador, testarStory, pausarAgendador, retomarAgendador, isAgendadorPausado };

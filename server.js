@@ -13,7 +13,7 @@ const {
   criarCampanhaCompleta, relatorioPerformance,
   listarCampanhas, listarAdSets, pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
 } = require("./scripts/createAds");
-const { iniciarAgendador, testarStory } = require("./scheduler/scheduler");
+const { iniciarAgendador, testarStory, pausarAgendador, retomarAgendador, isAgendadorPausado } = require("./scheduler/scheduler");
 const { storyTeaser, storyAbertura, buildStoryImageUrl, gerarTextoStory, sortearFotoStory } = require("./scripts/storyImage");
 const { generateStory, STORY_TYPES } = require("./scripts/generateStories");
 const fin = require("./scripts/financeiro");
@@ -513,6 +513,23 @@ app.post("/scheduler/testar-story", async (req, res) => {
   } catch (error) {
     res.status(500).json({ erro: error.message });
   }
+});
+
+// Pausar postagens automáticas de stories
+app.post("/scheduler/pausar", (req, res) => {
+  pausarAgendador();
+  res.json({ sucesso: true, pausado: true, mensagem: "Stories automáticos pausados. Nenhum story será postado até você retomar." });
+});
+
+// Retomar postagens automáticas de stories
+app.post("/scheduler/retomar", (req, res) => {
+  retomarAgendador();
+  res.json({ sucesso: true, pausado: false, mensagem: "Stories automáticos retomados! Voltarão a ser postados nos horários normais." });
+});
+
+// Status atual do agendador (pausado ou ativo)
+app.get("/scheduler/status", (req, res) => {
+  res.json({ pausado: isAgendadorPausado() });
 });
 
 // ──────────────────────────────────────────────
