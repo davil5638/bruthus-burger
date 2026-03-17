@@ -576,7 +576,7 @@ app.post("/mensagens/gerar", async (req, res) => {
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
 
-    const { dia = "quinta", quantidade = 3 } = req.body;
+    const { dia = "quinta", quantidade = 3, comPromocao = true } = req.body;
     const cfg = DIAS_CONFIG[dia];
 
     if (!cfg) {
@@ -591,7 +591,7 @@ app.post("/mensagens/gerar", async (req, res) => {
     const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
     const qtd = Math.min(Math.max(parseInt(quantidade) || 3, 1), 5);
 
-    const promocaoInfo = cfg.promocao
+    const promocaoInfo = (cfg.promocao && comPromocao)
       ? `\nPROMOÇÃO DO DIA (OBRIGATÓRIO mencionar em todas as mensagens):\n- ${cfg.promocao}\n`
       : "";
 

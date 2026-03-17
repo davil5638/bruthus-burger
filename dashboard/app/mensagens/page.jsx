@@ -116,20 +116,36 @@ function MensagemCard({ mensagem, index, cor }) {
 }
 
 export default function MensagensPage() {
-  const [diaAtivo, setDiaAtivo] = useState('quinta')
-  const [quantidade, setQuantidade] = useState(3)
-  const [gerando, setGerando] = useState(false)
-  const [mensagens, setMensagens] = useState([])
+  const [diaAtivo, setDiaAtivo]       = useState('quinta')
+  const [comPromocao, setComPromocao] = useState(true)
+  const [quantidade, setQuantidade]   = useState(3)
+  const [gerando, setGerando]         = useState(false)
+  const [mensagens, setMensagens]     = useState([])
   const [diaMensagens, setDiaMensagens] = useState(null)
-  const [toast, setToast] = useState(null)
+  const [toast, setToast]             = useState(null)
 
-  const diaConfig = DIAS.find(d => d.id === diaAtivo)
+  const diaConfig   = DIAS.find(d => d.id === diaAtivo)
+  const temPromocao = !!diaConfig?.promocao
+
+  // Ao trocar de dia, reseta o toggle para "com promoção" se o dia tiver promo
+  function selecionarDia(id) {
+    setDiaAtivo(id)
+    setMensagens([])
+    setDiaMensagens(null)
+    const dia = DIAS.find(d => d.id === id)
+    if (!dia?.promocao) setComPromocao(false)
+    else setComPromocao(true)
+  }
 
   async function gerarMensagens() {
     setGerando(true)
     setMensagens([])
     try {
-      const data = await api.post('/mensagens/gerar', { dia: diaAtivo, quantidade })
+      const data = await api.post('/mensagens/gerar', {
+        dia: diaAtivo,
+        quantidade,
+        comPromocao: temPromocao ? comPromocao : false,
+      })
       setMensagens(data.mensagens || [])
       setDiaMensagens(diaAtivo)
       setToast({ message: `${data.mensagens?.length} mensagens geradas para ${data.dia}! ✅`, type: 'success' })
@@ -167,7 +183,7 @@ export default function MensagensPage() {
           {DIAS.map(d => (
             <button
               key={d.id}
-              onClick={() => setDiaAtivo(d.id)}
+              onClick={() => selecionarDia(d.id)}
               className={`p-3 rounded-xl border text-center transition-all ${
                 diaAtivo === d.id ? d.corAtiva : 'border-[#222] bg-[#111] hover:border-[#333]'
               }`}
@@ -188,13 +204,32 @@ export default function MensagensPage() {
         </div>
       </div>
 
-      {/* Badge de promoção ativa */}
-      {diaConfig?.promocao && (
-        <div className={`mb-4 px-4 py-2.5 rounded-xl border ${diaConfig.corPromo} flex items-center gap-2`}>
-          <span className="text-base">🏷️</span>
-          <div>
-            <p className="text-xs font-bold">Promoção do dia incluída automaticamente</p>
-            <p className="text-[11px] opacity-80">{diaConfig.promocao}</p>
+      {/* Toggle promoção — só aparece em quinta e sexta */}
+      {temPromocao && (
+        <div className={`mb-4 rounded-xl border overflow-hidden ${comPromocao ? diaConfig.corPromo : 'border-[#222] bg-[#111]'}`}>
+          <div className="px-4 py-3 flex items-center justify-between gap-3">
+            <div>
+              <p className={`text-xs font-bold ${comPromocao ? '' : 'text-[#666]'}`}>
+                {comPromocao ? `🏷️ Mensagem promocional` : `💬 Mensagem normal`}
+              </p>
+              <p className={`text-[11px] mt-0.5 ${comPromocao ? 'opacity-80' : 'text-[#444]'}`}>
+                {comPromocao
+                  ? diaConfig.promocao
+                  : `Sem mencionar promoção — só avisar que está aberto`}
+              </p>
+            </div>
+
+            {/* Toggle switch */}
+            <button
+              onClick={() => setComPromocao(v => !v)}
+              className={`relative shrink-0 w-12 h-6 rounded-full transition-all duration-200 ${
+                comPromocao ? 'bg-[#f97316]' : 'bg-[#333]'
+              }`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${
+                comPromocao ? 'translate-x-6' : 'translate-x-0'
+              }`} />
+            </button>
           </div>
         </div>
       )}
@@ -244,9 +279,9 @@ export default function MensagensPage() {
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">{diaConfigMensagens?.emoji}</span>
             <p className="text-sm font-semibold text-white">
-              {mensagens.length} mensagens para {diaConfigMensagens ? DIAS.find(d => d.id === diaMensagens)?.label : ''}
+              {mensagens.length} mensagens para {diaConfigMensagens?.label}
             </p>
-            <span className="ml-auto text-[11px] text-[#555]">Clique em Editar para personalizar antes de copiar</span>
+            <span className="ml-auto text-[11px] text-[#555]">Clique em Editar para personalizar</span>
           </div>
 
           {mensagens.map((m, i) => (
@@ -269,7 +304,9 @@ export default function MensagensPage() {
         <div className="text-center py-16 rounded-xl border border-[#1e1e1e] bg-[#111]">
           <p className="text-4xl mb-3">💬</p>
           <p className="text-sm text-[#555]">Selecione o dia e clique em Gerar</p>
-          <p className="text-[11px] text-[#333] mt-1">A IA vai criar {quantidade} mensagem{quantidade > 1 ? 's' : ''} diferentes para você escolher</p>
+          <p className="text-[11px] text-[#333] mt-1">
+            A IA vai criar {quantidade} mensagem{quantidade > 1 ? 's' : ''} diferentes para você escolher
+          </p>
         </div>
       )}
     </div>
