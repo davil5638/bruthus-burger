@@ -40,7 +40,7 @@ const ORCAMENTO_DIARIO_CENTAVOS = 1000; // R$10,00/dia
 // Gestores removem Audience Network — tráfego de baixíssima qualidade
 const PLACEMENTS = {
   publisher_platforms: ["instagram"],
-  instagram_positions: ["stream", "story", "reels", "explore_home"],
+  instagram_positions: ["stream", "story", "reels", "explore", "explore_home"],
 };
 
 // Targeting: raio ampliado para 5km + interesses em camadas (OR dentro, AND entre grupos)
