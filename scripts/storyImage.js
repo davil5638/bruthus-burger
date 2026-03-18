@@ -35,10 +35,10 @@ async function listarFotosStory() {
   try {
     let fotos = [];
 
-    // Dynamic Folders: usa /resources com asset_folder
-    const r = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources`, {
+    // Dynamic Folders: usa /resources com resource_type + asset_folder
+    const r = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image`, {
       auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
-      params: { asset_folder: STORY_FOLDER, max_results: 100 },
+      params: { type: "upload", asset_folder: STORY_FOLDER, max_results: 100 },
     });
     fotos = (r.data.resources || []).map(res => res.public_id).filter(Boolean);
     console.log(`📸 ${fotos.length} fotos carregadas da pasta "${STORY_FOLDER}"`);
