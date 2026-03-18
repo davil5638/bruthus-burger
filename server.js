@@ -368,7 +368,8 @@ app.post("/ads", async (req, res) => {
 
     res.json({ sucesso: true, resultado });
   } catch (error) {
-    res.status(500).json({ erro: error.message });
+    const detalhe = error.response?.data?.error?.message || error.response?.data || error.message;
+    res.status(500).json({ erro: detalhe });
   }
 });
 
