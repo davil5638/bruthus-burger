@@ -34,7 +34,7 @@ function validarConfig() {
 // (LINK_CLICKS conta cliques que bounceiam antes de abrir)
 // ──────────────────────────────────────────────
 
-const ORCAMENTO_DIARIO_CENTAVOS = 2000; // R$20/dia — mínimo para sair da fase de aprendizado
+const ORCAMENTO_DIARIO_CENTAVOS = 1000; // R$10,00/dia
 
 // Placements: só Instagram + Facebook Feed/Stories/Reels
 // Gestores removem Audience Network — tráfego de baixíssima qualidade
@@ -51,7 +51,7 @@ const SEGMENTACAO_PADRAO = {
       {
         latitude:  parseFloat(process.env.LAT  || "-4.353948748936734"),
         longitude: parseFloat(process.env.LNG  || "-39.30777728465837"),
-        radius: 5,
+        radius: 3,
         distance_unit: "kilometer",
       },
     ],
