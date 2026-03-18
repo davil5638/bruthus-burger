@@ -82,7 +82,7 @@ async function criarCampanha(nomeCampanha, objetivo = "LINK_CLICKS") {
       name: nomeCampanha,
       objective: objetivo, // LINK_CLICKS ou CONVERSIONS
       status: "PAUSED",    // Inicia pausada para revisão
-      special_ad_categories: [],
+      special_ad_categories: JSON.stringify([]),
       access_token: ACCESS_TOKEN,
     },
   });
