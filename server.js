@@ -620,6 +620,31 @@ app.get("/scheduler/status", (req, res) => {
   res.json({ pausado: isAgendadorPausado() });
 });
 
+// Debug: lista fotos reais do Cloudinary
+app.get("/debug/cloudinary-fotos", async (req, res) => {
+  const axios = require("axios");
+  const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "duchjjeaw";
+  const CLOUD_API_KEY = process.env.CLOUDINARY_API_KEY;
+  const CLOUD_SECRET = process.env.CLOUDINARY_API_SECRET;
+  const FOLDER = process.env.CLOUDINARY_STORY_FOLDER || "bruthus/geral";
+
+  if (!CLOUD_API_KEY || !CLOUD_SECRET) {
+    return res.status(400).json({ erro: "CLOUDINARY_API_KEY ou CLOUDINARY_API_SECRET não configurados" });
+  }
+
+  try {
+    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image`;
+    const r = await axios.get(url, {
+      auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
+      params: { type: "upload", prefix: FOLDER, max_results: 10 },
+    });
+    const fotos = (r.data.resources || []).map(f => f.public_id);
+    res.json({ pasta: FOLDER, total: fotos.length, fotos, primeiraUrl: fotos[0] ? `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${fotos[0]}` : null });
+  } catch (e) {
+    res.status(500).json({ erro: e.message, detalhes: e.response?.data });
+  }
+});
+
 // ──────────────────────────────────────────────
 // STORIES
 // ──────────────────────────────────────────────

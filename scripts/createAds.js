@@ -299,8 +299,9 @@ async function criarCampanhaCompleta(config = {}) {
 
     return resultado;
   } catch (error) {
-    const detalhe = error.response?.data?.error?.message || error.response?.data || error.message;
-    console.error("\n❌ ERRO AO CRIAR CAMPANHA:", detalhe);
+    const apiError = error.response?.data?.error;
+    const detalhe = apiError?.error_user_msg || apiError?.message || error.response?.data || error.message;
+    console.error("\n❌ ERRO AO CRIAR CAMPANHA:", JSON.stringify(apiError || error.message, null, 2));
     const err = new Error(typeof detalhe === "string" ? detalhe : JSON.stringify(detalhe));
     throw err;
   }
