@@ -36,8 +36,10 @@ const diasAtivos = [0, 4, 5, 6] // Dom, Qui, Sex, Sáb
 
 
 function StoryCard({ story, pausado }) {
-  const [testando, setTestando] = useState(false)
-  const [toast, setToast]       = useState(null)
+  const [testando, setTestando]     = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [preview, setPreview]       = useState(null)
+  const [toast, setToast]           = useState(null)
 
   async function handleTestar() {
     setTestando(true)
@@ -47,6 +49,17 @@ function StoryCard({ story, pausado }) {
     } catch (err) {
       setToast({ message: err.message, type: 'error' })
     } finally { setTestando(false) }
+  }
+
+  async function handlePreview() {
+    setPreviewing(true)
+    setPreview(null)
+    try {
+      const data = await api.post('/stories/preview-automatico', { tipo: story.id })
+      setPreview(data)
+    } catch (err) {
+      setToast({ message: err.message, type: 'error' })
+    } finally { setPreviewing(false) }
   }
 
   return (
@@ -75,12 +88,50 @@ function StoryCard({ story, pausado }) {
         </div>
 
         {/* Ações */}
-        <div className="shrink-0">
+        <div className="shrink-0 flex flex-col gap-2">
+          <Button onClick={handlePreview} loading={previewing} variant="secondary" size="sm">
+            🖼️ Preview
+          </Button>
           <Button onClick={handleTestar} loading={testando} variant="secondary" size="sm" disabled={pausado}>
             ▶️ Testar agora
           </Button>
         </div>
       </div>
+
+      {/* Preview da imagem gerada */}
+      {previewing && (
+        <div className="mt-4 p-3 rounded-lg bg-[#111] border border-[#222] text-center text-xs text-[#555] animate-pulse">
+          ⏳ Gerando preview com foto aleatória e texto IA...
+        </div>
+      )}
+
+      {preview && (
+        <div className="mt-4 rounded-lg border border-[#222] bg-[#0f0f0f] overflow-hidden">
+          <div className="flex gap-4 p-3">
+            {/* Imagem no formato story */}
+            <div className="shrink-0" style={{ width: 90, height: 160 }}>
+              <img
+                src={preview.url}
+                alt="Preview story"
+                className="w-full h-full object-cover rounded-lg"
+                style={{ width: 90, height: 160 }}
+              />
+            </div>
+            {/* Detalhes */}
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <p className="text-xs font-bold text-white">{preview.texto?.principal}</p>
+              <p className="text-[11px] text-[#888]">{preview.texto?.secundario}</p>
+              <div className="flex flex-wrap gap-1 mt-2">
+                <span className="text-[10px] bg-[#1a1a1a] text-[#666] px-2 py-0.5 rounded">📅 {preview.dia}</span>
+                <span className="text-[10px] bg-[#1a1a1a] text-[#666] px-2 py-0.5 rounded">🖼️ foto aleatória</span>
+                {preview.temLink && <span className="text-[10px] bg-[#1a1a1a] text-green-500 px-2 py-0.5 rounded">🔗 com link</span>}
+              </div>
+              <p className="text-[10px] text-[#444] mt-1 break-all">{preview.url}</p>
+              <button onClick={() => setPreview(null)} className="text-[10px] text-[#555] hover:text-[#888] mt-1">✕ fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
