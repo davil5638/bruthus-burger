@@ -483,6 +483,74 @@ async function atualizarOrcamento(adSetId, novoOrcamentoCentavos) {
   return response.data;
 }
 
+/**
+ * Busca métricas completas de todas as campanhas (período máximo)
+ */
+async function gerarRelatorioCompleto() {
+  validarConfig();
+
+  // 1. Buscar todas as campanhas
+  const { data: campData } = await axios.get(`${GRAPH_API}/${AD_ACCOUNT_ID}/campaigns`, {
+    params: {
+      fields: 'id,name,status,objective,created_time,daily_budget,lifetime_budget',
+      limit: 100,
+      access_token: ACCESS_TOKEN,
+    }
+  });
+
+  const campanhas = campData.data || [];
+  console.log(`📊 ${campanhas.length} campanhas encontradas`);
+
+  const dados = [];
+  for (const camp of campanhas) {
+    try {
+      const { data: insData } = await axios.get(`${GRAPH_API}/${camp.id}/insights`, {
+        params: {
+          fields: 'impressions,clicks,ctr,cpc,cpm,spend,reach,frequency,actions,cost_per_action_type,unique_clicks,unique_ctr',
+          date_preset: 'maximum',
+          access_token: ACCESS_TOKEN,
+        }
+      });
+
+      const ins = insData.data?.[0] || {};
+      const actions = ins.actions || [];
+      const linkClicks = actions.find(a => a.action_type === 'link_click')?.value || '0';
+      const postEngagement = actions.find(a => a.action_type === 'post_engagement')?.value || '0';
+
+      dados.push({
+        id: camp.id,
+        nome: camp.name,
+        status: camp.status,
+        objetivo: camp.objective,
+        criada: camp.created_time,
+        orcamentoDiario: camp.daily_budget ? parseFloat(camp.daily_budget) / 100 : null,
+        impressoes: parseInt(ins.impressions || 0),
+        cliques: parseInt(ins.clicks || 0),
+        linkCliques: parseInt(linkClicks),
+        engajamento: parseInt(postEngagement),
+        alcance: parseInt(ins.reach || 0),
+        frequencia: parseFloat(ins.frequency || 0),
+        gasto: parseFloat(ins.spend || 0),
+        ctr: parseFloat(ins.ctr || 0),
+        cpc: parseFloat(ins.cpc || 0),
+        cpm: parseFloat(ins.cpm || 0),
+      });
+    } catch (e) {
+      console.warn(`⚠️ Erro insights campanha ${camp.id}:`, e.message);
+      dados.push({
+        id: camp.id,
+        nome: camp.name,
+        status: camp.status,
+        objetivo: camp.objective,
+        criada: camp.created_time,
+        erro: e.message,
+      });
+    }
+  }
+
+  return dados;
+}
+
 // Execução direta
 if (require.main === module) {
   const comando = process.argv[2];
@@ -499,4 +567,5 @@ module.exports = {
   criarCampanhaCompleta, impulsionarPost, listarPostsInstagram,
   relatorioPerformance, criarCampanha, criarAdSet,
   listarCampanhas, listarAdSets, pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
+  gerarRelatorioCompleto,
 };

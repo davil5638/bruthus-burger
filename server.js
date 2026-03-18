@@ -13,6 +13,7 @@ const {
   criarCampanhaCompleta, impulsionarPost, listarPostsInstagram,
   relatorioPerformance, listarCampanhas, listarAdSets,
   pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
+  gerarRelatorioCompleto,
 } = require("./scripts/createAds");
 const { iniciarAgendador, testarStory, pausarAgendador, retomarAgendador, isAgendadorPausado } = require("./scheduler/scheduler");
 const { gerarTextoStory, sortearFotoStory } = require("./scripts/storyImage");
@@ -413,13 +414,68 @@ app.post("/ads/impulsionar-post", async (req, res) => {
   }
 });
 
+// ── RELATÓRIO DE CAMPANHAS ──
 app.get("/ads/relatorio", async (req, res) => {
   try {
-    const { dias } = req.query;
-    const dados = await relatorioPerformance(parseInt(dias) || 7);
-    res.json({ sucesso: true, dados });
-  } catch (error) {
-    res.status(500).json({ erro: error.message });
+    const campanhas = await gerarRelatorioCompleto();
+
+    const comDados = campanhas.filter(c => !c.erro && c.impressoes > 0);
+    const totalGasto       = comDados.reduce((s, c) => s + c.gasto, 0);
+    const totalImpressoes  = comDados.reduce((s, c) => s + c.impressoes, 0);
+    const totalCliques     = comDados.reduce((s, c) => s + c.cliques, 0);
+    const totalAlcance     = comDados.reduce((s, c) => s + c.alcance, 0);
+    const ctrMedio         = comDados.length ? comDados.reduce((s, c) => s + c.ctr, 0) / comDados.length : 0;
+    const cpcMedio         = comDados.length ? comDados.reduce((s, c) => s + c.cpc, 0) / comDados.length : 0;
+    const cpmMedio         = comDados.length ? comDados.reduce((s, c) => s + c.cpm, 0) / comDados.length : 0;
+
+    // Análise IA
+    let analise = null;
+    try {
+      const openai = new (require("openai"))({ apiKey: process.env.OPENAI_API_KEY });
+      const prompt = `Você é especialista em Meta Ads para restaurantes no Brasil.
+
+Analise estas campanhas de Meta Ads de uma hamburgueria artesanal em cidade pequena do Nordeste:
+
+${JSON.stringify(comDados, null, 2)}
+
+Forneça em português:
+1. **Avaliação geral** (nota 0-10 com justificativa)
+2. **Por campanha**: performance, problemas identificados, recomendações
+3. **Top 3 ações prioritárias** para melhorar ROI agora
+4. **Benchmarks**: CTR ideal >1.5%, CPC ideal <R$1.50, Frequência ideal 1.5-3x
+
+Use linguagem direta e prática. Formato markdown.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 2000,
+        temperature: 0.7,
+      });
+      analise = completion.choices[0].message.content;
+    } catch (e) {
+      console.warn("⚠️ Análise IA falhou:", e.message);
+    }
+
+    res.json({
+      geradoEm: new Date().toISOString(),
+      resumo: {
+        totalCampanhas:  campanhas.length,
+        campanhasAtivas: campanhas.filter(c => c.status === "ACTIVE").length,
+        totalGasto:      totalGasto.toFixed(2),
+        totalImpressoes,
+        totalCliques,
+        totalAlcance,
+        ctrMedio:        ctrMedio.toFixed(2),
+        cpcMedio:        cpcMedio.toFixed(2),
+        cpmMedio:        cpmMedio.toFixed(2),
+      },
+      campanhas,
+      analise,
+    });
+  } catch (e) {
+    console.error("Erro /ads/relatorio:", e.message);
+    res.status(500).json({ erro: e.message });
   }
 });
 
