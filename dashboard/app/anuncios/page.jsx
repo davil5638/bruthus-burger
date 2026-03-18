@@ -9,10 +9,10 @@ const CLOUD_NAME    = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME    || 'duchj
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'bruthus_unsigned'
 
 const ORCAMENTOS = [
-  { valor: 1000, label: 'R$10/dia', desc: 'Início'      },
-  { valor: 2000, label: 'R$20/dia', desc: 'Recomendado' },
-  { valor: 3000, label: 'R$30/dia', desc: 'Mais alcance'},
-  { valor: 5000, label: 'R$50/dia', desc: 'Agressivo'   },
+  { valor: 2000, label: 'R$20/dia', desc: 'Mínimo recomendado' },
+  { valor: 3000, label: 'R$30/dia', desc: 'Bom alcance'        },
+  { valor: 5000, label: 'R$50/dia', desc: 'Escala rápida'      },
+  { valor: 10000,label: 'R$100/dia',desc: 'Máximo impacto'     },
 ]
 
 const TIPOS_IA = [

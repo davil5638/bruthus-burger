@@ -28,41 +28,63 @@ function validarConfig() {
 // ──────────────────────────────────────────────
 
 // ──────────────────────────────────────────────
-// FUNIL: Thu-Sun 19h–23h | 3km | R$10/dia
-// Objetivo: levar o cliente direto ao link de pedido
+// FUNIL: Thu-Sun 19h–23h | 5km | R$20/dia mínimo
+// Objetivo: OUTCOME_TRAFFIC → LANDING_PAGE_VIEWS
+// Gestores usam LPV pois garante que a página carregou
+// (LINK_CLICKS conta cliques que bounceiam antes de abrir)
 // ──────────────────────────────────────────────
 
-const ORCAMENTO_DIARIO_CENTAVOS = 1000; // R$10,00/dia
+const ORCAMENTO_DIARIO_CENTAVOS = 2000; // R$20/dia — mínimo para sair da fase de aprendizado
 
-// Dayparting: 19h–23h | Qui(4) Sex(5) Sáb(6) Dom(0)
-// Meta usa minutos desde meia-noite e dias 0=Dom…6=Sáb
+// Dayparting: 18h–23h | Qui(4) Sex(5) Sáb(6) Dom(0)
+// Ampliado para 18h: público começa a decidir o jantar antes das 19h
 const AD_SCHEDULE = [
-  { start_minute: 1140, end_minute: 1380, days: [0, 4, 5, 6] }, // 19:00–23:00
+  { start_minute: 1080, end_minute: 1380, days: [0, 4, 5, 6] }, // 18:00–23:00
 ];
 
+// Placements: só Instagram + Facebook Feed/Stories/Reels
+// Gestores removem Audience Network — tráfego de baixíssima qualidade
+const PLACEMENTS = {
+  publisher_platforms: ["facebook", "instagram"],
+  instagram_positions: ["stream", "story", "reels", "explore"],
+  facebook_positions:  ["feed", "story", "video_feeds"],
+};
+
+// Targeting: raio ampliado para 5km + interesses em camadas (OR dentro, AND entre grupos)
+// Técnica dos gestores: broader targeting → deixa o algoritmo da Meta trabalhar
 const SEGMENTACAO_PADRAO = {
   geo_locations: {
     custom_locations: [
       {
         latitude:  parseFloat(process.env.LAT  || "-4.353948748936734"),
         longitude: parseFloat(process.env.LNG  || "-39.30777728465837"),
-        radius: 3,
+        radius: 5,
         distance_unit: "kilometer",
       },
     ],
   },
   age_min: 18,
   age_max: 55,
+  // flexible_spec = OR entre interesses (basta ter 1)
+  // Gestores usam interesses + comportamentos em camadas separadas para ampliar alcance
   flexible_spec: [
     {
       interests: [
-        { id: "6003107902433", name: "Fast food" },
-        { id: "6003349442621", name: "Hamburger" },
-        { id: "6003020834693", name: "Food delivery" },
-        { id: "6003107902434", name: "Restaurant" },
+        { id: "6003107902433", name: "Fast food"         },
+        { id: "6003349442621", name: "Hamburger"         },
+        { id: "6003020834693", name: "Food delivery"     },
+        { id: "6003107902434", name: "Restaurant"        },
+        { id: "6003200757498", name: "Online food order" },
+        { id: "6003348604981", name: "Street food"       },
       ],
     },
   ],
+  // Cap de frequência: máx 3 impressões por pessoa a cada 7 dias
+  // Evita fadiga criativa (usuário ignorar o anúncio por ver demais)
+  frequency_control_specs: [
+    { event: "IMPRESSIONS", interval_days: 7, max_frequency: 3 },
+  ],
+  ...PLACEMENTS,
 };
 
 // ──────────────────────────────────────────────
@@ -72,7 +94,7 @@ const SEGMENTACAO_PADRAO = {
 /**
  * Cria uma campanha de tráfego com objetivo de converter em pedidos
  */
-async function criarCampanha(nomeCampanha, objetivo = "LINK_CLICKS") {
+async function criarCampanha(nomeCampanha, objetivo = "OUTCOME_TRAFFIC") {
   const url = `${GRAPH_API}/${AD_ACCOUNT_ID}/campaigns`;
 
   console.log(`\n📣 Criando campanha: "${nomeCampanha}"...`);
@@ -80,8 +102,8 @@ async function criarCampanha(nomeCampanha, objetivo = "LINK_CLICKS") {
   const response = await axios.post(url, null, {
     params: {
       name: nomeCampanha,
-      objective: objetivo, // LINK_CLICKS ou CONVERSIONS
-      status: "PAUSED",    // Inicia pausada para revisão
+      objective: objetivo, // OUTCOME_TRAFFIC (padrão atual Meta — substitui LINK_CLICKS)
+      status: "PAUSED",
       special_ad_categories: JSON.stringify([]),
       access_token: ACCESS_TOKEN,
     },
@@ -114,8 +136,9 @@ async function criarAdSet(campanhaId, nomeAdSet, orcamentoDiario = ORCAMENTO_DIA
     campaign_id: campanhaId,
     daily_budget: orcamentoDiario,
     billing_event: "IMPRESSIONS",
-    optimization_goal: "LINK_CLICKS",
-    bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+    optimization_goal: "LANDING_PAGE_VIEWS", // melhor que LINK_CLICKS — garante que a página abriu
+    bid_strategy: "LOWEST_COST_WITHOUT_CAP", // deixa o algoritmo da Meta otimizar o custo
+    destination_type: "WEBSITE",
     pacing_type: ["day_parting"],
     ad_schedule: AD_SCHEDULE,
     targeting: SEGMENTACAO_PADRAO,
