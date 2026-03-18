@@ -61,7 +61,13 @@ async function listarFotosStory() {
  */
 async function sortearFotoStory(fallbackId) {
   const fotos = await listarFotosStory();
-  if (!fotos || fotos.length === 0) return fallbackId;
+  if (!fotos || fotos.length === 0) {
+    // Auto-adiciona o prefixo da pasta se o fallback não inclui pasta
+    if (fallbackId && !fallbackId.includes('/') && STORY_FOLDER) {
+      return `${STORY_FOLDER}/${fallbackId}`;
+    }
+    return fallbackId;
+  }
   return fotos[Math.floor(Math.random() * fotos.length)];
 }
 

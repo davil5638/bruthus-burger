@@ -49,8 +49,8 @@ const SEGMENTACAO_PADRAO = {
   geo_locations: {
     custom_locations: [
       {
-        latitude:  parseFloat(process.env.LAT  || "-4.353948748936734"),
-        longitude: parseFloat(process.env.LNG  || "-39.30777728465837"),
+        latitude:  parseFloat(process.env.LAT || "-4.353948748936734"),
+        longitude: parseFloat(process.env.LNG || "-39.30777728465837"),
         radius: 2,
         distance_unit: "kilometer",
       },
@@ -58,16 +58,6 @@ const SEGMENTACAO_PADRAO = {
   },
   age_min: 18,
   age_max: 55,
-  flexible_spec: [
-    {
-      interests: [
-        { id: "6003107902433", name: "Fast food"     },
-        { id: "6003349442621", name: "Hamburger"     },
-        { id: "6003020834693", name: "Food delivery" },
-        { id: "6003107902434", name: "Restaurant"    },
-      ],
-    },
-  ],
   ...PLACEMENTS,
 };
 
@@ -115,19 +105,19 @@ async function criarAdSet(campanhaId, nomeAdSet, orcamentoDiario = ORCAMENTO_DIA
   console.log(`   📍 Raio: 3km | Idade: 18-55 anos`);
   console.log(`   🕖 Horário: 19h–23h | Qui a Dom`);
 
-  const response = await axios.post(url, {
-    name: nomeAdSet,
-    campaign_id: campanhaId,
-    daily_budget: orcamentoDiario,
-    billing_event: "IMPRESSIONS",
-    optimization_goal: "LINK_CLICKS",
-    bid_strategy: "LOWEST_COST_WITHOUT_CAP",
-    targeting: SEGMENTACAO_PADRAO,
-    start_time: Math.floor(amanha.getTime() / 1000),
-    status: "PAUSED",
-    access_token: ACCESS_TOKEN,
-  }, {
-    params: { access_token: ACCESS_TOKEN },
+  const response = await axios.post(url, null, {
+    params: {
+      name: nomeAdSet,
+      campaign_id: campanhaId,
+      daily_budget: orcamentoDiario,
+      billing_event: "IMPRESSIONS",
+      optimization_goal: "LINK_CLICKS",
+      bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+      targeting: JSON.stringify(SEGMENTACAO_PADRAO),
+      start_time: Math.floor(amanha.getTime() / 1000),
+      status: "PAUSED",
+      access_token: ACCESS_TOKEN,
+    },
   });
 
   console.log(`✅ Ad Set criado: ${response.data.id}`);
@@ -146,25 +136,27 @@ async function criarCreativo(nomeCreativo, imageUrl, titulo, corpo, cta = "ORDER
 
   console.log(`\n🎨 Criando criativo: "${nomeCreativo}"...`);
 
-  const response = await axios.post(url, {
-    name: nomeCreativo,
-    object_story_spec: {
-      page_id: process.env.FB_PAGE_ID || IG_USER_ID, // Usar Page ID do Facebook
-      instagram_actor_id: IG_USER_ID,
-      link_data: {
-        image_url: imageUrl,
-        link: ORDER_LINK,
-        message: corpo,
-        name: titulo,
-        call_to_action: {
-          type: cta, // ORDER_NOW, LEARN_MORE, SHOP_NOW
-          value: { link: ORDER_LINK },
-        },
+  const objectStorySpec = {
+    page_id: process.env.FB_PAGE_ID || "434452209747752",
+    instagram_actor_id: IG_USER_ID,
+    link_data: {
+      image_url: imageUrl,
+      link: ORDER_LINK,
+      message: corpo,
+      name: titulo,
+      call_to_action: {
+        type: cta,
+        value: { link: ORDER_LINK },
       },
     },
-    access_token: ACCESS_TOKEN,
-  }, {
-    params: { access_token: ACCESS_TOKEN },
+  };
+
+  const response = await axios.post(url, null, {
+    params: {
+      name: nomeCreativo,
+      object_story_spec: JSON.stringify(objectStorySpec),
+      access_token: ACCESS_TOKEN,
+    },
   });
 
   console.log(`✅ Criativo criado: ${response.data.id}`);
@@ -180,16 +172,18 @@ async function criarCreativoDePostExistente(nomeCreativo, mediaId) {
 
   console.log(`\n🎨 Criando criativo a partir do post ${mediaId}...`);
 
-  const response = await axios.post(url, {
-    name: nomeCreativo,
-    object_story_spec: {
-      page_id: process.env.FB_PAGE_ID || process.env.FACEBOOK_PAGE_ID || IG_USER_ID,
-      instagram_actor_id: IG_USER_ID,
+  const objectStorySpec = {
+    page_id: process.env.FB_PAGE_ID || "434452209747752",
+    instagram_actor_id: IG_USER_ID,
+  };
+
+  const response = await axios.post(url, null, {
+    params: {
+      name: nomeCreativo,
+      object_story_spec: JSON.stringify(objectStorySpec),
+      source_instagram_media_id: mediaId,
+      access_token: ACCESS_TOKEN,
     },
-    source_instagram_media_id: mediaId,
-    access_token: ACCESS_TOKEN,
-  }, {
-    params: { access_token: ACCESS_TOKEN },
   });
 
   console.log(`✅ Criativo de post existente criado: ${response.data.id}`);
@@ -208,14 +202,14 @@ async function criarAnuncio(adSetId, creativoId, nomeAnuncio) {
 
   console.log(`\n📱 Criando anúncio: "${nomeAnuncio}"...`);
 
-  const response = await axios.post(url, {
-    name: nomeAnuncio,
-    adset_id: adSetId,
-    creative: { creative_id: creativoId },
-    status: "PAUSED",
-    access_token: ACCESS_TOKEN,
-  }, {
-    params: { access_token: ACCESS_TOKEN },
+  const response = await axios.post(url, null, {
+    params: {
+      name: nomeAnuncio,
+      adset_id: adSetId,
+      creative: JSON.stringify({ creative_id: creativoId }),
+      status: "PAUSED",
+      access_token: ACCESS_TOKEN,
+    },
   });
 
   console.log(`✅ Anúncio criado: ${response.data.id}`);
