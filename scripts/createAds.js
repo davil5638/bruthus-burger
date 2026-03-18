@@ -105,18 +105,23 @@ async function criarAdSet(campanhaId, nomeAdSet, orcamentoDiario = ORCAMENTO_DIA
   console.log(`   📍 Raio: 3km | Idade: 18-55 anos`);
   console.log(`   🕖 Horário: 19h–23h | Qui a Dom`);
 
-  const params = new URLSearchParams();
-  params.append("name",                            nomeAdSet);
-  params.append("campaign_id",                     campanhaId);
-  params.append("daily_budget",                    String(orcamentoDiario));
-  params.append("billing_event",                   "IMPRESSIONS");
-  params.append("optimization_goal",               "LINK_CLICKS");
-  params.append("is_adset_budget_sharing_enabled", "false");
-  params.append("targeting",                       JSON.stringify(SEGMENTACAO_PADRAO));
-  params.append("status",                          "PAUSED");
-  params.append("access_token",                    ACCESS_TOKEN);
-
-  const response = await axios.post(url, params);
+  const response = await axios.post(url, null, {
+    params: {
+      name:                            nomeAdSet,
+      campaign_id:                     campanhaId,
+      daily_budget:                    orcamentoDiario,
+      billing_event:                   "IMPRESSIONS",
+      optimization_goal:               "LINK_CLICKS",
+      is_adset_budget_sharing_enabled: false,
+      targeting:                       JSON.stringify(SEGMENTACAO_PADRAO),
+      status:                          "PAUSED",
+      access_token:                    ACCESS_TOKEN,
+    },
+    paramsSerializer: params => {
+      const qs = require("qs");
+      return qs.stringify(params, { encode: false });
+    },
+  });
 
   console.log(`✅ Ad Set criado: ${response.data.id}`);
   return response.data.id;
