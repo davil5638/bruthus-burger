@@ -354,10 +354,10 @@ app.post("/ads", async (req, res) => {
     if (registrarFinanceiro !== false) {
       try {
         const valorDiario = orcamento / 100; // converte centavos para reais
-        fin.adicionarEntrada({
+        await fin.adicionarEntrada({
           tipo: "despesa",
           valor: valorDiario,
-          categoria: "Marketing/Anúncios",
+          categoria: "Marketing / Anúncios",
           descricao: `Meta Ads — campanha criada (R$${valorDiario.toFixed(2)}/dia) ID: ${resultado.campanhaId}`,
         });
         resultado.registradoFinanceiro = true;
@@ -793,21 +793,25 @@ Retorne APENAS um JSON válido, sem explicações:
 // FINANCEIRO
 // ──────────────────────────────────────────────
 
-app.get("/financeiro", (req, res) => {
+app.get("/financeiro", async (req, res) => {
   try {
     const { dataInicio, dataFim, tipo } = req.query;
-    const entradas = fin.listarEntradas({ dataInicio, dataFim, tipo });
+    const entradas = await fin.listarEntradas({ dataInicio, dataFim, tipo });
     res.json({ sucesso: true, total: entradas.length, entradas });
   } catch (error) {
     res.status(500).json({ erro: error.message });
   }
 });
 
-app.get("/financeiro/resumo", (req, res) => {
+app.get("/financeiro/resumo", async (req, res) => {
   try {
-    const { dias } = req.query;
+    const { dias, dataInicio, dataFim } = req.query;
+    if (dataInicio) {
+      const resumo = await fin.calcularResumoCustom(dataInicio, dataFim || null);
+      return res.json({ sucesso: true, resumo });
+    }
     const diasNum = dias !== undefined ? parseInt(dias) : 7;
-    const resumo = fin.calcularResumo(isNaN(diasNum) ? 7 : diasNum);
+    const resumo = await fin.calcularResumo(isNaN(diasNum) ? 7 : diasNum);
     res.json({ sucesso: true, resumo });
   } catch (error) {
     res.status(500).json({ erro: error.message });
@@ -821,18 +825,18 @@ app.get("/financeiro/categorias", (req, res) => {
   });
 });
 
-app.post("/financeiro", (req, res) => {
+app.post("/financeiro", async (req, res) => {
   try {
-    const entrada = fin.adicionarEntrada(req.body);
+    const entrada = await fin.adicionarEntrada(req.body);
     res.json({ sucesso: true, entrada });
   } catch (error) {
     res.status(400).json({ erro: error.message });
   }
 });
 
-app.delete("/financeiro/:id", (req, res) => {
+app.delete("/financeiro/:id", async (req, res) => {
   try {
-    const resultado = fin.removerEntrada(req.params.id);
+    const resultado = await fin.removerEntrada(req.params.id);
     res.json({ sucesso: true, ...resultado });
   } catch (error) {
     res.status(404).json({ erro: error.message });
@@ -849,6 +853,11 @@ app.get("/ping", (req, res) => {
 // ──────────────────────────────────────────────
 // INICIALIZAÇÃO
 // ──────────────────────────────────────────────
+
+const { conectar: conectarDB } = require("./scripts/db");
+conectarDB()
+  .then(() => console.log("🗄️  PostgreSQL (Neon) pronto"))
+  .catch(e => console.error("❌ PostgreSQL:", e.message));
 
 app.listen(PORT, () => {
   console.log("\n" + "═".repeat(55));

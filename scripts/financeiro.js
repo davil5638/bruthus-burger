@@ -1,8 +1,4 @@
-const fs     = require("fs");
-const path   = require("path");
-const { execSync } = require("child_process");
-
-const DATA_FILE = path.resolve(__dirname, "../data/financeiro.json");
+const { conectar } = require("./db");
 
 // ──────────────────────────────────────────────
 // CATEGORIAS
@@ -17,110 +13,130 @@ const CATEGORIAS_DESPESA = [
 ];
 
 // ──────────────────────────────────────────────
-// HELPERS
+// HELPER — linha do banco → objeto para o frontend
 // ──────────────────────────────────────────────
-function lerDados() {
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ entradas: [] }, null, 2));
-  }
-  try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-  } catch {
-    return { entradas: [] };
-  }
-}
-
-function salvarDados(dados) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(dados, null, 2));
-  autoCommit();
-}
-
-function autoCommit() {
-  try {
-    const root = path.resolve(__dirname, "..");
-    execSync("git add data/financeiro.json", { cwd: root, stdio: "ignore" });
-    const msg = `chore: atualiza financeiro [${new Date().toLocaleString("pt-BR", { timeZone: "America/Fortaleza" })}]`;
-    execSync(`git commit -m "${msg}"`, { cwd: root, stdio: "ignore" });
-    execSync("git push origin main", { cwd: root, stdio: "ignore" });
-  } catch {
-    // silencia erros de git (ex: "nothing to commit")
-  }
+function rowParaObj(row) {
+  return {
+    id:        row.id.toString(),
+    tipo:      row.tipo,
+    valor:     parseFloat(row.valor),
+    categoria: row.categoria,
+    descricao: row.descricao,
+    data:      row.data instanceof Date
+                 ? row.data.toISOString().slice(0, 10)
+                 : String(row.data).slice(0, 10),
+    criadoEm: row.criado_em,
+  };
 }
 
 // ──────────────────────────────────────────────
 // CRUD
 // ──────────────────────────────────────────────
 
-function adicionarEntrada({ tipo, valor, categoria, descricao, data }) {
+async function adicionarEntrada({ tipo, valor, categoria, descricao, data }) {
+  const pool = await conectar();
+
   if (!["receita", "despesa"].includes(tipo)) throw new Error("tipo deve ser 'receita' ou 'despesa'");
-  if (!valor || isNaN(valor) || valor <= 0) throw new Error("valor inválido");
+  if (!valor || isNaN(valor) || valor <= 0)   throw new Error("valor inválido");
 
-  const dados = lerDados();
-  const entrada = {
-    id: Date.now().toString(),
-    tipo,
-    valor: parseFloat(parseFloat(valor).toFixed(2)),
-    categoria: categoria || "Outros",
-    descricao: descricao || "",
-    data: data || new Date().toISOString().slice(0, 10),
-    criadoEm: new Date().toISOString(),
-  };
+  const dataFinal = data || new Date().toISOString().slice(0, 10);
 
-  dados.entradas.push(entrada);
-  salvarDados(dados);
-  return entrada;
+  const { rows } = await pool.query(
+    `INSERT INTO financeiro (tipo, valor, categoria, descricao, data)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [
+      tipo,
+      parseFloat(parseFloat(valor).toFixed(2)),
+      categoria || "Outros",
+      descricao || "",
+      dataFinal,
+    ]
+  );
+
+  return rowParaObj(rows[0]);
 }
 
-function removerEntrada(id) {
-  const dados = lerDados();
-  const antes = dados.entradas.length;
-  dados.entradas = dados.entradas.filter((e) => e.id !== id);
-  if (dados.entradas.length === antes) throw new Error("Entrada não encontrada");
-  salvarDados(dados);
+async function removerEntrada(id) {
+  const pool = await conectar();
+
+  const { rowCount } = await pool.query(
+    "DELETE FROM financeiro WHERE id = $1",
+    [id]
+  );
+
+  if (rowCount === 0) throw new Error("Entrada não encontrada");
   return { removido: id };
 }
 
-function listarEntradas(filtros = {}) {
-  const dados = lerDados();
-  let entradas = [...dados.entradas].sort((a, b) => new Date(b.data) - new Date(a.data));
+async function listarEntradas(filtros = {}) {
+  const pool = await conectar();
 
-  if (filtros.tipo) entradas = entradas.filter((e) => e.tipo === filtros.tipo);
-  if (filtros.dataInicio) entradas = entradas.filter((e) => e.data >= filtros.dataInicio);
-  if (filtros.dataFim)    entradas = entradas.filter((e) => e.data <= filtros.dataFim);
+  const conds = [];
+  const vals  = [];
 
-  return entradas;
+  if (filtros.tipo) {
+    vals.push(filtros.tipo);
+    conds.push(`tipo = $${vals.length}`);
+  }
+  if (filtros.dataInicio) {
+    vals.push(filtros.dataInicio);
+    conds.push(`data >= $${vals.length}`);
+  }
+  if (filtros.dataFim) {
+    vals.push(filtros.dataFim);
+    conds.push(`data <= $${vals.length}`);
+  }
+
+  const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
+  const { rows } = await pool.query(
+    `SELECT * FROM financeiro ${where} ORDER BY data DESC, criado_em DESC`,
+    vals
+  );
+
+  return rows.map(rowParaObj);
 }
 
 // ──────────────────────────────────────────────
 // RESUMO / MÉTRICAS
 // ──────────────────────────────────────────────
 
-function calcularResumo(dias = 7) {
-  // dias = 0 significa "tudo" (histórico completo)
+async function calcularResumo(dias = 7) {
+  const pool = await conectar();
+
   const tudoHistorico = dias === 0;
-  let entradas, dataInicioStr;
+  let dataInicioStr;
+  let rows;
 
   if (tudoHistorico) {
-    entradas = listarEntradas();
-    const datas = entradas.map((e) => e.data).sort();
-    dataInicioStr = datas[0] || new Date().toISOString().slice(0, 10);
+    ({ rows } = await pool.query(
+      "SELECT * FROM financeiro ORDER BY data ASC, criado_em ASC"
+    ));
+    dataInicioStr = rows.length > 0
+      ? rowParaObj(rows[0]).data
+      : new Date().toISOString().slice(0, 10);
   } else {
     const dataInicio = new Date();
     dataInicio.setDate(dataInicio.getDate() - (dias - 1));
     dataInicioStr = dataInicio.toISOString().slice(0, 10);
-    entradas = listarEntradas({ dataInicio: dataInicioStr });
+
+    ({ rows } = await pool.query(
+      "SELECT * FROM financeiro WHERE data >= $1 ORDER BY data ASC",
+      [dataInicioStr]
+    ));
   }
 
-  const faturamento = entradas.filter((e) => e.tipo === "receita").reduce((s, e) => s + e.valor, 0);
-  const gastos      = entradas.filter((e) => e.tipo === "despesa").reduce((s, e) => s + e.valor, 0);
+  const entradas = rows.map(rowParaObj);
+
+  const faturamento = entradas.filter(e => e.tipo === "receita").reduce((s, e) => s + e.valor, 0);
+  const gastos      = entradas.filter(e => e.tipo === "despesa").reduce((s, e) => s + e.valor, 0);
   const lucro       = faturamento - gastos;
   const margem      = faturamento > 0 ? parseFloat(((lucro / faturamento) * 100).toFixed(1)) : 0;
 
-  // Agrupa por semana (tudo) ou por dia
+  // Agrupamento por semana (histórico) ou por dia
   const porDia = {};
   if (tudoHistorico) {
-    entradas.forEach((e) => {
+    entradas.forEach(e => {
       const d = new Date(e.data + "T12:00:00");
       const inicio = new Date(d);
       inicio.setDate(d.getDate() - d.getDay());
@@ -135,7 +151,7 @@ function calcularResumo(dias = 7) {
       const key = d.toISOString().slice(0, 10);
       porDia[key] = { data: key, receita: 0, despesa: 0 };
     }
-    entradas.forEach((e) => {
+    entradas.forEach(e => {
       if (porDia[e.data]) {
         porDia[e.data][e.tipo === "receita" ? "receita" : "despesa"] += e.valor;
       }
@@ -144,7 +160,7 @@ function calcularResumo(dias = 7) {
 
   // Top categorias de despesa
   const catDespesa = {};
-  entradas.filter((e) => e.tipo === "despesa").forEach((e) => {
+  entradas.filter(e => e.tipo === "despesa").forEach(e => {
     catDespesa[e.categoria] = (catDespesa[e.categoria] || 0) + e.valor;
   });
 
@@ -164,11 +180,67 @@ function calcularResumo(dias = 7) {
   };
 }
 
+// ──────────────────────────────────────────────
+// RESUMO POR INTERVALO CUSTOMIZADO (ex: "esta semana")
+// ──────────────────────────────────────────────
+
+async function calcularResumoCustom(dataInicio, dataFim = null) {
+  const pool = await conectar();
+
+  const params = [dataInicio];
+  let whereFim = "";
+  if (dataFim) {
+    params.push(dataFim);
+    whereFim = ` AND data <= $2`;
+  }
+
+  const { rows } = await pool.query(
+    `SELECT * FROM financeiro WHERE data >= $1${whereFim} ORDER BY data ASC`,
+    params
+  );
+
+  const entradas = rows.map(rowParaObj);
+
+  const faturamento = entradas.filter(e => e.tipo === "receita").reduce((s, e) => s + e.valor, 0);
+  const gastos      = entradas.filter(e => e.tipo === "despesa").reduce((s, e) => s + e.valor, 0);
+  const lucro       = faturamento - gastos;
+  const margem      = faturamento > 0 ? parseFloat(((lucro / faturamento) * 100).toFixed(1)) : 0;
+
+  // Agrupamento por dia
+  const porDia = {};
+  entradas.forEach(e => {
+    if (!porDia[e.data]) porDia[e.data] = { data: e.data, receita: 0, despesa: 0 };
+    porDia[e.data][e.tipo === "receita" ? "receita" : "despesa"] += e.valor;
+  });
+
+  const catDespesa = {};
+  entradas.filter(e => e.tipo === "despesa").forEach(e => {
+    catDespesa[e.categoria] = (catDespesa[e.categoria] || 0) + e.valor;
+  });
+
+  return {
+    periodo: "custom",
+    dataInicio,
+    dataFim: dataFim || new Date().toISOString().slice(0, 10),
+    faturamento: parseFloat(faturamento.toFixed(2)),
+    gastos:      parseFloat(gastos.toFixed(2)),
+    lucro:       parseFloat(lucro.toFixed(2)),
+    margem,
+    totalEntradas: entradas.length,
+    grafico: Object.values(porDia).sort((a, b) => a.data.localeCompare(b.data)),
+    topDespesas: Object.entries(catDespesa)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([cat, val]) => ({ categoria: cat, valor: parseFloat(val.toFixed(2)) })),
+  };
+}
+
 module.exports = {
   adicionarEntrada,
   removerEntrada,
   listarEntradas,
   calcularResumo,
+  calcularResumoCustom,
   CATEGORIAS_RECEITA,
   CATEGORIAS_DESPESA,
 };

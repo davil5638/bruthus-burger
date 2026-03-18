@@ -5,11 +5,29 @@ import Button from '../../components/Button'
 import PageHeader from '../../components/PageHeader'
 import { Toast } from '../../components/Toast'
 
+// Retorna a segunda-feira da semana PASSADA no formato YYYY-MM-DD
+function getSegundaUltimaSemana() {
+  const hoje = new Date()
+  const dia = hoje.getDay() // 0=Dom, 1=Seg...
+  const diff = dia === 0 ? -13 : 1 - dia - 7
+  const seg = new Date(hoje)
+  seg.setDate(hoje.getDate() + diff)
+  return seg.toISOString().slice(0, 10)
+}
+
+// Retorna o domingo da semana PASSADA
+function getDomingoUltimaSemana() {
+  const seg = new Date(getSegundaUltimaSemana())
+  seg.setDate(seg.getDate() + 6)
+  return seg.toISOString().slice(0, 10)
+}
+
 const PERIODOS = [
-  { valor: 7,  label: '7 dias'  },
-  { valor: 14, label: '14 dias' },
-  { valor: 30, label: '30 dias' },
-  { valor: 0,  label: 'Todos'   },
+  { valor: 'semana', label: 'Última semana' },
+  { valor: 7,        label: '7 dias'      },
+  { valor: 14,       label: '14 dias'     },
+  { valor: 30,       label: '30 dias'     },
+  { valor: 0,        label: 'Todos'       },
 ]
 
 const CAT_RECEITA = ['Vendas no local', 'Delivery', 'Ifood', 'Outros']
@@ -19,7 +37,7 @@ function fmt(v) { return `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}` }
 function fmtData(d) { return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') }
 
 export default function FinanceiroPage() {
-  const [periodo, setPeriodo]     = useState(7)
+  const [periodo, setPeriodo]     = useState('semana')
   const [resumo, setResumo]       = useState(null)
   const [entradas, setEntradas]   = useState([])
   const [loading, setLoading]     = useState(true)
@@ -34,8 +52,14 @@ export default function FinanceiroPage() {
   const carregar = useCallback(async () => {
     setLoading(true)
     try {
+      let resumoUrl
+      if (periodo === 'semana') {
+        resumoUrl = `/financeiro/resumo?dataInicio=${getSegundaUltimaSemana()}&dataFim=${getDomingoUltimaSemana()}`
+      } else {
+        resumoUrl = `/financeiro/resumo?dias=${periodo}`
+      }
       const [r, e] = await Promise.all([
-        api.get(`/financeiro/resumo?dias=${periodo}`),
+        api.get(resumoUrl),
         api.get('/financeiro'),
       ])
       setResumo(r.resumo)
@@ -84,10 +108,16 @@ export default function FinanceiroPage() {
   const maxGrafico = resumo?.grafico ? Math.max(...resumo.grafico.map(d => Math.max(d.receita, d.despesa)), 1) : 1
 
   // Entradas do período exibido
-  const entradasPeriodo = periodo === 0 ? entradas : entradas.filter(e => {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (periodo - 1));
-    return new Date(e.data + 'T12:00:00') >= cutoff;
-  })
+  const entradasPeriodo = (() => {
+    if (periodo === 0) return entradas
+    if (periodo === 'semana') {
+      const seg = getSegundaUltimaSemana()
+      const dom = getDomingoUltimaSemana()
+      return entradas.filter(e => e.data >= seg && e.data <= dom)
+    }
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (periodo - 1))
+    return entradas.filter(e => new Date(e.data + 'T12:00:00') >= cutoff)
+  })()
 
   return (
     <div className="max-w-4xl">
@@ -122,7 +152,9 @@ export default function FinanceiroPage() {
             <p className={`text-xl font-bold ${c.cor}`}>
               {loading ? '…' : (c.custom || fmt(c.valor))}
             </p>
-            <p className="text-[10px] text-[#444] mt-1">{periodo === 0 ? 'desde a abertura' : `últimos ${periodo} dias`}</p>
+            <p className="text-[10px] text-[#444] mt-1">
+              {periodo === 0 ? 'desde a abertura' : periodo === 'semana' ? 'seg a dom da semana passada' : `últimos ${periodo} dias`}
+            </p>
           </div>
         ))}
       </div>

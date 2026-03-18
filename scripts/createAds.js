@@ -12,7 +12,7 @@ const AD_ACCOUNT_ID = _RAW_AD_ACCOUNT_ID.startsWith("act_")
 const IG_USER_ID = process.env.IG_USER_ID;
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
-const GRAPH_API = "https://graph.facebook.com/v18.0";
+const GRAPH_API = "https://graph.facebook.com/v21.0";
 
 // ──────────────────────────────────────────────
 // VALIDAÇÃO
