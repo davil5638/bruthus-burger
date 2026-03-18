@@ -61,12 +61,10 @@ const SEGMENTACAO_PADRAO = {
   flexible_spec: [
     {
       interests: [
-        { id: "6003107902433", name: "Fast food"         },
-        { id: "6003349442621", name: "Hamburger"         },
-        { id: "6003020834693", name: "Food delivery"     },
-        { id: "6003107902434", name: "Restaurant"        },
-        { id: "6003200757498", name: "Online food order" },
-        { id: "6003348604981", name: "Street food"       },
+        { id: "6003107902433", name: "Fast food"     },
+        { id: "6003349442621", name: "Hamburger"     },
+        { id: "6003020834693", name: "Food delivery" },
+        { id: "6003107902434", name: "Restaurant"    },
       ],
     },
   ],
@@ -122,9 +120,8 @@ async function criarAdSet(campanhaId, nomeAdSet, orcamentoDiario = ORCAMENTO_DIA
     campaign_id: campanhaId,
     daily_budget: orcamentoDiario,
     billing_event: "IMPRESSIONS",
-    optimization_goal: "LANDING_PAGE_VIEWS",
+    optimization_goal: "LINK_CLICKS",
     bid_strategy: "LOWEST_COST_WITHOUT_CAP",
-    destination_type: "WEBSITE",
     targeting: SEGMENTACAO_PADRAO,
     start_time: Math.floor(amanha.getTime() / 1000),
     status: "PAUSED",
