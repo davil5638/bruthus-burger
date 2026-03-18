@@ -16,8 +16,12 @@ const CLOUD_SEC  = process.env.CLOUDINARY_API_SECRET;
 // 1. Baixa foto do Cloudinary já redimensionada
 // ──────────────────────────────────────────────
 async function baixarFoto(publicId) {
-  const url = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/w_1080,h_1920,c_fill,g_north,f_jpg,q_auto/${publicId}`;
+  // Garante extensão .jpg para forçar conversão de HEIC/outros formatos
+  const idComExtensao = publicId.endsWith(".jpg") ? publicId : `${publicId}.jpg`;
+  const url = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/w_1080,h_1920,c_fill,g_north,q_auto/${idComExtensao}`;
+  console.log(`   📥 Baixando: ${url}`);
   const res = await axios.get(url, { responseType: "arraybuffer" });
+  if (!res.data || res.data.byteLength === 0) throw new Error("Cloudinary retornou imagem vazia");
   return Buffer.from(res.data);
 }
 
