@@ -5,29 +5,36 @@ import Button from '../../components/Button'
 import PageHeader from '../../components/PageHeader'
 import { Toast } from '../../components/Toast'
 
-// Retorna a segunda-feira da semana PASSADA no formato YYYY-MM-DD
-function getSegundaUltimaSemana() {
+// Ciclo Ter→Seg: retorna a última terça-feira (início da semana atual)
+function getUltimaTerca() {
   const hoje = new Date()
-  const dia = hoje.getDay() // 0=Dom, 1=Seg...
-  const diff = dia === 0 ? -13 : 1 - dia - 7
-  const seg = new Date(hoje)
-  seg.setDate(hoje.getDate() + diff)
-  return seg.toISOString().slice(0, 10)
+  const dia = hoje.getDay() // 0=Dom,1=Seg,2=Ter...
+  const diasDesdeTerca = (dia + 5) % 7 // Ter=0, Qua=1, ... Seg=6
+  const terca = new Date(hoje)
+  terca.setDate(hoje.getDate() - diasDesdeTerca)
+  return terca.toISOString().slice(0, 10)
 }
 
-// Retorna o domingo da semana PASSADA
-function getDomingoUltimaSemana() {
-  const seg = new Date(getSegundaUltimaSemana())
-  seg.setDate(seg.getDate() + 6)
-  return seg.toISOString().slice(0, 10)
+// Retorna a terça anterior à semana atual (início da semana passada)
+function getTercaSemanaPassada() {
+  const terca = new Date(getUltimaTerca())
+  terca.setDate(terca.getDate() - 7)
+  return terca.toISOString().slice(0, 10)
+}
+
+// Retorna a segunda-feira da semana passada (fim da semana passada)
+function getSegSemanaPassada() {
+  const terca = new Date(getUltimaTerca())
+  terca.setDate(terca.getDate() - 1) // dia anterior à terça atual = segunda passada
+  return terca.toISOString().slice(0, 10)
 }
 
 const PERIODOS = [
-  { valor: 'semana', label: 'Última semana' },
-  { valor: 7,        label: '7 dias'      },
-  { valor: 14,       label: '14 dias'     },
-  { valor: 30,       label: '30 dias'     },
-  { valor: 0,        label: 'Todos'       },
+  { valor: 'semana',        label: 'Semana atual'   },
+  { valor: 'semana-passada', label: 'Semana passada' },
+  { valor: 14,              label: '14 dias'        },
+  { valor: 30,              label: '30 dias'        },
+  { valor: 0,               label: 'Todos'          },
 ]
 
 const CAT_RECEITA = ['Vendas no local', 'Delivery', 'Ifood', 'Outros']
@@ -97,7 +104,9 @@ export default function FinanceiroPage() {
     try {
       let resumoUrl
       if (periodo === 'semana') {
-        resumoUrl = `/financeiro/resumo?dataInicio=${getSegundaUltimaSemana()}&dataFim=${getDomingoUltimaSemana()}`
+        resumoUrl = `/financeiro/resumo?dataInicio=${getUltimaTerca()}`
+      } else if (periodo === 'semana-passada') {
+        resumoUrl = `/financeiro/resumo?dataInicio=${getTercaSemanaPassada()}&dataFim=${getSegSemanaPassada()}`
       } else {
         resumoUrl = `/financeiro/resumo?dias=${periodo}`
       }
@@ -154,9 +163,13 @@ export default function FinanceiroPage() {
   const entradasPeriodo = (() => {
     if (periodo === 0) return entradas
     if (periodo === 'semana') {
-      const seg = getSegundaUltimaSemana()
-      const dom = getDomingoUltimaSemana()
-      return entradas.filter(e => e.data >= seg && e.data <= dom)
+      const terca = getUltimaTerca()
+      return entradas.filter(e => e.data >= terca)
+    }
+    if (periodo === 'semana-passada') {
+      const ini = getTercaSemanaPassada()
+      const fim = getSegSemanaPassada()
+      return entradas.filter(e => e.data >= ini && e.data <= fim)
     }
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (periodo - 1))
     return entradas.filter(e => new Date(e.data + 'T12:00:00') >= cutoff)
@@ -196,7 +209,7 @@ export default function FinanceiroPage() {
               {loading ? '…' : (c.custom || fmt(c.valor))}
             </p>
             <p className="text-[10px] text-[#444] mt-1">
-              {periodo === 0 ? 'desde a abertura' : periodo === 'semana' ? 'seg a dom da semana passada' : `últimos ${periodo} dias`}
+              {periodo === 0 ? 'desde a abertura' : periodo === 'semana' ? 'desde terça-feira' : periodo === 'semana-passada' ? 'ter → seg passados' : `últimos ${periodo} dias`}
             </p>
           </div>
         ))}
