@@ -633,18 +633,24 @@ app.get("/debug/cloudinary-fotos", async (req, res) => {
   }
 
   try {
-    // Usa /resources (sem /image) com asset_folder para Dynamic Folders
-    const r = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources`, {
+    // Lista TUDO com mais resultados para achar as fotos reais
+    const r = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image`, {
       auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
-      params: { asset_folder: FOLDER, max_results: 10 },
+      params: { type: "upload", max_results: 50 },
     });
-    const fotos = (r.data.resources || []).map(f => ({
+    const todos = (r.data.resources || []).map(f => ({
       public_id: f.public_id,
-      asset_folder: f.asset_folder,
+      asset_folder: f.asset_folder || "sem_pasta",
       display_name: f.display_name,
-      url: f.secure_url,
     }));
-    res.json({ pasta: FOLDER, total: fotos.length, fotos });
+    // Agrupa por pasta
+    const porPasta = {};
+    todos.forEach(f => {
+      const p = f.asset_folder;
+      if (!porPasta[p]) porPasta[p] = [];
+      porPasta[p].push(f.public_id);
+    });
+    res.json({ cloudName: CLOUD_NAME, pastaConfig: FOLDER, totalGeral: todos.length, porPasta });
   } catch (e) {
     res.status(500).json({ erro: e.message, detalhes: e.response?.data });
   }
