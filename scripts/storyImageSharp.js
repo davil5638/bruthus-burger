@@ -126,7 +126,8 @@ function gerarSVG({ principal, secundario, link, cor = "white" }) {
 // ──────────────────────────────────────────────
 async function uploadCloudinary(buffer, publicId) {
   const timestamp = Math.floor(Date.now() / 1000);
-  const toSign    = `public_id=${publicId}&timestamp=${timestamp}${CLOUD_SEC}`;
+  // Parâmetros em ordem alfabética + secret no final (exigência do Cloudinary)
+  const toSign    = `overwrite=true&public_id=${publicId}&timestamp=${timestamp}${CLOUD_SEC}`;
   const signature = crypto.createHash("sha1").update(toSign).digest("hex");
 
   const form = new FormData();
