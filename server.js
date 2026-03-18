@@ -414,6 +414,98 @@ app.post("/ads/impulsionar-post", async (req, res) => {
   }
 });
 
+// ── ANÁLISE PRÉ-CRIAÇÃO: vale a pena criar esse anúncio? ──
+app.post("/ads/analisar", async (req, res) => {
+  try {
+    const { orcamentoDiario = 2000, tipo = "SMASH" } = req.body;
+    const orcamentoReais = orcamentoDiario / 100;
+
+    // Busca histórico de campanhas (silencioso se falhar)
+    let comDados = [];
+    try {
+      const todas = await gerarRelatorioCompleto();
+      comDados = todas.filter(c => !c.erro && c.impressoes > 0);
+    } catch (e) {
+      console.warn("⚠️ Não buscou campanhas para análise:", e.message);
+    }
+
+    const totalGasto   = comDados.reduce((s, c) => s + c.gasto, 0);
+    const ctrMedio     = comDados.length ? comDados.reduce((s, c) => s + c.ctr, 0) / comDados.length : 0;
+    const cpcMedio     = comDados.length ? comDados.reduce((s, c) => s + c.cpc, 0) / comDados.length : 0;
+    const semHistorico = comDados.length === 0;
+
+    const campResumida = comDados.map(c => ({
+      nome:       c.nome,
+      status:     c.status,
+      impressoes: c.impressoes,
+      cliques:    c.cliques,
+      gasto:      c.gasto,
+      ctr:        c.ctr,
+      cpc:        c.cpc,
+      cpm:        c.cpm,
+      alcance:    c.alcance,
+      frequencia: c.frequencia,
+    }));
+
+    const openai = new (require("openai"))({ apiKey: process.env.OPENAI_API_KEY });
+
+    const prompt = `Você é um gestor de tráfego pago experiente em Meta Ads para restaurantes no Brasil. O dono é leigo — seja claro, direto e objetivo.
+
+Hamburgueria: Bruthus Burger (Fortaleza-CE) — delivery e retirada, cidade pequena
+Novo anúncio proposto: tipo "${tipo}", orçamento R$${orcamentoReais.toFixed(2)}/dia
+
+Histórico de campanhas:
+${semHistorico ? "Sem histórico — esta seria a primeira campanha." : JSON.stringify(campResumida, null, 2)}
+
+Referências reais do mercado (Meta Ads food delivery Brasil):
+- CTR bom: >1.5% | ruim: <0.8%
+- CPC bom: <R$1,50 | ruim: >R$2,50
+- CPM bom: <R$15 | ruim: >R$25
+- Orçamento mínimo para resultado real: R$20/dia (R$10/dia gera poucos dados)
+- Frequência ideal: 1.5–3x (abaixo = pouco impacto, acima = saturação)
+
+Avalie: vale a pena criar esse anúncio agora? Qual o retorno esperado?
+
+Retorne APENAS este JSON (sem markdown):
+{
+  "recomendacao": "SIM",
+  "nota": 7,
+  "resumo": "frase curta e direta",
+  "motivos": ["motivo positivo ou negativo 1", "motivo 2"],
+  "dicas": ["dica prática 1", "dica prática 2"],
+  "alertas": ["alerta importante se houver, senão array vazio"]
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 500,
+      temperature: 0.6,
+    });
+
+    const content = completion.choices[0].message.content.trim();
+    const match   = content.match(/\{[\s\S]*\}/);
+    const analise = match
+      ? JSON.parse(match[0])
+      : { recomendacao: "TALVEZ", nota: 5, resumo: "Análise indisponível.", motivos: [], dicas: [], alertas: [] };
+
+    res.json({
+      sucesso: true,
+      analise,
+      historico: {
+        totalCampanhas:    comDados.length,
+        totalGasto:        totalGasto.toFixed(2),
+        ctrMedio:          ctrMedio.toFixed(2),
+        cpcMedio:          cpcMedio.toFixed(2),
+        semHistorico,
+      },
+    });
+  } catch (e) {
+    console.error("Erro /ads/analisar:", e.message);
+    res.status(500).json({ erro: e.message });
+  }
+});
+
 // ── RELATÓRIO DE CAMPANHAS ──
 app.get("/ads/relatorio", async (req, res) => {
   try {

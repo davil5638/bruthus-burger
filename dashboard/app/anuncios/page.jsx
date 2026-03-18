@@ -162,6 +162,10 @@ export default function AnunciosPage() {
   const [loading, setLoading]     = useState(false)
   const [resultado, setResultado] = useState(null)
 
+  // Análise pré-criação
+  const [analise, setAnalise]         = useState(null)
+  const [analisando, setAnalisando]   = useState(false)
+
   // Campanhas existentes
   const [campanhas, setCampanhas]       = useState([])
   const [loadingCamp, setLoadingCamp]   = useState(false)
@@ -249,6 +253,16 @@ export default function AnunciosPage() {
     } catch (err) {
       setToast({ message: err.message, type: 'error' })
     } finally { setGerando(false) }
+  }
+
+  async function analisarAnuncio() {
+    setAnalisando(true); setAnalise(null)
+    try {
+      const data = await api.post('/ads/analisar', { orcamentoDiario: orcamento, tipo: tipoIA })
+      setAnalise(data)
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally { setAnalisando(false) }
   }
 
   async function criarCampanha() {
@@ -431,27 +445,116 @@ export default function AnunciosPage() {
             )}
           </div>
 
-          {/* Passo 3 — Orçamento */}
+          {/* Passo 3 — Orçamento + Análise */}
           <div className={`rounded-xl border p-5 transition-all ${step >= 3 ? 'border-[#f97316]/40 bg-[#f97316]/5' : 'border-[#1e1e1e] bg-[#111] opacity-60'}`}>
             <div className="flex items-center gap-2 mb-4">
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${resultado ? 'bg-[#f97316] text-black' : 'bg-[#222] text-[#666]'}`}>3</span>
               <span className="text-sm font-bold text-white">Orçamento</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
               {ORCAMENTOS.map(o => (
-                <button key={o.valor} onClick={() => setOrcamento(o.valor)}
+                <button key={o.valor} onClick={() => { setOrcamento(o.valor); setAnalise(null) }}
                   className={`p-3 rounded-xl border text-center transition-all ${orcamento === o.valor ? 'border-[#f97316] bg-[#f97316]/10 text-white' : 'border-[#222] bg-[#1a1a1a] text-[#666] hover:border-[#333] hover:text-white'}`}>
                   <div className="text-sm font-bold">{o.label}</div>
                   <div className="text-[10px] opacity-60">{o.desc}</div>
                 </button>
               ))}
             </div>
+
+            {/* Botão Analisar */}
+            {!analise && (
+              <Button onClick={analisarAnuncio} loading={analisando} variant="secondary" size="lg" className="w-full mb-3" disabled={step < 3}>
+                {analisando ? '⏳ Analisando com IA...' : '🔍 Analisar antes de criar'}
+              </Button>
+            )}
+
+            {/* Card de análise */}
+            {analise && (() => {
+              const a = analise.analise
+              const corMap = { SIM: { border: 'border-green-500/40', bg: 'bg-green-500/5', badge: 'bg-green-500/20 text-green-300 border-green-500/30', icon: '🟢' }, TALVEZ: { border: 'border-yellow-500/40', bg: 'bg-yellow-500/5', badge: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30', icon: '🟡' }, NAO: { border: 'border-red-500/40', bg: 'bg-red-500/5', badge: 'bg-red-500/20 text-red-300 border-red-500/30', icon: '🔴' } }
+              const cor = corMap[a?.recomendacao] || corMap.TALVEZ
+              return (
+                <div className={`rounded-xl border ${cor.border} ${cor.bg} p-4 mb-3`}>
+                  {/* Cabeçalho */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{cor.icon}</span>
+                      <div>
+                        <p className="text-sm font-bold text-white">Análise da IA</p>
+                        <p className="text-[11px] text-[#777]">{a?.resumo}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full border ${cor.badge}`}>
+                        {a?.recomendacao === 'SIM' ? '✅ Vale a pena' : a?.recomendacao === 'TALVEZ' ? '⚠️ Com cuidado' : '❌ Não recomendado'}
+                      </span>
+                      <span className="text-lg font-bold text-white">{a?.nota}/10</span>
+                    </div>
+                  </div>
+
+                  {/* Motivos */}
+                  {a?.motivos?.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-1.5">Por quê:</p>
+                      <ul className="space-y-1">
+                        {a.motivos.map((m, i) => (
+                          <li key={i} className="text-[11px] text-[#aaa] flex gap-1.5"><span className="text-[#555] shrink-0">•</span>{m}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Alertas */}
+                  {a?.alertas?.length > 0 && (
+                    <div className="mb-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                      <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wider mb-1">⚠️ Atenção:</p>
+                      {a.alertas.map((al, i) => (
+                        <p key={i} className="text-[11px] text-red-300">{al}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Dicas */}
+                  {a?.dicas?.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-1.5">💡 Dicas:</p>
+                      <ul className="space-y-1">
+                        {a.dicas.map((d, i) => (
+                          <li key={i} className="text-[11px] text-[#aaa] flex gap-1.5"><span className="text-[#f97316] shrink-0">→</span>{d}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Histórico */}
+                  {analise.historico && !analise.historico.semHistorico && (
+                    <div className="flex gap-2 flex-wrap mt-2">
+                      <span className="text-[10px] bg-[#1a1a1a] text-[#555] px-2 py-1 rounded">💰 Gasto total: R${analise.historico.totalGasto}</span>
+                      <span className="text-[10px] bg-[#1a1a1a] text-[#555] px-2 py-1 rounded">📈 CTR médio: {analise.historico.ctrMedio}%</span>
+                      <span className="text-[10px] bg-[#1a1a1a] text-[#555] px-2 py-1 rounded">💵 CPC médio: R${analise.historico.cpcMedio}</span>
+                    </div>
+                  )}
+
+                  <button onClick={() => setAnalise(null)} className="mt-3 text-[10px] text-[#555] hover:text-[#888]">↺ Nova análise</button>
+                </div>
+              )
+            })()}
+
             <div className="p-3 rounded-lg bg-[#0f0f0f] border border-[#1e1e1e] mb-4 text-xs text-[#666]">
               💡 Campanha criada <strong className="text-[#888]">pausada</strong> — ative no Gerenciador após revisão. Gasto registrado no financeiro automaticamente.
             </div>
-            <Button onClick={criarCampanha} loading={loading} size="lg" className="w-full" disabled={step < 3}>
-              📣 Criar Campanha · {ORCAMENTOS.find(o => o.valor === orcamento)?.label}
-            </Button>
+
+            {analise ? (
+              <Button onClick={criarCampanha} loading={loading} size="lg" className="w-full" disabled={step < 3}>
+                {analise.analise?.recomendacao === 'NAO'
+                  ? '⚠️ Criar mesmo assim'
+                  : `📣 Criar Campanha · ${ORCAMENTOS.find(o => o.valor === orcamento)?.label}`}
+              </Button>
+            ) : (
+              <button disabled className="w-full py-3 rounded-xl border border-[#222] bg-[#111] text-[#444] text-sm font-semibold cursor-not-allowed">
+                🔒 Analise primeiro para liberar a criação
+              </button>
+            )}
           </div>
 
           {/* Resultado */}

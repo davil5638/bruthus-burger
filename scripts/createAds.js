@@ -66,20 +66,23 @@ const SEGMENTACAO_PADRAO = {
 // ──────────────────────────────────────────────
 
 /**
- * Cria uma campanha de tráfego com objetivo de converter em pedidos
+ * Cria uma campanha de tráfego com CBO (Campaign Budget Optimization).
+ * O orçamento fica na campanha — elimina a necessidade de is_adset_budget_sharing_enabled.
  */
-async function criarCampanha(nomeCampanha, objetivo = "OUTCOME_TRAFFIC") {
+async function criarCampanha(nomeCampanha, objetivo = "OUTCOME_TRAFFIC", orcamentoDiario = ORCAMENTO_DIARIO_CENTAVOS) {
   const url = `${GRAPH_API}/${AD_ACCOUNT_ID}/campaigns`;
 
   console.log(`\n📣 Criando campanha: "${nomeCampanha}"...`);
+  console.log(`   💰 Orçamento CBO: R$${(orcamentoDiario / 100).toFixed(2)}/dia`);
 
   const response = await axios.post(url, null, {
     params: {
-      name: nomeCampanha,
-      objective: objetivo, // OUTCOME_TRAFFIC (padrão atual Meta — substitui LINK_CLICKS)
-      status: "PAUSED",
-      special_ad_categories: JSON.stringify([]),
-      access_token: ACCESS_TOKEN,
+      name:                   nomeCampanha,
+      objective:              objetivo,
+      status:                 "PAUSED",
+      special_ad_categories:  JSON.stringify([]),
+      daily_budget:           String(orcamentoDiario), // CBO — orçamento na campanha
+      access_token:           ACCESS_TOKEN,
     },
   });
 
@@ -92,33 +95,27 @@ async function criarCampanha(nomeCampanha, objetivo = "OUTCOME_TRAFFIC") {
 // ──────────────────────────────────────────────
 
 /**
- * Cria o conjunto de anúncios com segmentação e orçamento
+ * Cria o conjunto de anúncios com segmentação.
+ * Sem orçamento aqui — budget fica na campanha (CBO).
+ * Isso elimina o campo is_adset_budget_sharing_enabled.
  */
-async function criarAdSet(campanhaId, nomeAdSet, orcamentoDiario = ORCAMENTO_DIARIO_CENTAVOS) {
+async function criarAdSet(campanhaId, nomeAdSet) {
   const url = `${GRAPH_API}/${AD_ACCOUNT_ID}/adsets`;
-  const amanha = new Date();
-  amanha.setDate(amanha.getDate() + 1);
-  amanha.setHours(19, 0, 0, 0); // começa às 19h de amanhã
 
   console.log(`\n🎯 Criando Ad Set: "${nomeAdSet}"...`);
-  console.log(`   💰 Orçamento: R$${(orcamentoDiario / 100).toFixed(2)}/dia`);
   console.log(`   📍 Raio: 2km | Idade: 18-55 anos`);
 
-  // Todos os parâmetros no body (form-encoded) — padrão da Graph API
-  // is_adset_budget_sharing_enabled=0 (falso) é obrigatório quando sem CBO
-  const body = new URLSearchParams();
-  body.append("name",                            nomeAdSet);
-  body.append("campaign_id",                     campanhaId);
-  body.append("daily_budget",                    String(orcamentoDiario));
-  body.append("billing_event",                   "IMPRESSIONS");
-  body.append("optimization_goal",               "LINK_CLICKS");
-  body.append("targeting",                       JSON.stringify(SEGMENTACAO_PADRAO));
-  body.append("status",                          "PAUSED");
-  body.append("is_adset_budget_sharing_enabled", "0");
-  body.append("access_token",                    ACCESS_TOKEN);
-
-  const response = await axios.post(url, body, {
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  // CBO: sem daily_budget no ad set — budget já está na campanha
+  const response = await axios.post(url, null, {
+    params: {
+      name:              nomeAdSet,
+      campaign_id:       campanhaId,
+      billing_event:     "IMPRESSIONS",
+      optimization_goal: "LINK_CLICKS",
+      targeting:         JSON.stringify(SEGMENTACAO_PADRAO),
+      status:            "PAUSED",
+      access_token:      ACCESS_TOKEN,
+    },
   });
 
   console.log(`✅ Ad Set criado: ${response.data.id}`);
@@ -247,14 +244,17 @@ async function criarCampanhaCompleta(config = {}) {
 
     const timestamp = new Date().toISOString().slice(0, 10);
 
-    // 1. Campanha
-    const campanhaId = await criarCampanha(`${nomeCampanha} - ${timestamp}`);
+    // 1. Campanha — orçamento fica aqui (CBO)
+    const campanhaId = await criarCampanha(
+      `${nomeCampanha} - ${timestamp}`,
+      "OUTCOME_TRAFFIC",
+      orcamentoDiario
+    );
 
-    // 2. Ad Set
+    // 2. Ad Set — sem orçamento (herdado da campanha via CBO)
     const adSetId = await criarAdSet(
       campanhaId,
-      `AdSet — 3km | 19h-23h | Qui-Dom — ${timestamp}`,
-      orcamentoDiario
+      `AdSet — 2km | Instagram — ${timestamp}`
     );
 
     // 3. Criativo
@@ -342,8 +342,8 @@ async function impulsionarPost(config = {}) {
 
   const timestamp = new Date().toISOString().slice(0, 10);
 
-  const campanhaId  = await criarCampanha(`${nomeCampanha} - ${timestamp}`);
-  const adSetId     = await criarAdSet(campanhaId, `AdSet — 2km | Instagram — ${timestamp}`, orcamentoDiario);
+  const campanhaId  = await criarCampanha(`${nomeCampanha} - ${timestamp}`, "OUTCOME_TRAFFIC", orcamentoDiario);
+  const adSetId     = await criarAdSet(campanhaId, `AdSet — 2km | Instagram — ${timestamp}`);
   const creativoId  = await criarCreativoDePostExistente(`Criativo Post ${mediaId} - ${timestamp}`, mediaId);
   const anuncioId   = await criarAnuncio(adSetId, creativoId, `Anúncio Post - ${timestamp}`);
 
