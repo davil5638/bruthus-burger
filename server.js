@@ -834,12 +834,30 @@ app.post("/financeiro", async (req, res) => {
   }
 });
 
+app.put("/financeiro/:id", async (req, res) => {
+  try {
+    const entrada = await fin.editarEntrada(req.params.id, req.body);
+    res.json({ sucesso: true, entrada });
+  } catch (error) {
+    res.status(400).json({ erro: error.message });
+  }
+});
+
 app.delete("/financeiro/:id", async (req, res) => {
   try {
     const resultado = await fin.removerEntrada(req.params.id);
     res.json({ sucesso: true, ...resultado });
   } catch (error) {
     res.status(404).json({ erro: error.message });
+  }
+});
+
+app.get("/financeiro/evolucao", async (req, res) => {
+  try {
+    const evolucao = await fin.evolucaoMensal();
+    res.json({ sucesso: true, evolucao });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
   }
 });
 

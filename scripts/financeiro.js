@@ -181,6 +181,70 @@ async function calcularResumo(dias = 7) {
 }
 
 // ──────────────────────────────────────────────
+// EDITAR
+// ──────────────────────────────────────────────
+
+async function editarEntrada(id, dados) {
+  const pool = await conectar();
+
+  const campos = [];
+  const vals   = [];
+
+  if (dados.valor !== undefined) {
+    vals.push(parseFloat(parseFloat(dados.valor).toFixed(2)));
+    campos.push(`valor = $${vals.length}`);
+  }
+  if (dados.categoria !== undefined) {
+    vals.push(dados.categoria);
+    campos.push(`categoria = $${vals.length}`);
+  }
+  if (dados.descricao !== undefined) {
+    vals.push(dados.descricao);
+    campos.push(`descricao = $${vals.length}`);
+  }
+  if (dados.data !== undefined) {
+    vals.push(dados.data);
+    campos.push(`data = $${vals.length}`);
+  }
+
+  if (campos.length === 0) throw new Error("Nenhum campo para atualizar");
+
+  vals.push(id);
+  const { rows } = await pool.query(
+    `UPDATE financeiro SET ${campos.join(", ")} WHERE id = $${vals.length} RETURNING *`,
+    vals
+  );
+
+  if (rows.length === 0) throw new Error("Entrada não encontrada");
+  return rowParaObj(rows[0]);
+}
+
+// ──────────────────────────────────────────────
+// EVOLUÇÃO MENSAL
+// ──────────────────────────────────────────────
+
+async function evolucaoMensal() {
+  const pool = await conectar();
+
+  const { rows } = await pool.query(`
+    SELECT
+      TO_CHAR(data, 'YYYY-MM') AS mes,
+      SUM(CASE WHEN tipo = 'receita' THEN valor ELSE 0 END) AS faturamento,
+      SUM(CASE WHEN tipo = 'despesa' THEN valor ELSE 0 END) AS gastos
+    FROM financeiro
+    GROUP BY mes
+    ORDER BY mes ASC
+  `);
+
+  return rows.map(r => ({
+    mes:          r.mes,
+    faturamento:  parseFloat(r.faturamento || 0),
+    gastos:       parseFloat(r.gastos || 0),
+    lucro:        parseFloat((r.faturamento || 0) - (r.gastos || 0)),
+  }));
+}
+
+// ──────────────────────────────────────────────
 // RESUMO POR INTERVALO CUSTOMIZADO (ex: "esta semana")
 // ──────────────────────────────────────────────
 
@@ -237,10 +301,12 @@ async function calcularResumoCustom(dataInicio, dataFim = null) {
 
 module.exports = {
   adicionarEntrada,
+  editarEntrada,
   removerEntrada,
   listarEntradas,
   calcularResumo,
   calcularResumoCustom,
+  evolucaoMensal,
   CATEGORIAS_RECEITA,
   CATEGORIAS_DESPESA,
 };
