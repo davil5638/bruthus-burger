@@ -154,16 +154,10 @@ Retorne APENAS JSON:
  * e precisa de alguns caracteres escapados.
  */
 function encodeTexto(text) {
-  return text
-    .replace(/ /g, "_")
-    .replace(/,/g, "%2C")
-    .replace(/\//g, "%2F")
-    .replace(/:/g, "%3A")
-    .replace(/!/g, "\\!")
-    .replace(/\?/g, "%3F")
-    .replace(/&/g, "%26")
-    .replace(/\(/g, "%28")
-    .replace(/\)/g, "%29");
+  // encodeURIComponent trata acentos e caracteres especiais corretamente
+  return encodeURIComponent(text)
+    .replace(/%20/g, "_")   // espaço → underscore (padrão Cloudinary)
+    .replace(/'/g, "%27");  // apóstrofo extra
 }
 
 /**
