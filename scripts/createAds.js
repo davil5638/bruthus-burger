@@ -82,6 +82,7 @@ async function criarCampanha(nomeCampanha, objetivo = "OUTCOME_TRAFFIC", orcamen
       status:                 "PAUSED",
       special_ad_categories:  JSON.stringify([]),
       daily_budget:           String(orcamentoDiario), // CBO — orçamento na campanha
+      bid_strategy:           "LOWEST_COST_WITHOUT_CAP", // lance automático — sem bid_amount obrigatório
       access_token:           ACCESS_TOKEN,
     },
   });
