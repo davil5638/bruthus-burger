@@ -159,11 +159,16 @@ Retorne APENAS JSON:
  * O Cloudinary usa underscore no lugar de espaço
  * e precisa de alguns caracteres escapados.
  */
+function removerAcentos(str) {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 function encodeTexto(text) {
-  // encodeURIComponent trata acentos e caracteres especiais corretamente
-  return encodeURIComponent(text)
-    .replace(/%20/g, "_")   // espaço → underscore (padrão Cloudinary)
-    .replace(/'/g, "%27");  // apóstrofo extra
+  // Remove acentos antes de encodar — Cloudinary não processa %C3%9A etc no path
+  const semAcento = removerAcentos(text);
+  return encodeURIComponent(semAcento)
+    .replace(/%20/g, "_")
+    .replace(/'/g, "%27");
 }
 
 /**
