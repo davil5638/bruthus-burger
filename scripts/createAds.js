@@ -178,6 +178,31 @@ async function criarCreativo(nomeCreativo, imageUrl, titulo, corpo, cta = "ORDER
 }
 
 // ──────────────────────────────────────────────
+// CRIATIVO A PARTIR DE POST EXISTENTE DO INSTAGRAM
+// ──────────────────────────────────────────────
+
+async function criarCreativoDePostExistente(nomeCreativo, mediaId) {
+  const url = `${GRAPH_API}/${AD_ACCOUNT_ID}/adcreatives`;
+
+  console.log(`\n🎨 Criando criativo a partir do post ${mediaId}...`);
+
+  const response = await axios.post(url, {
+    name: nomeCreativo,
+    object_story_spec: {
+      page_id: process.env.FB_PAGE_ID || process.env.FACEBOOK_PAGE_ID || IG_USER_ID,
+      instagram_actor_id: IG_USER_ID,
+    },
+    source_instagram_media_id: mediaId,
+    access_token: ACCESS_TOKEN,
+  }, {
+    params: { access_token: ACCESS_TOKEN },
+  });
+
+  console.log(`✅ Criativo de post existente criado: ${response.data.id}`);
+  return response.data.id;
+}
+
+// ──────────────────────────────────────────────
 // CRIAR ANÚNCIO (AD)
 // ──────────────────────────────────────────────
 
@@ -293,6 +318,46 @@ async function criarCampanhaCompleta(config = {}) {
     const err = new Error(typeof detalhe === "string" ? detalhe : JSON.stringify(detalhe));
     throw err;
   }
+}
+
+// ──────────────────────────────────────────────
+// LISTAR POSTS DO INSTAGRAM
+// ──────────────────────────────────────────────
+
+async function listarPostsInstagram(limite = 12) {
+  validarConfig();
+  const response = await axios.get(`${GRAPH_API}/${IG_USER_ID}/media`, {
+    params: {
+      fields: "id,caption,media_type,media_url,thumbnail_url,timestamp,permalink",
+      limit: limite,
+      access_token: ACCESS_TOKEN,
+    },
+  });
+  return (response.data.data || []).filter(p => ["IMAGE", "CAROUSEL_ALBUM"].includes(p.media_type));
+}
+
+// ──────────────────────────────────────────────
+// IMPULSIONAR POST EXISTENTE DO INSTAGRAM
+// ──────────────────────────────────────────────
+
+async function impulsionarPost(config = {}) {
+  const {
+    mediaId,
+    nomeCampanha = `${BUSINESS_NAME} — Post Impulsionado`,
+    orcamentoDiario = ORCAMENTO_DIARIO_CENTAVOS,
+  } = config;
+
+  validarConfig();
+  if (!mediaId) throw new Error("❌ mediaId é obrigatório");
+
+  const timestamp = new Date().toISOString().slice(0, 10);
+
+  const campanhaId  = await criarCampanha(`${nomeCampanha} - ${timestamp}`);
+  const adSetId     = await criarAdSet(campanhaId, `AdSet — 2km | Instagram — ${timestamp}`, orcamentoDiario);
+  const creativoId  = await criarCreativoDePostExistente(`Criativo Post ${mediaId} - ${timestamp}`, mediaId);
+  const anuncioId   = await criarAnuncio(adSetId, creativoId, `Anúncio Post - ${timestamp}`);
+
+  return { campanhaId, adSetId, creativoId, anuncioId, status: "PAUSED", linkDestino: ORDER_LINK, criadoEm: new Date().toISOString() };
 }
 
 // ──────────────────────────────────────────────
@@ -444,6 +509,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  criarCampanhaCompleta, relatorioPerformance, criarCampanha, criarAdSet,
+  criarCampanhaCompleta, impulsionarPost, listarPostsInstagram,
+  relatorioPerformance, criarCampanha, criarAdSet,
   listarCampanhas, listarAdSets, pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
 };

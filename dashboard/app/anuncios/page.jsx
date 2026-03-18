@@ -165,7 +165,15 @@ export default function AnunciosPage() {
   // Campanhas existentes
   const [campanhas, setCampanhas]       = useState([])
   const [loadingCamp, setLoadingCamp]   = useState(false)
-  const [abaAtiva, setAbaAtiva]         = useState('criar') // 'criar' | 'gerenciar'
+  const [abaAtiva, setAbaAtiva]         = useState('criar') // 'criar' | 'impulsionar' | 'gerenciar'
+
+  // Impulsionar post
+  const [posts, setPosts]               = useState([])
+  const [loadingPosts, setLoadingPosts] = useState(false)
+  const [postSelecionado, setPostSel]   = useState(null)
+  const [orcImpulsionar, setOrcImp]     = useState(1000)
+  const [loadingImp, setLoadingImp]     = useState(false)
+  const [resultadoImp, setResultadoImp] = useState(null)
 
   // Relatório
   const [relatorio, setRelatorio]   = useState(null)
@@ -186,6 +194,30 @@ export default function AnunciosPage() {
   }
 
   useEffect(() => { if (abaAtiva === 'gerenciar') carregarCampanhas() }, [abaAtiva])
+
+  async function carregarPosts() {
+    setLoadingPosts(true); setPosts([]); setPostSel(null); setResultadoImp(null)
+    try {
+      const data = await api.get('/ads/posts-instagram')
+      setPosts(data.posts || [])
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally { setLoadingPosts(false) }
+  }
+
+  async function impulsionarPost() {
+    if (!postSelecionado) { setToast({ message: 'Selecione um post primeiro!', type: 'error' }); return }
+    setLoadingImp(true); setResultadoImp(null)
+    try {
+      const data = await api.post('/ads/impulsionar-post', { mediaId: postSelecionado.id, orcamentoDiario: orcImpulsionar, registrarFinanceiro: true })
+      setResultadoImp(data.resultado)
+      setToast({ message: '🎉 Post impulsionado com sucesso!', type: 'success' })
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally { setLoadingImp(false) }
+  }
+
+  useEffect(() => { if (abaAtiva === 'impulsionar') carregarPosts() }, [abaAtiva])
 
   async function handleFile(e) {
     const file = e.target.files?.[0]
@@ -284,9 +316,10 @@ export default function AnunciosPage() {
       {/* Abas */}
       <div className="flex gap-1 mb-6 p-1 bg-[#0f0f0f] rounded-xl border border-[#1e1e1e]">
         {[
-          { id: 'criar',     label: '➕ Nova Campanha' },
-          { id: 'gerenciar', label: '⚙️ Gerenciar'     },
-          { id: 'relatorio', label: '📊 Performance'   },
+          { id: 'criar',        label: '➕ Nova'        },
+          { id: 'impulsionar',  label: '📸 Impulsionar' },
+          { id: 'gerenciar',    label: '⚙️ Gerenciar'   },
+          { id: 'relatorio',    label: '📊 Performance' },
         ].map(a => (
           <button key={a.id} onClick={() => setAbaAtiva(a.id)}
             className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -443,6 +476,91 @@ export default function AnunciosPage() {
                 className="w-full py-2 rounded-xl bg-[#f97316]/10 border border-[#f97316]/30 text-[#f97316] text-xs font-semibold hover:bg-[#f97316]/20 transition">
                 ⚙️ Gerenciar campanhas →
               </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── ABA: IMPULSIONAR POST ─── */}
+      {abaAtiva === 'impulsionar' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-[#555]">Selecione um post do seu Instagram para transformar em anúncio</p>
+            <Button onClick={carregarPosts} loading={loadingPosts} variant="secondary" size="sm">🔄</Button>
+          </div>
+
+          {loadingPosts ? (
+            <div className="text-center py-12 text-[#444]">
+              <p className="text-2xl mb-2 animate-pulse">⏳</p>
+              <p className="text-sm">Carregando posts...</p>
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="text-center py-10 rounded-xl border border-[#1e1e1e] bg-[#111]">
+              <p className="text-2xl mb-2">📭</p>
+              <p className="text-sm text-[#555]">Nenhum post encontrado</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {posts.map(p => (
+                <button key={p.id} onClick={() => setPostSel(postSelecionado?.id === p.id ? null : p)}
+                  className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                    postSelecionado?.id === p.id ? 'border-[#f97316] ring-2 ring-[#f97316]/30' : 'border-[#222] hover:border-[#444]'
+                  }`}>
+                  <img src={p.media_url || p.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                  {postSelecionado?.id === p.id && (
+                    <div className="absolute inset-0 bg-[#f97316]/20 flex items-center justify-center">
+                      <span className="text-2xl">✅</span>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {postSelecionado && (
+            <div className="rounded-xl border border-[#f97316]/30 bg-[#f97316]/5 p-4 space-y-4">
+              <div className="flex gap-3 items-start">
+                <img src={postSelecionado.media_url || postSelecionado.thumbnail_url} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-white mb-1">Post selecionado</p>
+                  <p className="text-[11px] text-[#666] line-clamp-2">{postSelecionado.caption || 'Sem legenda'}</p>
+                  <p className="text-[10px] text-[#444] mt-1">{new Date(postSelecionado.timestamp).toLocaleDateString('pt-BR')}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-[#888] mb-2">Orçamento diário</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {ORCAMENTOS.map(o => (
+                    <button key={o.valor} onClick={() => setOrcImp(o.valor)}
+                      className={`p-3 rounded-xl border text-center transition-all ${orcImpulsionar === o.valor ? 'border-[#f97316] bg-[#f97316]/10 text-white' : 'border-[#222] bg-[#1a1a1a] text-[#666] hover:border-[#333] hover:text-white'}`}>
+                      <div className="text-sm font-bold">{o.label}</div>
+                      <div className="text-[10px] opacity-60">{o.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {resultadoImp ? (
+                <div className="rounded-xl border border-green-600/30 bg-green-600/5 p-4">
+                  <p className="font-bold text-green-300 text-sm mb-2">✅ Campanha criada — PAUSADA</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {[['📣 Campanha', resultadoImp.campanhaId], ['📱 Anúncio', resultadoImp.anuncioId]].map(([k, v]) => (
+                      <div key={k} className="p-2 rounded-lg bg-[#0f0f0f]">
+                        <p className="text-[#555]">{k}</p>
+                        <p className="text-white font-mono text-[11px] truncate">{v}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => setAbaAtiva('gerenciar')} className="mt-3 w-full py-2 rounded-xl bg-[#f97316]/10 border border-[#f97316]/30 text-[#f97316] text-xs font-semibold hover:bg-[#f97316]/20 transition">
+                    ⚙️ Gerenciar campanhas →
+                  </button>
+                </div>
+              ) : (
+                <Button onClick={impulsionarPost} loading={loadingImp} size="lg" className="w-full">
+                  📣 Impulsionar Post · {ORCAMENTOS.find(o => o.valor === orcImpulsionar)?.label}
+                </Button>
+              )}
             </div>
           )}
         </div>

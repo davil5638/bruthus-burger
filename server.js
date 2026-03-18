@@ -10,8 +10,9 @@ const { generatePromotion, generateWeeklyPromotions, getPromocaoDoDia, PROMOCOES
 const { generateReelsScript } = require("./scripts/generateReelsScript");
 const { generateHashtags } = require("./scripts/generateHashtags");
 const {
-  criarCampanhaCompleta, relatorioPerformance,
-  listarCampanhas, listarAdSets, pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
+  criarCampanhaCompleta, impulsionarPost, listarPostsInstagram,
+  relatorioPerformance, listarCampanhas, listarAdSets,
+  pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
 } = require("./scripts/createAds");
 const { iniciarAgendador, testarStory, pausarAgendador, retomarAgendador, isAgendadorPausado } = require("./scheduler/scheduler");
 const { storyTeaser, storyAbertura, buildStoryImageUrl, gerarTextoStory, sortearFotoStory } = require("./scripts/storyImage");
@@ -364,6 +365,43 @@ app.post("/ads", async (req, res) => {
         console.warn("⚠️ Não registrou no financeiro:", finErr.message);
         resultado.registradoFinanceiro = false;
       }
+    }
+
+    res.json({ sucesso: true, resultado });
+  } catch (error) {
+    const detalhe = error.response?.data?.error?.message || error.response?.data || error.message;
+    res.status(500).json({ erro: detalhe });
+  }
+});
+
+// Lista posts recentes do Instagram para impulsionar
+app.get("/ads/posts-instagram", async (req, res) => {
+  try {
+    const posts = await listarPostsInstagram(12);
+    res.json({ sucesso: true, posts });
+  } catch (error) {
+    const detalhe = error.response?.data?.error?.message || error.message;
+    res.status(500).json({ erro: detalhe });
+  }
+});
+
+// Impulsiona um post existente do Instagram como anúncio
+app.post("/ads/impulsionar-post", async (req, res) => {
+  try {
+    const { mediaId, orcamentoDiario, registrarFinanceiro } = req.body;
+    if (!mediaId) return res.status(400).json({ erro: "mediaId é obrigatório" });
+
+    const resultado = await impulsionarPost({ mediaId, orcamentoDiario: orcamentoDiario || 1000 });
+
+    if (registrarFinanceiro !== false) {
+      try {
+        const valorDiario = (orcamentoDiario || 1000) / 100;
+        fin.adicionarEntrada({
+          tipo: "despesa", valor: valorDiario, categoria: "Marketing/Anúncios",
+          descricao: `Meta Ads — post impulsionado (R$${valorDiario.toFixed(2)}/dia) ID: ${resultado.campanhaId}`,
+        });
+        resultado.registradoFinanceiro = true;
+      } catch { resultado.registradoFinanceiro = false; }
     }
 
     res.json({ sucesso: true, resultado });
