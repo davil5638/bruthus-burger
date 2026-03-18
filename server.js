@@ -862,6 +862,59 @@ app.get("/financeiro/evolucao", async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// WEBHOOK OLACLICK — registra pedidos como receita
+// ──────────────────────────────────────────────
+app.post("/webhook/olaclick", async (req, res) => {
+  try {
+    const payload = req.body;
+    const tipo    = payload?.event_type || payload?.type || "";
+    const pedido  = payload?.order || payload?.data || payload;
+
+    console.log(`[OlaClick Webhook] evento: ${tipo}`, JSON.stringify(payload).slice(0, 200));
+
+    // Só processa criação de pedido
+    if (tipo !== "order_created" && tipo !== "order_updated") {
+      return res.status(200).json({ ok: true, ignorado: true });
+    }
+
+    // Tenta extrair o valor total do pedido
+    const valor = parseFloat(
+      pedido?.total || pedido?.total_price || pedido?.amount ||
+      pedido?.subtotal || pedido?.grand_total || 0
+    );
+
+    if (!valor || valor <= 0) {
+      console.warn("[OlaClick Webhook] valor não encontrado no payload:", JSON.stringify(pedido));
+      return res.status(200).json({ ok: true, aviso: "valor não encontrado" });
+    }
+
+    const orderId = pedido?.id || pedido?.order_id || pedido?.code || "?";
+    const data    = new Date().toISOString().slice(0, 10);
+
+    // Verifica se já foi registrado (evita duplicata em order_updated)
+    if (tipo === "order_updated") {
+      // Para updates, apenas loga — não duplica receita
+      console.log(`[OlaClick Webhook] order_updated ignorado para não duplicar. ID: ${orderId}`);
+      return res.status(200).json({ ok: true, ignorado: "order_updated" });
+    }
+
+    await fin.adicionarEntrada({
+      tipo:      "receita",
+      valor,
+      categoria: "Delivery",
+      descricao: `OlaClick — Pedido #${orderId}`,
+      data,
+    });
+
+    console.log(`✅ [OlaClick] Pedido #${orderId} registrado: R$ ${valor.toFixed(2)}`);
+    res.status(200).json({ ok: true, registrado: { orderId, valor } });
+  } catch (error) {
+    console.error("[OlaClick Webhook] erro:", error.message);
+    res.status(200).json({ ok: false, erro: error.message }); // 200 para OlaClick não reenviar
+  }
+});
+
+// ──────────────────────────────────────────────
 // PING — keep-alive para Render free tier
 // ──────────────────────────────────────────────
 app.get("/ping", (req, res) => {
