@@ -124,26 +124,56 @@ async function criarAdSet(campanhaId, nomeAdSet) {
 }
 
 // ──────────────────────────────────────────────
+// FAZER UPLOAD DA IMAGEM → obter image_hash
+// ──────────────────────────────────────────────
+
+/**
+ * Faz upload de uma imagem via URL para a conta de anúncios Meta.
+ * Retorna o image_hash necessário para criar o criativo.
+ */
+async function uploadImagemMeta(imageUrl) {
+  console.log(`\n📤 Fazendo upload da imagem para o Meta...`);
+  const url = `${GRAPH_API}/${AD_ACCOUNT_ID}/adimages`;
+
+  const response = await axios.post(url, null, {
+    params: {
+      url:          imageUrl,
+      access_token: ACCESS_TOKEN,
+    },
+  });
+
+  const images = response.data.images;
+  const hash   = Object.values(images)[0]?.hash;
+  if (!hash) throw new Error("Meta não retornou image_hash após upload");
+
+  console.log(`   ✅ image_hash obtido: ${hash}`);
+  return hash;
+}
+
+// ──────────────────────────────────────────────
 // CRIAR CREATIVE (CRIATIVO DO ANÚNCIO)
 // ──────────────────────────────────────────────
 
 /**
- * Cria o criativo visual do anúncio
+ * Cria o criativo visual do anúncio.
+ * Faz upload da imagem primeiro para obter o image_hash.
  */
 async function criarCreativo(nomeCreativo, imageUrl, titulo, corpo, cta = "ORDER_NOW") {
   const url = `${GRAPH_API}/${AD_ACCOUNT_ID}/adcreatives`;
 
   console.log(`\n🎨 Criando criativo: "${nomeCreativo}"...`);
 
+  const imageHash = await uploadImagemMeta(imageUrl);
+
   const objectStorySpec = {
     page_id: process.env.FB_PAGE_ID || "434452209747752",
     link_data: {
-      image_url: imageUrl,
-      link: ORDER_LINK,
-      message: corpo,
-      name: titulo,
+      image_hash: imageHash,
+      link:       ORDER_LINK,
+      message:    corpo,
+      name:       titulo,
       call_to_action: {
-        type: cta,
+        type:  cta,
         value: { link: ORDER_LINK },
       },
     },
@@ -151,9 +181,9 @@ async function criarCreativo(nomeCreativo, imageUrl, titulo, corpo, cta = "ORDER
 
   const response = await axios.post(url, null, {
     params: {
-      name: nomeCreativo,
-      object_story_spec: JSON.stringify(objectStorySpec),
-      access_token: ACCESS_TOKEN,
+      name:               nomeCreativo,
+      object_story_spec:  JSON.stringify(objectStorySpec),
+      access_token:       ACCESS_TOKEN,
     },
   });
 
