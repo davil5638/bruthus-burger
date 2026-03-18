@@ -40,7 +40,7 @@ const ORCAMENTO_DIARIO_CENTAVOS = 1000; // R$10,00/dia
 // Gestores removem Audience Network — tráfego de baixíssima qualidade
 const PLACEMENTS = {
   publisher_platforms: ["instagram"],
-  instagram_positions: ["stream", "story", "reels", "explore"],
+  instagram_positions: ["stream", "story", "reels", "explore_home"],
 };
 
 // Targeting: raio ampliado para 5km + interesses em camadas (OR dentro, AND entre grupos)
@@ -110,7 +110,7 @@ async function criarAdSet(campanhaId, nomeAdSet, orcamentoDiario = ORCAMENTO_DIA
       name: nomeAdSet,
       campaign_id: campanhaId,
       daily_budget: orcamentoDiario,
-      billing_event: "IMPRESSIONS",
+      billing_event: "LINK_CLICKS",
       optimization_goal: "LINK_CLICKS",
       targeting: JSON.stringify(SEGMENTACAO_PADRAO),
       status: "PAUSED",

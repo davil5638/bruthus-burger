@@ -16,13 +16,27 @@ const CLOUD_SEC  = process.env.CLOUDINARY_API_SECRET;
 // 1. Baixa foto do Cloudinary já redimensionada
 // ──────────────────────────────────────────────
 async function baixarFoto(publicId) {
-  // Garante extensão .jpg para forçar conversão de HEIC/outros formatos
-  const idComExtensao = publicId.endsWith(".jpg") ? publicId : `${publicId}.jpg`;
-  const url = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/w_1080,h_1920,c_fill,g_north,q_auto/${idComExtensao}`;
-  console.log(`   📥 Baixando: ${url}`);
-  const res = await axios.get(url, { responseType: "arraybuffer" });
-  if (!res.data || res.data.byteLength === 0) throw new Error("Cloudinary retornou imagem vazia");
-  return Buffer.from(res.data);
+  // Baixa imagem original sem transformações — Sharp cuida do redimensionamento
+  // Tenta com .jpg primeiro, depois sem extensão
+  const tentativas = [
+    `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/q_auto,f_jpg/${publicId}`,
+    `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${publicId}.jpg`,
+    `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${publicId}`,
+  ];
+
+  for (const url of tentativas) {
+    try {
+      console.log(`   📥 Baixando: ${url}`);
+      const res = await axios.get(url, { responseType: "arraybuffer", timeout: 15000 });
+      if (res.data && res.data.byteLength > 0) {
+        console.log(`   ✅ Imagem baixada (${(res.data.byteLength / 1024).toFixed(0)} KB)`);
+        return Buffer.from(res.data);
+      }
+    } catch (e) {
+      console.warn(`   ⚠️ Falhou: ${url} — ${e.message}`);
+    }
+  }
+  throw new Error(`Não foi possível baixar a imagem: ${publicId}`);
 }
 
 // ──────────────────────────────────────────────
@@ -147,8 +161,9 @@ async function gerarStoryImagem(publicId, opts = {}) {
   const svg       = gerarSVG(opts);
   const svgBuffer = Buffer.from(svg);
 
-  // Compõe com Sharp
+  // Redimensiona para 1080x1920 e compõe com Sharp
   const finalBuffer = await sharp(fotoBuffer)
+    .resize(1080, 1920, { fit: "cover", position: "north" })
     .composite([{ input: svgBuffer, blend: "over" }])
     .jpeg({ quality: 88 })
     .toBuffer();
