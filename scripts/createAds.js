@@ -112,6 +112,7 @@ async function criarAdSet(campanhaId, nomeAdSet, orcamentoDiario = ORCAMENTO_DIA
       daily_budget: orcamentoDiario,
       billing_event: "LINK_CLICKS",
       optimization_goal: "LINK_CLICKS",
+      is_adset_budget_sharing_enabled: false,
       targeting: JSON.stringify(SEGMENTACAO_PADRAO),
       status: "PAUSED",
       access_token: ACCESS_TOKEN,
