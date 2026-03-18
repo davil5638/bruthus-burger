@@ -1,8 +1,8 @@
 const axios = require("axios");
 const { calcularResumoCustom } = require("./financeiro");
 
-const PHONE    = process.env.WHATSAPP_PHONE;
-const APIKEY   = process.env.CALLMEBOT_APIKEY;
+const PHONE  = process.env.WHATSAPP_PHONE;
+const APIKEY = process.env.CALLMEBOT_APIKEY;
 
 // ──────────────────────────────────────────────
 // Retorna o range Ter→Seg da semana PASSADA

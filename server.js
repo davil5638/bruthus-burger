@@ -596,6 +596,17 @@ app.post("/scheduler/pausar", (req, res) => {
   res.json({ sucesso: true, pausado: true, mensagem: "Stories automáticos pausados. Nenhum story será postado até você retomar." });
 });
 
+// Testar resumo semanal WhatsApp manualmente
+app.post("/scheduler/testar-resumo-wpp", async (req, res) => {
+  try {
+    const { enviarResumoSemanal } = require("./scripts/whatsappResumo");
+    const resultado = await enviarResumoSemanal();
+    res.json({ sucesso: true, mensagem: "Resumo enviado para o WhatsApp!", texto: resultado.texto });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
 // Retomar postagens automáticas de stories
 app.post("/scheduler/retomar", (req, res) => {
   retomarAgendador();

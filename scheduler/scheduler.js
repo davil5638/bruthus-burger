@@ -97,8 +97,8 @@ function iniciarAgendador() {
   }, tz);
   console.log("  📊 Relatório:      Quinta às 9h");
 
-  // ── Resumo financeiro no WhatsApp — toda segunda às 8h ──
-  cron.schedule("0 10 * * 1", async () => {
+  // ── Resumo financeiro no WhatsApp — toda terça às 10h ──
+  cron.schedule("0 10 * * 2", async () => {
     console.log("\n📱 Enviando resumo semanal para WhatsApp...");
     try {
       const { enviarResumoSemanal } = require("../scripts/whatsappResumo");
@@ -107,7 +107,7 @@ function iniciarAgendador() {
       console.error("❌ Erro no resumo WhatsApp:", e.message);
     }
   }, tz);
-  console.log("  📱 Resumo WhatsApp: Segunda às 10h\n");
+  console.log("  📱 Resumo WhatsApp: Terça às 10h\n");
 
   console.log("═".repeat(55));
   console.log("🚀 Rodando! Pressione Ctrl+C para parar.\n");
