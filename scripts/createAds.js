@@ -449,15 +449,37 @@ async function listarCampanhas() {
   try {
     const response = await axios.get(`${GRAPH_API}/${AD_ACCOUNT_ID}/campaigns`, {
       params: {
-        fields: "id,name,status,created_time,daily_budget,spend_cap",
+        fields: "id,name,status,created_time,daily_budget",
         access_token: ACCESS_TOKEN,
       },
     });
     return response.data.data || [];
   } catch (e) {
-    const msg = e.response?.data?.error?.message || e.message;
-    throw new Error(`Meta API: ${msg}`);
+    const err = e.response?.data?.error;
+    if (err) {
+      const msg = `Meta API: [${err.code}] ${err.message}${err.error_subcode ? ` (subcode ${err.error_subcode})` : ""}`;
+      throw new Error(msg);
+    }
+    throw new Error(`Meta API: ${e.message}`);
   }
+}
+
+/** Testa a conexão com a Meta API — útil para diagnóstico */
+async function testarConexaoMeta() {
+  validarConfig();
+  // Verifica token
+  const { data: tokenInfo } = await axios.get(`${GRAPH_API}/me`, {
+    params: { fields: "id,name", access_token: ACCESS_TOKEN },
+  });
+  // Verifica conta de anúncios
+  const { data: contaInfo } = await axios.get(`${GRAPH_API}/${AD_ACCOUNT_ID}`, {
+    params: { fields: "id,name,account_status,currency", access_token: ACCESS_TOKEN },
+  });
+  return {
+    token: { id: tokenInfo.id, nome: tokenInfo.name },
+    conta: contaInfo,
+    adAccountId: AD_ACCOUNT_ID,
+  };
 }
 
 /** Lista ad sets de uma campanha (para pegar o orçamento diário) */
@@ -599,5 +621,5 @@ module.exports = {
   criarCampanhaCompleta, impulsionarPost, listarPostsInstagram,
   relatorioPerformance, criarCampanha, criarAdSet,
   listarCampanhas, listarAdSets, pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
-  gerarRelatorioCompleto,
+  gerarRelatorioCompleto, testarConexaoMeta,
 };

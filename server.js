@@ -13,7 +13,7 @@ const {
   criarCampanhaCompleta, impulsionarPost, listarPostsInstagram,
   relatorioPerformance, listarCampanhas, listarAdSets,
   pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
-  gerarRelatorioCompleto,
+  gerarRelatorioCompleto, testarConexaoMeta,
 } = require("./scripts/createAds");
 const { iniciarAgendador, testarStory, pausarAgendador, retomarAgendador, isAgendadorPausado } = require("./scheduler/scheduler");
 const { gerarTextoStory, sortearFotoStory } = require("./scripts/storyImage");
@@ -568,6 +568,27 @@ Use linguagem direta e prática. Formato markdown.`;
   } catch (e) {
     console.error("Erro /ads/relatorio:", e.message);
     res.status(500).json({ erro: e.message });
+  }
+});
+
+// Diagnóstico de conexão Meta Ads
+app.get("/ads/testar-conexao", async (req, res) => {
+  try {
+    const resultado = await testarConexaoMeta();
+    res.json({ sucesso: true, ...resultado });
+  } catch (error) {
+    const err = error.response?.data?.error;
+    res.status(500).json({
+      sucesso: false,
+      erro: error.message,
+      detalhes: err || null,
+      adAccountIdUsado: process.env.AD_ACCOUNT_ID,
+      dica: err?.code === 190
+        ? "Token expirado ou inválido — extraia um novo token do Ads Manager"
+        : err?.code === 100
+        ? "Parâmetro inválido — verifique se o AD_ACCOUNT_ID está só com números (sem 'act_')"
+        : "Verifique META_ACCESS_TOKEN e AD_ACCOUNT_ID no Render",
+    });
   }
 });
 
