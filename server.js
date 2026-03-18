@@ -19,6 +19,7 @@ const { gerarTextoStory, sortearFotoStory } = require("./scripts/storyImage");
 const { gerarStoryImagem } = require("./scripts/storyImageSharp");
 const { generateStory, STORY_TYPES } = require("./scripts/generateStories");
 const fin = require("./scripts/financeiro");
+const { processarMensagem, configurarWebhook } = require("./scripts/telegramBot");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -947,6 +948,20 @@ app.get("/ping", (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// WEBHOOK TELEGRAM — recebe mensagens do bot
+// ──────────────────────────────────────────────
+
+app.post("/webhook/telegram", async (req, res) => {
+  res.sendStatus(200); // responde imediatamente ao Telegram
+  try {
+    const { message } = req.body;
+    if (message) await processarMensagem(message);
+  } catch (e) {
+    console.error("❌ Telegram webhook:", e.message);
+  }
+});
+
+// ──────────────────────────────────────────────
 // INICIALIZAÇÃO
 // ──────────────────────────────────────────────
 
@@ -966,6 +981,10 @@ app.listen(PORT, () => {
 
   // Inicia o agendador automático
   iniciarAgendador();
+
+  // Configura webhook do Telegram
+  const SERVER_URL = process.env.RENDER_EXTERNAL_URL || process.env.SERVER_URL || `http://localhost:${PORT}`;
+  configurarWebhook(SERVER_URL);
 
   // Keep-alive: auto-ping a cada 10 minutos para não dormir no Render free tier
   const SELF_URL = process.env.RENDER_EXTERNAL_URL;
