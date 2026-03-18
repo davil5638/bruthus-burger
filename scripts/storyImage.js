@@ -188,28 +188,25 @@ function buildStoryImageUrl(publicId, opts = {}) {
   // Redimensiona para formato story 9:16 — foto visível no topo
   layers.push("w_1080,h_1920,c_fill,g_north,q_auto,f_jpg");
 
-  // Faixa escura na PARTE INFERIOR — fundo preto semitransparente
-  layers.push("l_text:Arial_1:x,co_rgb:000000,b_rgb:000000,c_fill,w_1080,h_620,g_south,o_75,fl_layer_apply");
-
-  // Texto principal — grande, cor variável
+  // Texto principal — grande, cor variável, com sombra para legibilidade
   if (principal) {
     layers.push(
-      `l_text:Impact_88_bold_center:${encodeTexto(principal)},co_${cor},g_south,y_400,w_960,fl_layer_apply`
+      `l_text:Impact_88_bold_center:${encodeTexto(principal)},co_${cor},g_south,y_400,w_960,e_shadow:50,fl_layer_apply`
     );
   }
 
-  // Texto secundário — branco sempre (legibilidade)
+  // Texto secundário — branco com sombra
   if (secundario) {
     layers.push(
-      `l_text:Arial_52_center:${encodeTexto(secundario)},co_white,g_south,y_260,w_920,fl_layer_apply`
+      `l_text:Arial_52_center:${encodeTexto(secundario)},co_white,g_south,y_260,w_920,e_shadow:40,fl_layer_apply`
     );
   }
 
-  // Link do pedido — laranja, no rodapé
+  // Link do pedido — laranja com sombra, no rodapé
   if (link) {
     const linkDisplay = link.replace("https://", "").replace("http://", "");
     layers.push(
-      `l_text:Arial_42_bold_center:${encodeTexto(linkDisplay)},co_rgb:f97316,g_south,y_140,w_920,fl_layer_apply`
+      `l_text:Arial_42_bold_center:${encodeTexto(linkDisplay)},co_rgb:f97316,g_south,y_140,w_920,e_shadow:40,fl_layer_apply`
     );
   }
 
