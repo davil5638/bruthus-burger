@@ -35,13 +35,17 @@ async function listarFotosStory() {
   try {
     let fotos = [];
 
-    // Dynamic Folders: usa /resources com resource_type + asset_folder
+    // Busca todas as imagens e filtra por asset_folder (modo dinâmico do Cloudinary)
     const r = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image`, {
       auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
-      params: { type: "upload", asset_folder: STORY_FOLDER, max_results: 100 },
+      params: { type: "upload", max_results: 500 },
     });
-    fotos = (r.data.resources || []).map(res => res.public_id).filter(Boolean);
-    console.log(`📸 ${fotos.length} fotos carregadas da pasta "${STORY_FOLDER}"`);
+    const todos = r.data.resources || [];
+    fotos = todos
+      .filter(res => res.asset_folder === STORY_FOLDER)
+      .map(res => res.public_id)
+      .filter(Boolean);
+    console.log(`📸 ${fotos.length} fotos carregadas da pasta "${STORY_FOLDER}" (total: ${todos.length})`);
 
     if (fotos.length === 0) {
       console.warn("⚠️ Nenhuma foto encontrada na pasta:", STORY_FOLDER);
