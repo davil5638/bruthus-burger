@@ -49,6 +49,49 @@ export default function FinanceiroPage() {
   const [salvando, setSalvando]     = useState(false)
   const [deletandoId, setDeletandoId] = useState(null)
 
+  // Importar do WhatsApp
+  const [mostraWpp, setMostraWpp]   = useState(false)
+  const [wppTexto, setWppTexto]     = useState('')
+  const [wppValores, setWppValores] = useState([])
+  const [wppCat, setWppCat]         = useState(CAT_DESPESA[0])
+  const [wppDesc, setWppDesc]       = useState('')
+  const [wppData, setWppData]       = useState(new Date().toISOString().slice(0, 10))
+  const [salvandoWpp, setSalvandoWpp] = useState(false)
+
+  function parsearWpp(texto) {
+    const linhas = texto.split('\n').filter(l => l.trim())
+    const valores = []
+    for (const linha of linhas) {
+      // Remove tudo antes do último ": " e tenta extrair número
+      const partes = linha.split(': ')
+      const ultimo = partes[partes.length - 1].trim().replace(',', '.')
+      const val = parseFloat(ultimo)
+      if (!isNaN(val) && val > 0) valores.push(val)
+    }
+    return valores
+  }
+
+  function handleWppChange(texto) {
+    setWppTexto(texto)
+    setWppValores(parsearWpp(texto))
+  }
+
+  async function salvarWpp() {
+    const total = wppValores.reduce((s, v) => s + v, 0)
+    if (total <= 0) { setToast({ message: 'Nenhum valor encontrado no texto!', type: 'error' }); return }
+    setSalvandoWpp(true)
+    try {
+      await api.post('/financeiro', { tipo: 'despesa', valor: total, categoria: wppCat, descricao: wppDesc || `Importado do WhatsApp (${wppValores.length} lançamentos)`, data: wppData })
+      setToast({ message: `Gasto de ${fmt(total)} registrado!`, type: 'success' })
+      setMostraWpp(false)
+      setWppTexto('')
+      setWppValores([])
+      carregar()
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally { setSalvandoWpp(false) }
+  }
+
   const carregar = useCallback(async () => {
     setLoading(true)
     try {
@@ -160,16 +203,20 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Botões adicionar */}
-      <div className="flex gap-3 mb-6">
-        <button onClick={() => abrirForm('receita')}
+      <div className="flex gap-3 mb-3">
+        <button onClick={() => { abrirForm('receita'); setMostraWpp(false) }}
           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20 font-semibold text-sm transition-all">
           + Adicionar Receita
         </button>
-        <button onClick={() => abrirForm('despesa')}
+        <button onClick={() => { abrirForm('despesa'); setMostraWpp(false) }}
           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 font-semibold text-sm transition-all">
           − Adicionar Gasto
         </button>
       </div>
+      <button onClick={() => { setMostraWpp(v => !v); setMostraForm(null) }}
+        className="w-full flex items-center justify-center gap-2 py-2.5 mb-6 rounded-xl border border-[#25d366]/30 bg-[#25d366]/10 text-[#25d366] hover:bg-[#25d366]/20 font-semibold text-sm transition-all">
+        📋 Importar gastos do WhatsApp
+      </button>
 
       {/* Formulário inline */}
       {mostraForm && (
@@ -217,6 +264,62 @@ export default function FinanceiroPage() {
             </Button>
             <Button onClick={() => setMostraForm(null)} variant="ghost">Cancelar</Button>
           </div>
+        </div>
+      )}
+
+      {/* Importar do WhatsApp */}
+      {mostraWpp && (
+        <div className="mb-6 rounded-xl border border-[#25d366]/30 bg-[#25d366]/5 p-5 animate-slide-up">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-white text-sm">📋 Importar gastos do WhatsApp</h3>
+            <button onClick={() => setMostraWpp(false)} className="text-[#555] hover:text-white text-lg">×</button>
+          </div>
+
+          <label className="block text-xs text-[#888] mb-1">Cole as mensagens do WhatsApp</label>
+          <textarea rows={6} placeholder={"[16:29, 12/03/2026] Davi lima: 150\n[17:38, 15/03/2026] Davi lima: 71\n..."}
+            value={wppTexto} onChange={e => handleWppChange(e.target.value)}
+            className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#25d366] resize-none mb-3 font-mono" />
+
+          {wppValores.length > 0 && (
+            <div className="mb-4 p-3 rounded-lg bg-[#1a1a1a] border border-[#333]">
+              <div className="flex flex-wrap gap-2 mb-2">
+                {wppValores.map((v, i) => (
+                  <span key={i} className="text-xs bg-[#25d366]/10 text-[#25d366] border border-[#25d366]/20 px-2 py-0.5 rounded-full">
+                    {fmt(v)}
+                  </span>
+                ))}
+              </div>
+              <p className="text-sm font-bold text-white">
+                Total: <span className="text-red-400">{fmt(wppValores.reduce((s, v) => s + v, 0))}</span>
+                <span className="text-[#555] font-normal text-xs ml-2">({wppValores.length} lançamentos)</span>
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-[#888] mb-1">Categoria</label>
+              <select value={wppCat} onChange={e => setWppCat(e.target.value)}
+                className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#25d366]">
+                {CAT_DESPESA.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-[#888] mb-1">Data de referência</label>
+              <input type="date" value={wppData} onChange={e => setWppData(e.target.value)}
+                className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#25d366]" />
+            </div>
+          </div>
+          <div className="mb-4">
+            <label className="block text-xs text-[#888] mb-1">Descrição (opcional)</label>
+            <input type="text" placeholder="Ex: Compras da semana"
+              value={wppDesc} onChange={e => setWppDesc(e.target.value)}
+              className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#25d366]" />
+          </div>
+          <Button onClick={salvarWpp} loading={salvandoWpp} variant="danger"
+            disabled={wppValores.length === 0} className="w-full">
+            Salvar Gasto Total ({wppValores.length > 0 ? fmt(wppValores.reduce((s, v) => s + v, 0)) : 'R$ 0,00'})
+          </Button>
         </div>
       )}
 
