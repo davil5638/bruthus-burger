@@ -33,13 +33,30 @@ async function listarFotosStory() {
   }
 
   try {
-    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image`;
-    const res = await axios.get(url, {
-      auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
-      params: { type: "upload", prefix: STORY_FOLDER, max_results: 100 },
-    });
+    let fotos = [];
 
-    const fotos = (res.data.resources || []).map(r => r.public_id);
+    // Tenta Dynamic Folders (novo sistema Cloudinary)
+    try {
+      const r1 = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources`, {
+        auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
+        params: { asset_folder: STORY_FOLDER, max_results: 100 },
+      });
+      fotos = (r1.data.resources || []).map(r => r.public_id).filter(Boolean);
+      if (fotos.length > 0) console.log(`📸 ${fotos.length} fotos (dynamic folders)`);
+    } catch (e1) {
+      console.warn("⚠️ Dynamic folders falhou, tentando fixed folders...");
+    }
+
+    // Fallback: Fixed Folders (sistema antigo)
+    if (fotos.length === 0) {
+      const r2 = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image`, {
+        auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
+        params: { type: "upload", prefix: STORY_FOLDER, max_results: 100 },
+      });
+      fotos = (r2.data.resources || []).map(r => r.public_id).filter(Boolean);
+      if (fotos.length > 0) console.log(`📸 ${fotos.length} fotos (fixed folders)`);
+    }
+
     if (fotos.length === 0) {
       console.warn("⚠️ Nenhuma foto encontrada na pasta:", STORY_FOLDER);
       return null;
@@ -47,7 +64,6 @@ async function listarFotosStory() {
 
     _fotoCache = fotos;
     _fotoCacheTs = agora;
-    console.log(`📸 ${fotos.length} fotos carregadas da pasta "${STORY_FOLDER}"`);
     return fotos;
   } catch (e) {
     console.error("❌ Erro ao listar fotos do Cloudinary:", e.message);

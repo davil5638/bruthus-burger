@@ -633,13 +633,31 @@ app.get("/debug/cloudinary-fotos", async (req, res) => {
   }
 
   try {
-    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image`;
-    const r = await axios.get(url, {
-      auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
-      params: { type: "upload", prefix: FOLDER, max_results: 10 },
-    });
-    const fotos = (r.data.resources || []).map(f => f.public_id);
-    res.json({ pasta: FOLDER, total: fotos.length, fotos, primeiraUrl: fotos[0] ? `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${fotos[0]}` : null });
+    // Tenta Dynamic Folders (novo sistema Cloudinary) e Fixed Folders (antigo)
+    let fotos = [];
+    let modo = "";
+
+    try {
+      const r1 = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources`, {
+        auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
+        params: { asset_folder: FOLDER, max_results: 10 },
+      });
+      fotos = (r1.data.resources || []).map(f => f.public_id || f.asset_id);
+      modo = "dynamic_folders";
+    } catch (e1) {
+      console.warn("asset_folder falhou:", e1.message);
+    }
+
+    if (fotos.length === 0) {
+      const r2 = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image`, {
+        auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
+        params: { type: "upload", prefix: FOLDER, max_results: 10 },
+      });
+      fotos = (r2.data.resources || []).map(f => f.public_id);
+      modo = "fixed_folders";
+    }
+
+    res.json({ pasta: FOLDER, modo, total: fotos.length, fotos, primeiraUrl: fotos[0] ? `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${fotos[0]}` : null });
   } catch (e) {
     res.status(500).json({ erro: e.message, detalhes: e.response?.data });
   }
