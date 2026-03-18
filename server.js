@@ -633,18 +633,18 @@ app.get("/debug/cloudinary-fotos", async (req, res) => {
   }
 
   try {
-    // Lista TUDO sem filtro para descobrir os public_ids reais
-    const r = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image`, {
+    // Usa /resources (sem /image) com asset_folder para Dynamic Folders
+    const r = await axios.get(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources`, {
       auth: { username: CLOUD_API_KEY, password: CLOUD_SECRET },
-      params: { type: "upload", max_results: 10 },
+      params: { asset_folder: FOLDER, max_results: 10 },
     });
-    const todos = (r.data.resources || []).map(f => ({
+    const fotos = (r.data.resources || []).map(f => ({
       public_id: f.public_id,
       asset_folder: f.asset_folder,
       display_name: f.display_name,
       url: f.secure_url,
     }));
-    res.json({ pasta: FOLDER, totalSemFiltro: todos.length, recursos: todos });
+    res.json({ pasta: FOLDER, total: fotos.length, fotos });
   } catch (e) {
     res.status(500).json({ erro: e.message, detalhes: e.response?.data });
   }
