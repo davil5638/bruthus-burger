@@ -1,7 +1,8 @@
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 const cron = require("node-cron");
 const { publicarStory } = require("../scripts/postInstagram");
-const { buildStoryImageUrl, gerarTextoStory, sortearFotoStory } = require("../scripts/storyImage");
+const { gerarTextoStory, sortearFotoStory } = require("../scripts/storyImage");
+const { gerarStoryImagem } = require("../scripts/storyImageSharp");
 
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 
@@ -52,7 +53,7 @@ function iniciarAgendador() {
       ]);
       if (!fotoId) { console.warn("⚠️ Nenhuma foto disponível para o story das 16h."); return; }
       console.log(`✍️  Texto gerado: "${texto.principal}" | "${texto.secundario}"`);
-      const url = buildStoryImageUrl(fotoId, { principal: texto.principal, secundario: texto.secundario, cor: texto.cor });
+      const url = await gerarStoryImagem(fotoId, { principal: texto.principal, secundario: texto.secundario, cor: texto.cor });
       await publicarStory(url, null);
       console.log("✅ Story teaser (16h) publicado!");
     } catch (e) {
@@ -75,8 +76,7 @@ function iniciarAgendador() {
       ]);
       if (!fotoId) { console.warn("⚠️ Nenhuma foto disponível para o story das 18h30."); return; }
       console.log(`✍️  Texto gerado: "${texto.principal}" | "${texto.secundario}"`);
-      const url = buildStoryImageUrl(fotoId, { principal: texto.principal, secundario: texto.secundario, cor: texto.cor, link: ORDER_LINK });
-      // Story das 18h30 tem link clicável para pedido
+      const url = await gerarStoryImagem(fotoId, { principal: texto.principal, secundario: texto.secundario, cor: texto.cor, link: ORDER_LINK });
       await publicarStory(url, ORDER_LINK);
       console.log("✅ Story abertura (18h30) publicado!");
     } catch (e) {
@@ -138,7 +138,7 @@ async function testarStory(tipo = "teaser") {
   console.log(`✍️  Texto gerado: "${texto.principal}" | "${texto.secundario}"`);
 
   const linkOpts = tipo === "abertura" ? { link: ORDER_LINK } : {};
-  const url = buildStoryImageUrl(fotoId, { principal: texto.principal, secundario: texto.secundario, cor: texto.cor, ...linkOpts });
+  const url = await gerarStoryImagem(fotoId, { principal: texto.principal, secundario: texto.secundario, cor: texto.cor, ...linkOpts });
 
   console.log("🔗 URL gerada:", url);
   await publicarStory(url, tipo === "abertura" ? ORDER_LINK : null);

@@ -15,7 +15,8 @@ const {
   pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
 } = require("./scripts/createAds");
 const { iniciarAgendador, testarStory, pausarAgendador, retomarAgendador, isAgendadorPausado } = require("./scheduler/scheduler");
-const { storyTeaser, storyAbertura, buildStoryImageUrl, gerarTextoStory, sortearFotoStory } = require("./scripts/storyImage");
+const { gerarTextoStory, sortearFotoStory } = require("./scripts/storyImage");
+const { gerarStoryImagem } = require("./scripts/storyImageSharp");
 const { generateStory, STORY_TYPES } = require("./scripts/generateStories");
 const fin = require("./scripts/financeiro");
 
@@ -665,7 +666,7 @@ app.post("/stories/preview-automatico", async (req, res) => {
     const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
     const link = tipo === "abertura" ? ORDER_LINK : null;
 
-    const url = buildStoryImageUrl(fotoId, {
+    const url = await gerarStoryImagem(fotoId, {
       principal: texto.principal,
       secundario: texto.secundario,
       cor: texto.cor,
