@@ -102,25 +102,23 @@ async function criarAdSet(campanhaId, nomeAdSet, orcamentoDiario = ORCAMENTO_DIA
 
   console.log(`\n🎯 Criando Ad Set: "${nomeAdSet}"...`);
   console.log(`   💰 Orçamento: R$${(orcamentoDiario / 100).toFixed(2)}/dia`);
-  console.log(`   📍 Raio: 3km | Idade: 18-55 anos`);
-  console.log(`   🕖 Horário: 19h–23h | Qui a Dom`);
+  console.log(`   📍 Raio: 2km | Idade: 18-55 anos`);
 
-  const response = await axios.post(url, null, {
-    params: {
-      name:                            nomeAdSet,
-      campaign_id:                     campanhaId,
-      daily_budget:                    orcamentoDiario,
-      billing_event:                   "IMPRESSIONS",
-      optimization_goal:               "LINK_CLICKS",
-      is_adset_budget_sharing_enabled: false,
-      targeting:                       JSON.stringify(SEGMENTACAO_PADRAO),
-      status:                          "PAUSED",
-      access_token:                    ACCESS_TOKEN,
-    },
-    paramsSerializer: params => {
-      const qs = require("qs");
-      return qs.stringify(params, { encode: false });
-    },
+  // Todos os parâmetros no body (form-encoded) — padrão da Graph API
+  // is_adset_budget_sharing_enabled=0 (falso) é obrigatório quando sem CBO
+  const body = new URLSearchParams();
+  body.append("name",                            nomeAdSet);
+  body.append("campaign_id",                     campanhaId);
+  body.append("daily_budget",                    String(orcamentoDiario));
+  body.append("billing_event",                   "IMPRESSIONS");
+  body.append("optimization_goal",               "LINK_CLICKS");
+  body.append("targeting",                       JSON.stringify(SEGMENTACAO_PADRAO));
+  body.append("status",                          "PAUSED");
+  body.append("is_adset_budget_sharing_enabled", "0");
+  body.append("access_token",                    ACCESS_TOKEN);
+
+  const response = await axios.post(url, body, {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
 
   console.log(`✅ Ad Set criado: ${response.data.id}`);
