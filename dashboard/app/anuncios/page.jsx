@@ -330,10 +330,9 @@ export default function AnunciosPage() {
       {/* Abas */}
       <div className="flex gap-1 mb-6 p-1 bg-[#0f0f0f] rounded-xl border border-[#1e1e1e]">
         {[
-          { id: 'criar',        label: '➕ Nova'        },
-          { id: 'impulsionar',  label: '📸 Impulsionar' },
-          { id: 'gerenciar',    label: '⚙️ Gerenciar'   },
-          { id: 'relatorio',    label: '📊 Performance' },
+          { id: 'criar',     label: '🚀 Impulsionar' },
+          { id: 'gerenciar', label: '⚙️ Gerenciar'   },
+          { id: 'relatorio', label: '📊 Performance' },
         ].map(a => (
           <button key={a.id} onClick={() => setAbaAtiva(a.id)}
             className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -343,61 +342,18 @@ export default function AnunciosPage() {
         ))}
       </div>
 
-      {/* ─── ABA: CRIAR ─── */}
+      {/* ─── ABA: IMPULSIONAR (GUIA MANUAL) ─── */}
       {abaAtiva === 'criar' && (
         <div className="space-y-4">
-          {/* Info segmentação */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[['📍','Raio','3km'],['🕖','Horário','19h–23h'],['📅','Dias','Qui-Dom'],['🎯','Objetivo','Cliques']].map(([e,l,v]) => (
-              <div key={l} className="p-3 rounded-xl bg-[#111] border border-[#1e1e1e] text-center">
-                <div className="text-lg mb-1">{e}</div>
-                <div className="text-[10px] text-[#555] uppercase tracking-wider">{l}</div>
-                <div className="text-xs text-white font-semibold mt-0.5">{v}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Passo 1 — Imagem */}
-          <div className={`rounded-xl border p-5 transition-all ${step >= 1 ? 'border-[#f97316]/40 bg-[#f97316]/5' : 'border-[#1e1e1e] bg-[#111]'}`}>
+          {/* ─── Gerador de texto IA ─── */}
+          <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-5">
             <div className="flex items-center gap-2 mb-4">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${imageUrl ? 'bg-[#f97316] text-black' : 'bg-[#222] text-[#666]'}`}>1</span>
-              <span className="text-sm font-bold text-white">Imagem do anúncio</span>
-              {imageUrl && <span className="text-[10px] text-[#f97316] ml-auto">✅ Pronto</span>}
+              <span className="w-6 h-6 rounded-full bg-[#f97316] text-black flex items-center justify-center text-xs font-bold">1</span>
+              <span className="text-sm font-bold text-white">Gere o texto do anúncio com IA</span>
             </div>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-            {imagePreview ? (
-              <div className="flex items-center gap-4">
-                <img src={imagePreview} alt="Preview" className="w-20 h-20 rounded-lg object-cover border border-[#333]" />
-                <div className="flex-1">
-                  <p className="text-xs text-green-400 mb-1">✅ Imagem enviada</p>
-                  <p className="text-[11px] text-[#555] font-mono truncate">{imageUrl}</p>
-                  <button onClick={() => fileRef.current?.click()} className="mt-2 text-xs text-[#f97316] hover:underline">Trocar imagem</button>
-                </div>
-              </div>
-            ) : (
-              <div onClick={() => fileRef.current?.click()} onDrop={handleDrop} onDragOver={e => e.preventDefault()}
-                className="border-2 border-dashed border-[#2a2a2a] hover:border-[#f97316]/50 rounded-xl p-8 text-center cursor-pointer transition-colors">
-                {uploading ? <p className="text-sm text-[#f97316]">⏳ Enviando...</p> : (
-                  <>
-                    <p className="text-2xl mb-2">📷</p>
-                    <p className="text-sm text-[#888]">Clique ou arraste a imagem aqui</p>
-                    <p className="text-[11px] text-[#555] mt-1">JPG, PNG · 1080×1080px recomendado</p>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Passo 2 — Texto */}
-          <div className={`rounded-xl border p-5 transition-all ${step >= 2 ? 'border-[#f97316]/40 bg-[#f97316]/5' : 'border-[#1e1e1e] bg-[#111] opacity-60'}`}>
-            <div className="flex items-center gap-2 mb-4">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${titulo && corpo ? 'bg-[#f97316] text-black' : 'bg-[#222] text-[#666]'}`}>2</span>
-              <span className="text-sm font-bold text-white">Texto do anúncio</span>
-              {titulo && corpo && <span className="text-[10px] text-[#f97316] ml-auto">✅ Pronto</span>}
-            </div>
-
-            <div className="flex items-center gap-2 mb-4 p-3 rounded-lg bg-[#0f0f0f] border border-[#1e1e1e]">
-              <span className="text-xs text-[#666] shrink-0">🤖 Gerar com IA:</span>
+            <p className="text-[11px] text-[#555] mb-3">Escolha o tipo de post e copie o texto gerado para usar ao impulsionar no Instagram.</p>
+            <div className="flex items-center gap-2 mb-4 p-3 rounded-lg bg-[#0f0f0f] border border-[#1e1e1e] flex-wrap">
+              <span className="text-xs text-[#666] shrink-0">🤖 Tipo:</span>
               <div className="flex gap-1 flex-wrap flex-1">
                 {TIPOS_IA.map(t => (
                   <button key={t.id} onClick={() => setTipoIA(t.id)}
@@ -408,264 +364,100 @@ export default function AnunciosPage() {
               </div>
               <Button onClick={gerarTexto} loading={gerando} variant="secondary" size="sm" className="shrink-0">✨ Gerar</Button>
             </div>
-
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between mb-1.5">
-                  <label className="text-xs text-[#888]">Título</label>
-                  <span className={`text-[10px] ${titulo.length > 40 ? 'text-red-400' : 'text-[#555]'}`}>{titulo.length}/40</span>
-                </div>
-                <input type="text" value={titulo} onChange={e => setTitulo(e.target.value)} maxLength={40}
-                  placeholder="🍔 Peça seu Bruthus Burger Agora!"
-                  className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#555] focus:outline-none focus:border-[#f97316] transition-colors" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-1.5">
-                  <label className="text-xs text-[#888]">Corpo</label>
-                  <span className={`text-[10px] ${corpo.length > 125 ? 'text-red-400' : 'text-[#555]'}`}>{corpo.length}/125</span>
-                </div>
-                <textarea value={corpo} onChange={e => setCorpo(e.target.value)} rows={3} maxLength={125}
-                  placeholder="Smash artesanal suculento esperando por você. Entrega rápida!"
-                  className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl px-4 py-2.5 text-sm text-white resize-none placeholder-[#555] focus:outline-none focus:border-[#f97316] transition-colors" />
-              </div>
-            </div>
-
-            {titulo && corpo && imagePreview && (
-              <div className="mt-4 p-3 rounded-xl bg-[#0f0f0f] border border-[#222]">
-                <p className="text-[10px] text-[#555] mb-2 uppercase tracking-wider">Preview</p>
-                <div className="flex gap-3 items-start">
-                  <img src={imagePreview} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
-                  <div>
-                    <p className="text-xs font-bold text-white leading-snug">{titulo}</p>
-                    <p className="text-[11px] text-[#777] mt-1 leading-relaxed">{corpo}</p>
-                    <p className="text-[10px] text-[#f97316] mt-1 font-semibold">Peça Agora →</p>
+            {(titulo || corpo) && (
+              <div className="space-y-2">
+                {titulo && (
+                  <div className="p-3 rounded-lg bg-[#0f0f0f] border border-[#222]">
+                    <p className="text-[10px] text-[#555] mb-1">TÍTULO</p>
+                    <p className="text-sm font-bold text-white">{titulo}</p>
                   </div>
-                </div>
+                )}
+                {corpo && (
+                  <div className="p-3 rounded-lg bg-[#0f0f0f] border border-[#222]">
+                    <p className="text-[10px] text-[#555] mb-1">LEGENDA</p>
+                    <p className="text-xs text-[#ccc] leading-relaxed">{corpo}</p>
+                  </div>
+                )}
+                <p className="text-[10px] text-[#444]">💡 Copie o texto acima e use ao impulsionar no Instagram</p>
               </div>
             )}
           </div>
 
-          {/* Passo 3 — Orçamento + Análise */}
-          <div className={`rounded-xl border p-5 transition-all ${step >= 3 ? 'border-[#f97316]/40 bg-[#f97316]/5' : 'border-[#1e1e1e] bg-[#111] opacity-60'}`}>
+          {/* ─── Orçamento recomendado ─── */}
+          <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-5">
             <div className="flex items-center gap-2 mb-4">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${resultado ? 'bg-[#f97316] text-black' : 'bg-[#222] text-[#666]'}`}>3</span>
-              <span className="text-sm font-bold text-white">Orçamento</span>
+              <span className="w-6 h-6 rounded-full bg-[#f97316] text-black flex items-center justify-center text-xs font-bold">2</span>
+              <span className="text-sm font-bold text-white">Escolha o orçamento</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-              {ORCAMENTOS.map(o => (
-                <button key={o.valor} onClick={() => { setOrcamento(o.valor); setAnalise(null) }}
-                  className={`p-3 rounded-xl border text-center transition-all ${orcamento === o.valor ? 'border-[#f97316] bg-[#f97316]/10 text-white' : 'border-[#222] bg-[#1a1a1a] text-[#666] hover:border-[#333] hover:text-white'}`}>
-                  <div className="text-sm font-bold">{o.label}</div>
-                  <div className="text-[10px] opacity-60">{o.desc}</div>
-                </button>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+              {[
+                { label: 'R$10/dia', dias: '3 dias = R$30', alcance: '~800–1.5k pessoas', rec: false },
+                { label: 'R$20/dia', dias: '3 dias = R$60', alcance: '~1.5k–3k pessoas', rec: true  },
+                { label: 'R$30/dia', dias: '3 dias = R$90', alcance: '~3k–5k pessoas',   rec: false },
+                { label: 'R$50/dia', dias: '3 dias = R$150',alcance: '~5k–8k pessoas',   rec: false },
+              ].map(o => (
+                <div key={o.label} className={`p-3 rounded-xl border text-center relative ${o.rec ? 'border-[#f97316]/60 bg-[#f97316]/5' : 'border-[#222] bg-[#1a1a1a]'}`}>
+                  {o.rec && <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[9px] bg-[#f97316] text-black px-2 rounded-full font-bold">Recomendado</span>}
+                  <div className={`text-sm font-bold ${o.rec ? 'text-[#f97316]' : 'text-white'}`}>{o.label}</div>
+                  <div className="text-[10px] text-[#555] mt-1">{o.dias}</div>
+                  <div className="text-[10px] text-[#444] mt-0.5">{o.alcance}</div>
+                </div>
               ))}
             </div>
-
-            {/* Botão Analisar */}
-            {!analise && (
-              <Button onClick={analisarAnuncio} loading={analisando} variant="secondary" size="lg" className="w-full mb-3" disabled={step < 3}>
-                {analisando ? '⏳ Analisando com IA...' : '🔍 Analisar antes de criar'}
-              </Button>
-            )}
-
-            {/* Card de análise */}
-            {analise && (() => {
-              const a = analise.analise
-              const corMap = { SIM: { border: 'border-green-500/40', bg: 'bg-green-500/5', badge: 'bg-green-500/20 text-green-300 border-green-500/30', icon: '🟢' }, TALVEZ: { border: 'border-yellow-500/40', bg: 'bg-yellow-500/5', badge: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30', icon: '🟡' }, NAO: { border: 'border-red-500/40', bg: 'bg-red-500/5', badge: 'bg-red-500/20 text-red-300 border-red-500/30', icon: '🔴' } }
-              const cor = corMap[a?.recomendacao] || corMap.TALVEZ
-              return (
-                <div className={`rounded-xl border ${cor.border} ${cor.bg} p-4 mb-3`}>
-                  {/* Cabeçalho */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{cor.icon}</span>
-                      <div>
-                        <p className="text-sm font-bold text-white">Análise da IA</p>
-                        <p className="text-[11px] text-[#777]">{a?.resumo}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-bold px-2 py-1 rounded-full border ${cor.badge}`}>
-                        {a?.recomendacao === 'SIM' ? '✅ Vale a pena' : a?.recomendacao === 'TALVEZ' ? '⚠️ Com cuidado' : '❌ Não recomendado'}
-                      </span>
-                      <span className="text-lg font-bold text-white">{a?.nota}/10</span>
-                    </div>
-                  </div>
-
-                  {/* Motivos */}
-                  {a?.motivos?.length > 0 && (
-                    <div className="mb-2">
-                      <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-1.5">Por quê:</p>
-                      <ul className="space-y-1">
-                        {a.motivos.map((m, i) => (
-                          <li key={i} className="text-[11px] text-[#aaa] flex gap-1.5"><span className="text-[#555] shrink-0">•</span>{m}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Alertas */}
-                  {a?.alertas?.length > 0 && (
-                    <div className="mb-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
-                      <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wider mb-1">⚠️ Atenção:</p>
-                      {a.alertas.map((al, i) => (
-                        <p key={i} className="text-[11px] text-red-300">{al}</p>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Dicas */}
-                  {a?.dicas?.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-1.5">💡 Dicas:</p>
-                      <ul className="space-y-1">
-                        {a.dicas.map((d, i) => (
-                          <li key={i} className="text-[11px] text-[#aaa] flex gap-1.5"><span className="text-[#f97316] shrink-0">→</span>{d}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Histórico */}
-                  {analise.historico && !analise.historico.semHistorico && (
-                    <div className="flex gap-2 flex-wrap mt-2">
-                      <span className="text-[10px] bg-[#1a1a1a] text-[#555] px-2 py-1 rounded">💰 Gasto total: R${analise.historico.totalGasto}</span>
-                      <span className="text-[10px] bg-[#1a1a1a] text-[#555] px-2 py-1 rounded">📈 CTR médio: {analise.historico.ctrMedio}%</span>
-                      <span className="text-[10px] bg-[#1a1a1a] text-[#555] px-2 py-1 rounded">💵 CPC médio: R${analise.historico.cpcMedio}</span>
-                    </div>
-                  )}
-
-                  <button onClick={() => setAnalise(null)} className="mt-3 text-[10px] text-[#555] hover:text-[#888]">↺ Nova análise</button>
-                </div>
-              )
-            })()}
-
-            <div className="p-3 rounded-lg bg-[#0f0f0f] border border-[#1e1e1e] mb-4 text-xs text-[#666]">
-              💡 Campanha criada <strong className="text-[#888]">pausada</strong> — ative no Gerenciador após revisão. Gasto registrado no financeiro automaticamente.
-            </div>
-
-            {analise ? (
-              <Button onClick={criarCampanha} loading={loading} size="lg" className="w-full" disabled={step < 3}>
-                {analise.analise?.recomendacao === 'NAO'
-                  ? '⚠️ Criar mesmo assim'
-                  : `📣 Criar Campanha · ${ORCAMENTOS.find(o => o.valor === orcamento)?.label}`}
-              </Button>
-            ) : (
-              <button disabled className="w-full py-3 rounded-xl border border-[#222] bg-[#111] text-[#444] text-sm font-semibold cursor-not-allowed">
-                🔒 Analise primeiro para liberar a criação
-              </button>
-            )}
+            <p className="text-[11px] text-[#555]">💡 Para uma cidade pequena como Fortaleza, <strong className="text-[#888]">R$20/dia por 3 a 5 dias</strong> é o ideal para sentir o resultado sem gastar muito.</p>
           </div>
 
-          {/* Resultado */}
-          {resultado && (
-            <div className="rounded-xl border border-green-600/30 bg-green-600/5 p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">✅</span>
-                <div>
-                  <p className="font-bold text-green-300 text-sm">Campanha criada — PAUSADA</p>
-                  {resultado.registradoFinanceiro && <p className="text-[11px] text-[#666]">💰 Gasto registrado no financeiro</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mb-3">
-                {[['📣 Campanha', resultado.campanhaId],['🎯 Ad Set', resultado.adSetId],['🎨 Criativo', resultado.creativoId],['📱 Anúncio', resultado.anuncioId]].map(([k,v]) => (
-                  <div key={k} className="p-2 rounded-lg bg-[#0f0f0f]">
-                    <p className="text-[#555]">{k}</p>
-                    <p className="text-white font-mono text-[11px] truncate">{v}</p>
+          {/* ─── Passo a passo no celular ─── */}
+          <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="w-6 h-6 rounded-full bg-[#f97316] text-black flex items-center justify-center text-xs font-bold">3</span>
+              <span className="text-sm font-bold text-white">Impulsione pelo celular</span>
+              <span className="text-[10px] bg-[#1a1a1a] text-[#555] px-2 py-0.5 rounded ml-auto">App do Instagram</span>
+            </div>
+            <div className="space-y-3">
+              {[
+                { n: '1', icon: '📱', titulo: 'Abra o Instagram', desc: 'Entre no perfil @bruthus_burger' },
+                { n: '2', icon: '🖼️', titulo: 'Escolha o melhor post', desc: 'Prefira fotos de burger com boa iluminação — evite posts com muito texto' },
+                { n: '3', icon: '👆', titulo: 'Toque em "Impulsionar publicação"', desc: 'Botão azul abaixo da foto, no perfil ou no feed' },
+                { n: '4', icon: '🎯', titulo: 'Configure o público', desc: 'Selecione "Criar o seu próprio" → Localização: sua cidade → Raio: 3 a 5 km → Idade: 18–45 anos → Interesse: Comida, Hambúrguer, Delivery' },
+                { n: '5', icon: '💰', titulo: 'Defina orçamento e duração', desc: 'R$20/dia · 3 a 5 dias · Destino: Site (cole o link bruthus-burger.ola.click/products)' },
+                { n: '6', icon: '✅', titulo: 'Toque em "Impulsionar"', desc: 'Meta revisa em até 24h e o anúncio entra no ar automaticamente' },
+              ].map(p => (
+                <div key={p.n} className="flex gap-3 items-start p-3 rounded-lg bg-[#0f0f0f] border border-[#1e1e1e]">
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-[#1a1a1a] border border-[#333] flex items-center justify-center text-xs font-bold text-[#f97316]">{p.n}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-white">{p.icon} {p.titulo}</p>
+                    <p className="text-[11px] text-[#666] mt-0.5 leading-relaxed">{p.desc}</p>
                   </div>
-                ))}
-              </div>
-              <button onClick={() => setAbaAtiva('gerenciar')}
-                className="w-full py-2 rounded-xl bg-[#f97316]/10 border border-[#f97316]/30 text-[#f97316] text-xs font-semibold hover:bg-[#f97316]/20 transition">
-                ⚙️ Gerenciar campanhas →
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ─── ABA: IMPULSIONAR POST ─── */}
-      {abaAtiva === 'impulsionar' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-[#555]">Selecione um post do seu Instagram para transformar em anúncio</p>
-            <Button onClick={carregarPosts} loading={loadingPosts} variant="secondary" size="sm">🔄</Button>
-          </div>
-
-          {loadingPosts ? (
-            <div className="text-center py-12 text-[#444]">
-              <p className="text-2xl mb-2 animate-pulse">⏳</p>
-              <p className="text-sm">Carregando posts...</p>
-            </div>
-          ) : posts.length === 0 ? (
-            <div className="text-center py-10 rounded-xl border border-[#1e1e1e] bg-[#111]">
-              <p className="text-2xl mb-2">📭</p>
-              <p className="text-sm text-[#555]">Nenhum post encontrado</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {posts.map(p => (
-                <button key={p.id} onClick={() => setPostSel(postSelecionado?.id === p.id ? null : p)}
-                  className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                    postSelecionado?.id === p.id ? 'border-[#f97316] ring-2 ring-[#f97316]/30' : 'border-[#222] hover:border-[#444]'
-                  }`}>
-                  <img src={p.media_url || p.thumbnail_url} alt="" className="w-full h-full object-cover" />
-                  {postSelecionado?.id === p.id && (
-                    <div className="absolute inset-0 bg-[#f97316]/20 flex items-center justify-center">
-                      <span className="text-2xl">✅</span>
-                    </div>
-                  )}
-                </button>
+                </div>
               ))}
             </div>
-          )}
+          </div>
 
-          {postSelecionado && (
-            <div className="rounded-xl border border-[#f97316]/30 bg-[#f97316]/5 p-4 space-y-4">
-              <div className="flex gap-3 items-start">
-                <img src={postSelecionado.media_url || postSelecionado.thumbnail_url} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-white mb-1">Post selecionado</p>
-                  <p className="text-[11px] text-[#666] line-clamp-2">{postSelecionado.caption || 'Sem legenda'}</p>
-                  <p className="text-[10px] text-[#444] mt-1">{new Date(postSelecionado.timestamp).toLocaleDateString('pt-BR')}</p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-[#888] mb-2">Orçamento diário</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {ORCAMENTOS.map(o => (
-                    <button key={o.valor} onClick={() => setOrcImp(o.valor)}
-                      className={`p-3 rounded-xl border text-center transition-all ${orcImpulsionar === o.valor ? 'border-[#f97316] bg-[#f97316]/10 text-white' : 'border-[#222] bg-[#1a1a1a] text-[#666] hover:border-[#333] hover:text-white'}`}>
-                      <div className="text-sm font-bold">{o.label}</div>
-                      <div className="text-[10px] opacity-60">{o.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {resultadoImp ? (
-                <div className="rounded-xl border border-green-600/30 bg-green-600/5 p-4">
-                  <p className="font-bold text-green-300 text-sm mb-2">✅ Campanha criada — PAUSADA</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    {[['📣 Campanha', resultadoImp.campanhaId], ['📱 Anúncio', resultadoImp.anuncioId]].map(([k, v]) => (
-                      <div key={k} className="p-2 rounded-lg bg-[#0f0f0f]">
-                        <p className="text-[#555]">{k}</p>
-                        <p className="text-white font-mono text-[11px] truncate">{v}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={() => setAbaAtiva('gerenciar')} className="mt-3 w-full py-2 rounded-xl bg-[#f97316]/10 border border-[#f97316]/30 text-[#f97316] text-xs font-semibold hover:bg-[#f97316]/20 transition">
-                    ⚙️ Gerenciar campanhas →
-                  </button>
-                </div>
-              ) : (
-                <Button onClick={impulsionarPost} loading={loadingImp} size="lg" className="w-full">
-                  📣 Impulsionar Post · {ORCAMENTOS.find(o => o.valor === orcImpulsionar)?.label}
-                </Button>
-              )}
+          {/* ─── Dicas rápidas ─── */}
+          <div className="rounded-xl border border-[#1e1e1e] bg-[#0f0f0f] p-4">
+            <p className="text-xs font-semibold text-[#888] mb-3">💡 Dicas para o anúncio performar melhor</p>
+            <div className="space-y-1.5">
+              {[
+                '📸 Use fotos com boa iluminação e o hambúrguer em destaque — sem fundo bagunçado',
+                '🕖 Impulsione de Qui a Dom, que são os dias que você abre',
+                '🔗 Sempre coloque o link do cardápio como destino — não o Instagram',
+                '📊 Deixe rodar pelo menos 3 dias antes de analisar o resultado',
+                '🔁 Se performar bem (muitos cliques), repita o mesmo post com mais orçamento',
+              ].map((d, i) => (
+                <p key={i} className="text-[11px] text-[#666] flex gap-2">{d}</p>
+              ))}
             </div>
-          )}
+          </div>
+
+          {/* ─── Botão direto ─── */}
+          <a
+            href="https://www.instagram.com/bruthus_burger"
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-[#f97316] to-[#ea580c] text-black text-sm font-bold hover:opacity-90 transition"
+          >
+            📲 Abrir @bruthus_burger no Instagram →
+          </a>
         </div>
       )}
 

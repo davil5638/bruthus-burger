@@ -7,9 +7,10 @@ const { gerarStoryImagem } = require("../scripts/storyImageSharp");
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 
 // ──────────────────────────────────────────────
-// FLAG DE PAUSA — controlada pelo dashboard
+// FLAG DE PAUSA — começa SEMPRE pausado
+// Ativar manualmente pelo dashboard quando quiser usar
 // ──────────────────────────────────────────────
-let _pausado = false;
+let _pausado = true;
 
 function pausarAgendador()  { _pausado = true;  console.log("⏸️  Agendador de stories PAUSADO."); }
 function retomarAgendador() { _pausado = false; console.log("▶️  Agendador de stories RETOMADO."); }
