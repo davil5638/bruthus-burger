@@ -125,9 +125,6 @@ async function criarAdSet(campanhaId, nomeAdSet, orcamentoDiario = ORCAMENTO_DIA
     optimization_goal: "LANDING_PAGE_VIEWS",
     bid_strategy: "LOWEST_COST_WITHOUT_CAP",
     destination_type: "WEBSITE",
-    // dayparting (pacing_type + ad_schedule) removido — exige lifetime_budget, não daily_budget
-    // O algoritmo da Meta otimiza automaticamente os horários de maior conversão
-    frequency_control_specs: [{ event: "IMPRESSIONS", interval_days: 7, max_frequency: 3 }],
     targeting: SEGMENTACAO_PADRAO,
     start_time: Math.floor(amanha.getTime() / 1000),
     status: "PAUSED",
