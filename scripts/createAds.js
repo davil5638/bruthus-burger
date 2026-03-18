@@ -51,7 +51,7 @@ const SEGMENTACAO_PADRAO = {
       {
         latitude:  parseFloat(process.env.LAT  || "-4.353948748936734"),
         longitude: parseFloat(process.env.LNG  || "-39.30777728465837"),
-        radius: 3,
+        radius: 2,
         distance_unit: "kilometer",
       },
     ],
