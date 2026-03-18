@@ -45,9 +45,8 @@ const AD_SCHEDULE = [
 // Placements: só Instagram + Facebook Feed/Stories/Reels
 // Gestores removem Audience Network — tráfego de baixíssima qualidade
 const PLACEMENTS = {
-  publisher_platforms: ["facebook", "instagram"],
+  publisher_platforms: ["instagram"],
   instagram_positions: ["stream", "story", "reels", "explore"],
-  facebook_positions:  ["feed", "story", "video_feeds"],
 };
 
 // Targeting: raio ampliado para 5km + interesses em camadas (OR dentro, AND entre grupos)
