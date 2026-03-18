@@ -16,11 +16,13 @@ const ORCAMENTOS = [
 ]
 
 const TIPOS_IA = [
-  { id: 'SMASH',   label: '🍔 Smash'   },
-  { id: 'COMBO',   label: '🍟 Combo'   },
-  { id: 'FAMILIA', label: '❤️ Família' },
-  { id: 'QUINTA',  label: '🎉 Quinta'  },
-  { id: 'SEXTA',   label: '🔥 Sexta'   },
+  { id: 'VENDAS',  label: '💰 Vendas'       },
+  { id: 'SMASH',   label: '🍔 Smash'        },
+  { id: 'NORMAL',  label: '🍔 Normal 150g'  },
+  { id: 'COMBO',   label: '🍟 Combo'        },
+  { id: 'FAMILIA', label: '❤️ Família'      },
+  { id: 'QUINTA',  label: '🎉 Quinta'       },
+  { id: 'SEXTA',   label: '🔥 Sexta'        },
 ]
 
 const STATUS_CONFIG = {

@@ -389,8 +389,10 @@ async function publicarStory(imageUrl, linkPedido = null) {
 
     return resultado;
   } catch (error) {
-    console.error("\n❌ ERRO AO PUBLICAR STORY:", error.message);
-    throw error;
+    const detalhe = error.response?.data?.error?.message || error.response?.data || error.message;
+    console.error("\n❌ ERRO AO PUBLICAR STORY:", detalhe);
+    const err = new Error(typeof detalhe === "string" ? detalhe : JSON.stringify(detalhe));
+    throw err;
   }
 }
 

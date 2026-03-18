@@ -260,22 +260,57 @@ app.post("/ads/gerar-texto", async (req, res) => {
     const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
 
     const tiposDesc = {
-      SMASH:    "Smash Burger artesanal prensado na chapa",
-      COMBO:    "Combo completo (burger + batata + refri)",
-      FAMILIA:  "Combo família para o final de semana",
-      QUINTA:   "Promoção especial da Quinta do Hambúrguer",
-      SEXTA:    "Cupom SEXTAOFF10 — 10% OFF sexta-feira",
+      SMASH:   { produto: "Smash Burger artesanal 80g prensado na chapa, carne angus, queijo derretido, molho especial", gatilho: "textura crocante por fora, suculento por dentro — diferente de qualquer burger da cidade" },
+      NORMAL:  { produto: "Hambúrguer artesanal 150g, pão brioche tostado, blend da casa, ingredientes selecionados", gatilho: "porção generosa, sabor que vicia — feito na hora pra você" },
+      COMBO:   { produto: "Combo completo: burger artesanal + batata frita crocante + refrigerante gelado", gatilho: "tudo que você quer em um só pedido, com o melhor custo-benefício" },
+      FAMILIA: { produto: "Combo Família: 4 burgers + 2 batatas grandes + 4 refrigerantes por R$99,99", gatilho: "dom é dia de família — um combo que cabe no bolso e agrada todo mundo" },
+      QUINTA:  { produto: "Combo Quinta do Hambúrguer: 2 Smash + Batata + 2 Refrigerantes por R$47,99 — só nesta quinta", gatilho: "promoção exclusiva da quinta — não volta amanhã" },
+      SEXTA:   { produto: "10% OFF em todo o cardápio nesta sexta com o cupom SEXTAOFF10 no link de pedido", gatilho: "sexta merece recompensa — desconto real, sem complicação" },
+      VENDAS:  { produto: "Cardápio completo da Bruthus Burger — Smash, combos, batata, delivery e retirada", gatilho: "conversão direta para o cardápio digital — público que ainda não conhece a marca" },
     };
 
-    const prompt = `Crie um anúncio de Meta Ads para uma hamburgueria artesanal brasileira chamada "${BUSINESS_NAME}".
+    const cfg = tiposDesc[tipo] || { produto: tipo, gatilho: "qualidade artesanal, entrega rápida" };
 
-Produto/Tema: ${tiposDesc[tipo] || tipo}
-Link de destino: ${ORDER_LINK}
+    // Padrões reais usados pelas grandes redes (Madero, Bullguer, Burger King, McDonald's, Bob's)
+    const referenciasGrandes = `
+PADRÕES DAS GRANDES REDES (estude e aplique para a Bruthus Burger):
 
-Retorne um JSON com:
+TÍTULO — o que funciona:
+- Burger King BR: "Você sabe o que quer. 🔥" / "Imperfeito. Do jeito certo."
+- Madero: "Feito pra quem leva burger a sério." / "O melhor burger que você já vai comer."
+- Bullguer: "Novo. Diferente. Viciante." / "Esse é o tipo de burger que você manda foto."
+- McDonald's BR: "Hoje é dia de Big Mac." / "Bate aquela fome? A gente resolve."
+- Bob's: "Clássico desde sempre. Irresistível agora."
+- Padrão universal: frase curta + impacto + sem explicação longa. O título não vende — ele PARA.
+
+CORPO — o que funciona:
+- Madero: descrição sensorial precisa ("smash na chapa, queijo derretido, brioche tostado na manteiga") + CTA simples ("Peça agora")
+- Burger King BR: provocação ou benefício direto + link sem rodeios
+- McDonald's BR: palavra que ativa memória sensorial ("crocante", "quentinho", "aquele cheiro") + urgência leve
+- Bullguer: linguagem de quem entende ("blend da casa", "prensado na hora") + CTA conversacional ("Já tá aberto. Vai lá.")
+- Padrão universal: máx 2 frases. Frase 1 = desejo. Frase 2 = ação.`;
+
+    const instrucaoVendas = tipo === "VENDAS"
+      ? `\nESTRATÉGIA PARA VENDAS GERAIS: O objetivo é levar o usuário desconhecido direto ao cardápio digital. Use curiosidade + prova social implícita + CTA forte. Não cite produto específico — venda a experiência e o clique.`
+      : "";
+
+    const prompt = `Você é um especialista em copywriting de alta conversão para anúncios Meta Ads de hamburguerias brasileiras. Seu objetivo é fazer o usuário PARAR o scroll, sentir fome e clicar AGORA para pedir.
+
+Hamburgueria: ${BUSINESS_NAME} (Fortaleza-CE) — delivery e retirada
+Produto/Campanha: ${cfg.produto}
+Gatilho principal: ${cfg.gatilho}
+Link de pedido: ${ORDER_LINK}
+${instrucaoVendas}
+${referenciasGrandes}
+
+SUAS REGRAS:
+TÍTULO (máx 40 caracteres): curto, impactante, para o scroll. 1 emoji estratégico permitido. Varie o estilo: pode ser provocativo, sensorial, de urgência ou de identidade.
+CORPO (máx 125 caracteres): frase 1 desperta desejo (sensorial ou emocional), frase 2 é CTA direto. NÃO use "venha nos visitar", "qualidade garantida" ou frases genéricas. Escreva como um amigo que está recomendando agora.
+
+Retorne APENAS este JSON:
 {
-  "titulo": "título do anúncio — máx 40 caracteres, impactante, com emoji",
-  "corpo": "texto do anúncio — máx 125 caracteres, apetitoso e urgente, termina com CTA"
+  "titulo": "...",
+  "corpo": "..."
 }
 
 Sem explicações. Só o JSON.`;
@@ -511,7 +546,8 @@ app.post("/scheduler/testar-story", async (req, res) => {
     const resultado = await testarStory(tipo || "teaser");
     res.json({ sucesso: true, mensagem: `Story "${tipo}" publicado para teste`, ...resultado });
   } catch (error) {
-    res.status(500).json({ erro: error.message });
+    const detalhe = error.response?.data?.error?.message || error.response?.data || error.message;
+    res.status(500).json({ erro: detalhe });
   }
 });
 
