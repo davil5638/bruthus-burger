@@ -862,6 +862,19 @@ app.get("/financeiro/evolucao", async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// RESUMO WHATSAPP — envio manual ou agendado
+// ──────────────────────────────────────────────
+app.post("/financeiro/enviar-resumo-whatsapp", async (req, res) => {
+  try {
+    const { enviarResumoSemanal } = require("./scripts/whatsappResumo");
+    const resultado = await enviarResumoSemanal();
+    res.json({ sucesso: true, ...resultado });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 // WEBHOOK OLACLICK — registra pedidos como receita
 // ──────────────────────────────────────────────
 app.post("/webhook/olaclick", async (req, res) => {

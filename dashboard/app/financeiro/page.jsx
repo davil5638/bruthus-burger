@@ -91,6 +91,7 @@ export default function FinanceiroPage() {
 
   // Resumo WhatsApp
   const [resumoWpp, setResumoWpp]       = useState(null)
+  const [enviandoWpp, setEnviandoWpp]   = useState(false)
 
   // ── Load configs localStorage ──
   useEffect(() => {
@@ -214,7 +215,18 @@ export default function FinanceiroPage() {
     a.click(); URL.revokeObjectURL(url)
   }
 
-  // ── Resumo WhatsApp ──
+  // ── Enviar resumo direto pelo servidor ──
+  async function enviarResumoAgora() {
+    setEnviandoWpp(true)
+    try {
+      await api.post('/financeiro/enviar-resumo-whatsapp', {})
+      setToast({ message: 'Resumo enviado para o seu WhatsApp!', type: 'success' })
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally { setEnviandoWpp(false) }
+  }
+
+  // ── Resumo WhatsApp (copiar) ──
   function gerarResumoWpp() {
     if (!resumo) return
     const emoji = resumo.lucro >= 0 ? '✅' : '⚠️'
@@ -401,7 +413,11 @@ export default function FinanceiroPage() {
         </button>
         <button onClick={gerarResumoWpp}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#333] bg-[#111] text-[#888] hover:text-white font-semibold text-sm transition-all">
-          📱 Resumo p/ WhatsApp
+          📋 Copiar resumo
+        </button>
+        <button onClick={enviarResumoAgora} disabled={enviandoWpp}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#25d366]/30 bg-[#25d366]/10 text-[#25d366] hover:bg-[#25d366]/20 font-semibold text-sm transition-all disabled:opacity-50">
+          {enviandoWpp ? '…' : '📲 Enviar WPP'}
         </button>
       </div>
 
