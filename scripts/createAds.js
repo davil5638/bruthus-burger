@@ -36,12 +36,6 @@ function validarConfig() {
 
 const ORCAMENTO_DIARIO_CENTAVOS = 2000; // R$20/dia — mínimo para sair da fase de aprendizado
 
-// Dayparting: 18h–23h | Qui(4) Sex(5) Sáb(6) Dom(0)
-// Ampliado para 18h: público começa a decidir o jantar antes das 19h
-const AD_SCHEDULE = [
-  { start_minute: 1080, end_minute: 1380, days: [0, 4, 5, 6] }, // 18:00–23:00
-];
-
 // Placements: só Instagram + Facebook Feed/Stories/Reels
 // Gestores removem Audience Network — tráfego de baixíssima qualidade
 const PLACEMENTS = {
@@ -64,8 +58,6 @@ const SEGMENTACAO_PADRAO = {
   },
   age_min: 18,
   age_max: 55,
-  // flexible_spec = OR entre interesses (basta ter 1)
-  // Gestores usam interesses + comportamentos em camadas separadas para ampliar alcance
   flexible_spec: [
     {
       interests: [
@@ -77,11 +69,6 @@ const SEGMENTACAO_PADRAO = {
         { id: "6003348604981", name: "Street food"       },
       ],
     },
-  ],
-  // Cap de frequência: máx 3 impressões por pessoa a cada 7 dias
-  // Evita fadiga criativa (usuário ignorar o anúncio por ver demais)
-  frequency_control_specs: [
-    { event: "IMPRESSIONS", interval_days: 7, max_frequency: 3 },
   ],
   ...PLACEMENTS,
 };
@@ -135,11 +122,12 @@ async function criarAdSet(campanhaId, nomeAdSet, orcamentoDiario = ORCAMENTO_DIA
     campaign_id: campanhaId,
     daily_budget: orcamentoDiario,
     billing_event: "IMPRESSIONS",
-    optimization_goal: "LANDING_PAGE_VIEWS", // melhor que LINK_CLICKS — garante que a página abriu
-    bid_strategy: "LOWEST_COST_WITHOUT_CAP", // deixa o algoritmo da Meta otimizar o custo
+    optimization_goal: "LANDING_PAGE_VIEWS",
+    bid_strategy: "LOWEST_COST_WITHOUT_CAP",
     destination_type: "WEBSITE",
-    pacing_type: ["day_parting"],
-    ad_schedule: AD_SCHEDULE,
+    // dayparting (pacing_type + ad_schedule) removido — exige lifetime_budget, não daily_budget
+    // O algoritmo da Meta otimiza automaticamente os horários de maior conversão
+    frequency_control_specs: [{ event: "IMPRESSIONS", interval_days: 7, max_frequency: 3 }],
     targeting: SEGMENTACAO_PADRAO,
     start_time: Math.floor(amanha.getTime() / 1000),
     status: "PAUSED",
