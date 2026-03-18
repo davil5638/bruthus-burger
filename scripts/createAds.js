@@ -135,11 +135,8 @@ async function criarCreativo(nomeCreativo, imageUrl, titulo, corpo, cta = "ORDER
 
   console.log(`\n🎨 Criando criativo: "${nomeCreativo}"...`);
 
-  // instagram_actor_id só é incluído se IG_USER_ID estiver definido e parecer válido
-  // (deve ser o ID da conta Instagram Business, não o ID de mídia)
   const objectStorySpec = {
     page_id: process.env.FB_PAGE_ID || "434452209747752",
-    ...(IG_USER_ID && /^\d+$/.test(IG_USER_ID) ? { instagram_actor_id: IG_USER_ID } : {}),
     link_data: {
       image_url: imageUrl,
       link: ORDER_LINK,
@@ -175,7 +172,6 @@ async function criarCreativoDePostExistente(nomeCreativo, mediaId) {
 
   const objectStorySpec = {
     page_id: process.env.FB_PAGE_ID || "434452209747752",
-    ...(IG_USER_ID && /^\d+$/.test(IG_USER_ID) ? { instagram_actor_id: IG_USER_ID } : {}),
   };
 
   const response = await axios.post(url, null, {
