@@ -4,19 +4,13 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
 const nav = [
-  { href: '/',           label: 'Dashboard',    icon: '📊' },
-  { href: '/posts',      label: 'Publicar Post', icon: '📸' },
-  { href: '/legendas',   label: 'Legendas',     icon: '✍️'  },
-  { href: '/promocoes',  label: 'Promoções',    icon: '🎉' },
-  { href: '/reels',      label: 'Reels',        icon: '🎬' },
-  { href: '/hashtags',   label: 'Hashtags',     icon: '#'  },
-  { href: '/anuncios',           label: 'Anúncios',     icon: '📣' },
+  { href: '/',                   label: 'Dashboard',     icon: '🏠' },
+  { href: '/legendas',           label: 'Legendas',      icon: '✍️'  },
+  { href: '/mensagens',          label: 'Transmissão',   icon: '💬' },
+  { href: '/anuncios',           label: 'Anúncios',      icon: '📣' },
   { href: '/anuncios/relatorio', label: 'Relatório Ads', icon: '📊' },
-  { href: '/agendador',  label: 'Agendador',    icon: '📅' },
-  { href: '/stories',    label: 'Stories',      icon: '📱' },
-  { href: '/mensagens',  label: 'Transmissão',  icon: '💬' },
-  { href: '/financeiro', label: 'Financeiro',   icon: '💰' },
-  { href: '/midias',     label: 'Mídias',       icon: '🖼️' },
+  { href: '/agendador',          label: 'Agendador',     icon: '📅' },
+  { href: '/financeiro',         label: 'Financeiro',    icon: '💰' },
 ]
 
 export default function Sidebar() {
