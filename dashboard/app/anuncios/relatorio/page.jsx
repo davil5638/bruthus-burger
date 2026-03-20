@@ -392,6 +392,82 @@ function CampanhaCard({ camp }) {
   )
 }
 
+function EstimativaInvestimento({ campanhas }) {
+  const [cliquesDesejados, setCliquesDesejados] = useState('100')
+  const comDados = campanhas.filter(c => !c.erro && c.cpc > 0 && c.linkCliques > 0)
+  if (comDados.length === 0) return null
+  const cpcMedio = comDados.reduce((s, c) => s + c.cpc, 0) / comDados.length
+  const cliques = parseInt(cliquesDesejados) || 0
+  const budgetEst = cliques * cpcMedio
+  const diasEst3 = (budgetEst / 3).toFixed(2)
+  const diasEst5 = (budgetEst / 5).toFixed(2)
+  const diasEst7 = (budgetEst / 7).toFixed(2)
+  return (
+    <div className="mb-6 rounded-xl border border-[#1e1e1e] bg-[#111] p-4">
+      <p className="text-xs font-bold text-white mb-1">💡 Estimativa de Investimento</p>
+      <p className="text-[11px] text-[#555] mb-4">Baseado no seu CPC médio histórico de {fmtBRL(cpcMedio)}</p>
+      <div className="flex items-center gap-3 mb-4">
+        <label className="text-xs text-[#666] shrink-0">Cliques que quero gerar:</label>
+        <input type="number" value={cliquesDesejados} onChange={e => setCliquesDesejados(e.target.value)} min="10"
+          className="w-24 bg-[#0f0f0f] border border-[#333] rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#f97316]" />
+      </div>
+      {cliques > 0 && (
+        <>
+          <div className="p-3 rounded-lg bg-[#0a0a0a] border border-[#f97316]/20 mb-3 text-center">
+            <p className="text-[10px] text-[#555] mb-1">Orçamento total estimado</p>
+            <p className="text-2xl font-black text-[#f97316]">{fmtBRL(budgetEst)}</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {[['3 dias', diasEst3], ['5 dias', diasEst5], ['7 dias', diasEst7]].map(([label, val]) => (
+              <div key={label} className="p-2 rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] text-center">
+                <p className="text-xs font-bold text-white">{fmtBRL(parseFloat(val))}/dia</p>
+                <p className="text-[10px] text-[#555] mt-0.5">em {label}</p>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function GraficoCampanhas({ campanhas }) {
+  const comDados = campanhas.filter(c => !c.erro && c.impressoes > 0)
+  if (comDados.length < 2) return null
+  const maxGasto = Math.max(...comDados.map(c => c.gasto), 1)
+  const maxCTR   = Math.max(...comDados.map(c => c.ctr), 1)
+  return (
+    <div className="mb-6 rounded-xl border border-[#1e1e1e] bg-[#111] p-4">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-bold text-white">📊 Comparativo Visual das Campanhas</p>
+        <div className="flex items-center gap-3 text-[10px] text-[#555]">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-[#f97316]" /> Gasto</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-500" /> CTR</span>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {comDados.map((c, i) => (
+          <div key={i}>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[11px] text-[#888] truncate max-w-[60%]">{c.nome}</p>
+              <div className="flex items-center gap-3 text-[10px]">
+                <span className="text-[#f97316]">{fmtBRL(c.gasto)}</span>
+                <span className={c.ctr >= 1.5 ? 'text-green-400' : c.ctr >= 1 ? 'text-yellow-400' : 'text-red-400'}>{fmt(c.ctr)}% CTR</span>
+              </div>
+            </div>
+            <div className="flex gap-1 h-3">
+              <div className="bg-[#f97316]/70 rounded-sm transition-all" style={{ width: `${(c.gasto / maxGasto) * 100}%`, minWidth: c.gasto > 0 ? '4px' : '0' }} />
+            </div>
+            <div className="flex gap-1 h-2 mt-0.5">
+              <div className={`rounded-sm transition-all ${c.ctr >= 1.5 ? 'bg-green-500/70' : c.ctr >= 1 ? 'bg-yellow-500/70' : 'bg-red-500/70'}`} style={{ width: `${(c.ctr / maxCTR) * 100}%`, minWidth: c.ctr > 0 ? '4px' : '0' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function SummaryCard({ label, explicacao, value, sub, cor = '#f97316' }) {
   return (
     <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-4">
@@ -573,6 +649,75 @@ export default function RelatorioPage() {
             />
           </div>
 
+          {/* Melhor e Pior */}
+          {(() => {
+            const comDados = dados.campanhas.filter(c => !c.erro && c.gasto > 0)
+            if (comDados.length < 2) return null
+            const melhorCTR  = [...comDados].sort((a, b) => b.ctr - a.ctr)[0]
+            const piorCPC    = [...comDados].sort((a, b) => b.cpc - a.cpc)[0]
+            return (
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4">
+                  <p className="text-[10px] font-semibold text-green-400 uppercase tracking-wider mb-2">🏆 Melhor CTR</p>
+                  <p className="text-sm font-bold text-white truncate">{melhorCTR.nome}</p>
+                  <p className="text-xl font-black text-green-400 mt-1">{fmt(melhorCTR.ctr)}%</p>
+                  <p className="text-[10px] text-[#555] mt-1">Gasto: {fmtBRL(melhorCTR.gasto)}</p>
+                </div>
+                <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
+                  <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wider mb-2">💀 Maior CPC</p>
+                  <p className="text-sm font-bold text-white truncate">{piorCPC.nome}</p>
+                  <p className="text-xl font-black text-red-400 mt-1">{fmtBRL(piorCPC.cpc)}</p>
+                  <p className="text-[10px] text-[#555] mt-1">Gasto: {fmtBRL(piorCPC.gasto)}</p>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Benchmark personalizado */}
+          {(() => {
+            const comDados = dados.campanhas.filter(c => !c.erro && c.gasto > 0 && c.impressoes > 500)
+            if (comDados.length < 2) return null
+            const suaCTR = (comDados.reduce((s, c) => s + c.ctr, 0) / comDados.length)
+            const suaCPC = (comDados.reduce((s, c) => s + c.cpc, 0) / comDados.length)
+            const IDEAL_CTR = 1.5
+            const IDEAL_CPC = 1.5
+            return (
+              <div className="mb-6 rounded-xl border border-[#1e1e1e] bg-[#111] p-4">
+                <p className="text-xs font-bold text-white mb-3">🎯 Seu Benchmark vs Ideal</p>
+                <div className="space-y-3">
+                  {[
+                    { label: 'CTR médio', sua: suaCTR, ideal: IDEAL_CTR, fmt: v => `${v.toFixed(2)}%`, maior: true },
+                    { label: 'CPC médio', sua: suaCPC, ideal: IDEAL_CPC, fmt: v => `R$${v.toFixed(2)}`, maior: false },
+                  ].map(m => {
+                    const melhor = m.maior ? m.sua >= m.ideal : m.sua <= m.ideal
+                    const pct = m.maior
+                      ? Math.min((m.sua / (m.ideal * 1.5)) * 100, 100)
+                      : Math.min((m.ideal / Math.max(m.sua, 0.01)) * 100 * (m.ideal / (m.ideal * 1.5)), 100)
+                    return (
+                      <div key={m.label}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-[#666]">{m.label}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] text-[#555]">Ideal: {m.fmt(m.ideal)}</span>
+                            <span className={`text-xs font-bold ${melhor ? 'text-green-400' : 'text-yellow-400'}`}>
+                              {melhor ? '✅' : '⚠️'} Sua média: {m.fmt(m.sua)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${melhor ? 'bg-green-500' : 'bg-yellow-500'}`} style={{ width: `${Math.max(Math.min(m.maior ? (m.sua/m.ideal)*100 : (m.ideal/Math.max(m.sua,0.01))*100, 100), 5)}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <p className="text-[10px] text-[#444]">Baseado em {comDados.length} campanhas com dados suficientes</p>
+                </div>
+              </div>
+            )
+          })()}
+
+          <EstimativaInvestimento campanhas={dados.campanhas} />
+
           {/* Lista de campanhas */}
           <p className="text-xs font-semibold text-[#888] uppercase tracking-wider mb-3">
             Suas campanhas ({dados.campanhas.length}) — clique para ver detalhes
@@ -580,6 +725,8 @@ export default function RelatorioPage() {
           <div className="space-y-2 mb-6">
             {dados.campanhas.map(c => <CampanhaCard key={c.id} camp={c} />)}
           </div>
+
+          <GraficoCampanhas campanhas={dados.campanhas} />
 
           {/* Análise IA */}
           {dados.analise && (

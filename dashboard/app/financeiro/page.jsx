@@ -591,6 +591,105 @@ export default function FinanceiroPage() {
         </div>
       )}
 
+      {/* DRE Mensal */}
+      {evolucao.length > 0 && (
+        <div className="mb-6 rounded-xl border border-[#1e1e1e] bg-[#111] overflow-hidden">
+          <div className="px-5 py-3 border-b border-[#1e1e1e] flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white">📋 DRE — Resultado por Mês</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[#1a1a1a]">
+                  <th className="px-4 py-2 text-left text-[#555] font-semibold">Mês</th>
+                  <th className="px-4 py-2 text-right text-green-400 font-semibold">Faturamento</th>
+                  <th className="px-4 py-2 text-right text-red-400 font-semibold">Gastos</th>
+                  <th className="px-4 py-2 text-right text-blue-400 font-semibold">Lucro</th>
+                  <th className="px-4 py-2 text-right text-yellow-400 font-semibold">Margem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...evolucao].reverse().map((d, i) => {
+                  const margem = d.faturamento > 0 ? ((d.lucro / d.faturamento) * 100).toFixed(1) : '0.0'
+                  const isPositivo = d.lucro >= 0
+                  return (
+                    <tr key={i} className="border-b border-[#1a1a1a] hover:bg-[#161616] transition-colors">
+                      <td className="px-4 py-2.5 text-white font-medium">{fmtMes(d.mes)}</td>
+                      <td className="px-4 py-2.5 text-right text-green-400">{fmt(d.faturamento)}</td>
+                      <td className="px-4 py-2.5 text-right text-red-400">{fmt(d.gastos)}</td>
+                      <td className={`px-4 py-2.5 text-right font-bold ${isPositivo ? 'text-blue-400' : 'text-red-400'}`}>
+                        {isPositivo ? '+' : ''}{fmt(d.lucro)}
+                      </td>
+                      <td className={`px-4 py-2.5 text-right font-semibold ${parseFloat(margem) >= 30 ? 'text-green-400' : parseFloat(margem) >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
+                        {margem}%
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-[#0f0f0f]">
+                  <td className="px-4 py-2.5 text-[#888] font-semibold text-[11px] uppercase tracking-wider">Total</td>
+                  <td className="px-4 py-2.5 text-right text-green-400 font-bold">{fmt(evolucao.reduce((s, d) => s + d.faturamento, 0))}</td>
+                  <td className="px-4 py-2.5 text-right text-red-400 font-bold">{fmt(evolucao.reduce((s, d) => s + d.gastos, 0))}</td>
+                  <td className={`px-4 py-2.5 text-right font-bold ${evolucao.reduce((s, d) => s + d.lucro, 0) >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                    {evolucao.reduce((s, d) => s + d.lucro, 0) >= 0 ? '+' : ''}{fmt(evolucao.reduce((s, d) => s + d.lucro, 0))}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-[#555]">—</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Projeção de fechamento */}
+      {(() => {
+        const hoje = new Date()
+        const mesAtual = hoje.toISOString().slice(0, 7)
+        const entradasMes = entradas.filter(e => e.data && e.data.startsWith(mesAtual))
+        const diaDoMes = hoje.getDate()
+        const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()
+        const diasRestantes = diasNoMes - diaDoMes
+        if (diaDoMes < 3 || entradasMes.length === 0) return null
+        const fat = entradasMes.filter(e => e.tipo === 'receita').reduce((s, e) => s + e.valor, 0)
+        const gas = entradasMes.filter(e => e.tipo === 'despesa').reduce((s, e) => s + e.valor, 0)
+        const fatDiario = fat / diaDoMes
+        const gasDiario = gas / diaDoMes
+        const fatProj = fat + fatDiario * diasRestantes
+        const gasProj = gas + gasDiario * diasRestantes
+        const lucroProj = fatProj - gasProj
+        const margemProj = fatProj > 0 ? ((lucroProj / fatProj) * 100).toFixed(1) : '0.0'
+        const isPositivo = lucroProj >= 0
+        return (
+          <div className="mb-6 rounded-xl border border-[#f97316]/20 bg-[#f97316]/5 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg">🔮</span>
+              <div>
+                <h3 className="text-sm font-bold text-white">Projeção de fechamento do mês</h3>
+                <p className="text-[11px] text-[#666]">Baseada nos últimos {diaDoMes} dias — {diasRestantes} dias restantes no mês</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Faturamento proj.', valor: fmt(fatProj), cor: 'text-green-400' },
+                { label: 'Gastos proj.',      valor: fmt(gasProj),  cor: 'text-red-400'   },
+                { label: 'Lucro proj.',       valor: (isPositivo ? '+' : '') + fmt(lucroProj), cor: isPositivo ? 'text-blue-400' : 'text-red-400' },
+                { label: 'Margem proj.',      valor: `${margemProj}%`, cor: parseFloat(margemProj) >= 30 ? 'text-green-400' : parseFloat(margemProj) >= 15 ? 'text-yellow-400' : 'text-red-400' },
+              ].map(m => (
+                <div key={m.label} className="bg-[#111] rounded-xl border border-[#1e1e1e] p-3 text-center">
+                  <p className={`text-base font-black ${m.cor}`}>{m.valor}</p>
+                  <p className="text-[10px] text-[#555] mt-0.5">{m.label}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-[#555] mt-3 text-center">
+              ⚠️ Estimativa baseada na média diária atual — valores reais podem variar
+            </p>
+          </div>
+        )
+      })()}
+
       {/* Top despesas */}
       {resumo?.topDespesas && resumo.topDespesas.length > 0 && (
         <div className="mb-6 rounded-xl border border-[#1e1e1e] bg-[#111] p-5">

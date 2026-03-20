@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../../lib/api'
 import Button from '../../components/Button'
 import PageHeader from '../../components/PageHeader'
@@ -48,15 +48,64 @@ const DIAS = [
   },
 ]
 
-function MensagemCard({ mensagem, index, cor }) {
+function lerFavoritas() {
+  try {
+    return JSON.parse(localStorage.getItem('bruthus_favoritas') || '[]')
+  } catch {
+    return []
+  }
+}
+
+function salvarFavoritas(lista) {
+  localStorage.setItem('bruthus_favoritas', JSON.stringify(lista))
+}
+
+function lerHistorico() {
+  try {
+    return JSON.parse(localStorage.getItem('bruthus_historico') || '[]')
+  } catch {
+    return []
+  }
+}
+
+function salvarHistorico(lista) {
+  localStorage.setItem('bruthus_historico', JSON.stringify(lista))
+}
+
+function MensagemCard({ mensagem, index, cor, dia = '' }) {
   const [copiado, setCopiado] = useState(false)
   const [texto, setTexto] = useState(mensagem.texto)
   const [editando, setEditando] = useState(false)
+  const [favorita, setFavorita] = useState(false)
+
+  useEffect(() => {
+    const lista = lerFavoritas()
+    setFavorita(lista.some(f => f.texto === mensagem.texto))
+  }, [mensagem.texto])
 
   async function copiar() {
     await navigator.clipboard.writeText(texto)
     setCopiado(true)
     setTimeout(() => setCopiado(false), 2000)
+
+    // Salvar no histórico (max 20 itens)
+    const historico = lerHistorico()
+    const novoItem = { texto, dia: dia || 'Livre', data: new Date().toISOString() }
+    const atualizado = [novoItem, ...historico].slice(0, 20)
+    salvarHistorico(atualizado)
+  }
+
+  function toggleFavorita() {
+    const lista = lerFavoritas()
+    if (favorita) {
+      const nova = lista.filter(f => f.texto !== mensagem.texto)
+      salvarFavoritas(nova)
+      setFavorita(false)
+    } else {
+      const novoItem = { texto: mensagem.texto, dia: dia || 'Livre', data: new Date().toISOString() }
+      salvarFavoritas([...lista, novoItem])
+      setFavorita(true)
+    }
   }
 
   return (
@@ -66,6 +115,13 @@ function MensagemCard({ mensagem, index, cor }) {
           Opção {index + 1}
         </span>
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleFavorita}
+            title={favorita ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+            className="text-[13px] px-2 py-0.5 rounded bg-[#1a1a1a] transition-colors hover:bg-[#222]"
+          >
+            {favorita ? '⭐' : '★'}
+          </button>
           <button
             onClick={() => setEditando(v => !v)}
             className="text-[11px] text-[#666] hover:text-white transition-colors px-2 py-0.5 rounded bg-[#1a1a1a]"
@@ -111,6 +167,163 @@ function MensagemCard({ mensagem, index, cor }) {
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+function SecaoFavoritas({ onAtualizar }) {
+  const [favoritas, setFavoritas] = useState([])
+  const [copiados, setCopiados] = useState({})
+
+  useEffect(() => {
+    setFavoritas(lerFavoritas())
+  }, [onAtualizar])
+
+  async function copiarFavorita(texto, index) {
+    await navigator.clipboard.writeText(texto)
+    setCopiados(prev => ({ ...prev, [index]: true }))
+    setTimeout(() => setCopiados(prev => ({ ...prev, [index]: false })), 2000)
+
+    const historico = lerHistorico()
+    const novoItem = { texto, dia: 'Favorita', data: new Date().toISOString() }
+    salvarHistorico([novoItem, ...historico].slice(0, 20))
+  }
+
+  function removerFavorita(texto) {
+    const nova = lerFavoritas().filter(f => f.texto !== texto)
+    salvarFavoritas(nova)
+    setFavoritas(nova)
+  }
+
+  if (favoritas.length === 0) return null
+
+  return (
+    <div className="mb-6">
+      <h3 className="text-sm font-bold text-[#f97316] mb-3">⭐ Mensagens Favoritas</h3>
+      <div className="space-y-3">
+        {favoritas.map((fav, i) => (
+          <div key={i} className="rounded-xl border border-[#f97316]/20 bg-[#f97316]/5 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] text-[#f97316]/60 font-mono uppercase tracking-wider">
+                {fav.dia}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => copiarFavorita(fav.texto, i)}
+                  className={`text-[11px] font-semibold px-3 py-1 rounded-lg border transition-all ${
+                    copiados[i]
+                      ? 'bg-green-500/20 border-green-500/40 text-green-400'
+                      : 'bg-[#1a1a1a] border-[#333] text-white hover:bg-[#222]'
+                  }`}
+                >
+                  {copiados[i] ? '✅ Copiado!' : '📋 Copiar'}
+                </button>
+                <button
+                  onClick={() => removerFavorita(fav.texto)}
+                  title="Remover dos favoritos"
+                  className="text-[11px] px-2 py-1 rounded-lg bg-[#1a1a1a] border border-[#333] text-[#666] hover:text-red-400 hover:border-red-500/30 transition-all"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+            <p className="text-sm text-[#ccc] leading-relaxed whitespace-pre-wrap">{fav.texto}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SecaoHistorico() {
+  const [historico, setHistorico] = useState([])
+  const [aberto, setAberto] = useState(false)
+  const [copiados, setCopiados] = useState({})
+
+  useEffect(() => {
+    setHistorico(lerHistorico())
+  }, [aberto])
+
+  async function copiarItem(texto, index) {
+    await navigator.clipboard.writeText(texto)
+    setCopiados(prev => ({ ...prev, [index]: true }))
+    setTimeout(() => setCopiados(prev => ({ ...prev, [index]: false })), 2000)
+  }
+
+  function limparHistorico() {
+    salvarHistorico([])
+    setHistorico([])
+  }
+
+  function formatarData(iso) {
+    try {
+      const d = new Date(iso)
+      return d.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    } catch {
+      return iso
+    }
+  }
+
+  if (historico.length === 0) return null
+
+  const ultimos10 = historico.slice(0, 10)
+
+  return (
+    <div className="mt-8 rounded-xl border border-[#1e1e1e] bg-[#111] overflow-hidden">
+      <button
+        onClick={() => setAberto(v => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[#151515] transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-white">📋 Histórico de Envios</span>
+          <span className="text-[11px] text-[#555] bg-[#1a1a1a] px-2 py-0.5 rounded-full border border-[#333]">
+            {historico.length} {historico.length === 1 ? 'item' : 'itens'}
+          </span>
+        </div>
+        <span className="text-[#555] text-xs transition-transform duration-200" style={{ display: 'inline-block', transform: aberto ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+          ▼
+        </span>
+      </button>
+
+      {aberto && (
+        <div className="px-5 pb-5">
+          <div className="space-y-2 mb-4">
+            {ultimos10.map((item, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-lg border border-[#1e1e1e] bg-[#0f0f0f] p-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] text-[#f97316]/70 font-mono">{item.dia}</span>
+                    <span className="text-[10px] text-[#444]">{formatarData(item.data)}</span>
+                  </div>
+                  <p className="text-xs text-[#888] leading-relaxed line-clamp-2 whitespace-pre-wrap">{item.texto}</p>
+                </div>
+                <button
+                  onClick={() => copiarItem(item.texto, i)}
+                  className={`shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all ${
+                    copiados[i]
+                      ? 'bg-green-500/20 border-green-500/40 text-green-400'
+                      : 'bg-[#1a1a1a] border-[#333] text-[#888] hover:text-white hover:bg-[#222]'
+                  }`}
+                >
+                  {copiados[i] ? '✅' : '📋'}
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={limparHistorico}
+            className="text-[11px] text-[#555] hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg border border-[#1e1e1e] hover:border-red-500/30 bg-[#0f0f0f]"
+          >
+            🗑️ Limpar histórico
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -311,6 +524,7 @@ export default function MensagensPage() {
               index={i}
               mensagem={m}
               cor={diaConfigMensagens?.cor || 'border-[#222] bg-[#111]'}
+              dia={diaConfigMensagens?.label || ''}
             />
           ))}
 
@@ -330,6 +544,9 @@ export default function MensagensPage() {
           </p>
         </div>
       )}
+
+      {/* Seção Favoritas */}
+      <SecaoFavoritas />
 
       {/* Divider */}
       <div className="my-8 border-t border-[#1e1e1e]" />
@@ -372,11 +589,15 @@ export default function MensagensPage() {
                 index={i}
                 mensagem={m}
                 cor="border-[#f97316]/20 bg-[#f97316]/5"
+                dia="Livre"
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Histórico de Envios */}
+      <SecaoHistorico />
     </div>
   )
 }
