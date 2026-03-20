@@ -345,64 +345,84 @@ export default function FinanceiroPage() {
 
       {/* Meta semanal */}
       {metaSemanal > 0 && periodo === 'semana' && (
-        <div className="mb-4 rounded-xl border border-[#1e1e1e] bg-[#111] px-4 py-3">
-          <div className="flex justify-between items-center mb-1.5">
-            <span className="text-xs text-[#888]">Meta semanal</span>
-            <span className="text-xs font-semibold text-white">{fmt(resumo?.faturamento || 0)} / {fmt(metaSemanal)}</span>
+        <div className="mb-4 rounded-2xl px-5 py-4" style={{ background: '#0b0b0b', border: '1px solid #181818' }}>
+          <div className="flex justify-between items-center mb-2.5">
+            <span className="text-xs font-medium" style={{ color: '#444' }}>Meta semanal de faturamento</span>
+            <span className="text-xs font-bold text-white">{fmt(resumo?.faturamento || 0)} / {fmt(metaSemanal)}</span>
           </div>
-          <div className="h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all ${metaPct >= 100 ? 'bg-green-500' : metaPct >= 70 ? 'bg-yellow-500' : 'bg-[#f97316]'}`}
-              style={{ width: `${metaPct}%` }} />
+          <div className="h-2 rounded-full overflow-hidden" style={{ background: '#141414' }}>
+            <div className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${metaPct}%`,
+                background: metaPct >= 100
+                  ? 'linear-gradient(90deg, #34d399, #059669)'
+                  : metaPct >= 70
+                  ? 'linear-gradient(90deg, #facc15, #d97706)'
+                  : 'linear-gradient(90deg, #f97316, #ea580c)',
+                boxShadow: metaPct > 5 ? '0 0 10px rgba(249,115,22,0.2)' : 'none',
+              }} />
           </div>
-          <p className="text-[10px] text-[#555] mt-1">{metaPct.toFixed(0)}% da meta atingida</p>
+          <p className="text-[10px] mt-2" style={{ color: '#2a2a2a' }}>
+            {metaPct >= 100 ? '🎯 Meta atingida!' : `${metaPct.toFixed(0)}% — faltam ${fmt(metaSemanal - (resumo?.faturamento || 0))}`}
+          </p>
         </div>
       )}
 
       {/* Cards de métricas */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        {[
-          { label: 'Faturamento', valor: resumo?.faturamento, cor: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', emoji: '📈', pct: pctFat },
-          { label: 'Gastos',      valor: resumo?.gastos,      cor: 'text-red-400',   bg: 'bg-red-500/10',   border: 'border-red-500/20',   emoji: '📉', pct: pctGast, invertPct: true },
-          { label: 'Lucro',       valor: resumo?.lucro,       cor: resumo?.lucro >= 0 ? 'text-blue-400' : 'text-red-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', emoji: '💵', pct: pctLucro },
-          { label: 'Margem',      valor: null,                cor: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', emoji: '📊', custom: `${resumo?.margem ?? '—'}%` },
-        ].map(c => (
-          <div key={c.label} className={`rounded-xl border ${c.border} ${c.bg} p-4`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-lg">{c.emoji}</span>
-              <span className="text-[10px] text-[#555] uppercase tracking-wider">{c.label}</span>
+      <div className="rounded-2xl overflow-hidden mb-6" style={{ border: '1px solid #181818', background: '#0b0b0b' }}>
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x divide-[#141414]">
+          {[
+            { label: 'Faturamento', valor: resumo?.faturamento, cor: '#34d399', pct: pctFat,  invertPct: false },
+            { label: 'Gastos',      valor: resumo?.gastos,      cor: '#f87171', pct: pctGast, invertPct: true  },
+            { label: 'Lucro',       valor: resumo?.lucro,       cor: resumo?.lucro >= 0 ? '#60a5fa' : '#f87171', pct: pctLucro, invertPct: false },
+            { label: 'Margem',      valor: null, custom: `${resumo?.margem ?? '—'}%`,
+              cor: resumo && resumo.faturamento > 0 ? (parseFloat(resumo.margem) >= 30 ? '#34d399' : parseFloat(resumo.margem) >= 15 ? '#facc15' : '#f87171') : '#555',
+              pct: null, invertPct: false },
+          ].map(c => (
+            <div key={c.label} className="px-5 py-5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-[2px]"
+                style={{ background: `linear-gradient(90deg, ${c.cor}60, transparent)` }} />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] mb-2.5" style={{ color: '#3a3a3a' }}>
+                {c.label}
+              </p>
+              <p className="text-3xl font-black tracking-tight leading-none mb-2" style={{ color: c.cor }}>
+                {loading ? <span style={{ color: '#1a1a1a' }}>—</span> : (c.custom || fmt(c.valor))}
+              </p>
+              {c.pct !== null && c.pct !== undefined && resumoAnt ? (
+                <span
+                  className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                  style={(c.invertPct ? c.pct <= 0 : c.pct >= 0)
+                    ? { background: 'rgba(52,211,153,0.12)', color: '#34d399' }
+                    : { background: 'rgba(248,113,113,0.12)', color: '#f87171' }}
+                >
+                  {(c.invertPct ? c.pct <= 0 : c.pct >= 0) ? '↑' : '↓'} {Math.abs(c.pct).toFixed(0)}% vs ant.
+                </span>
+              ) : (
+                <p className="text-[10px]" style={{ color: '#252525' }}>
+                  {periodo === 0 ? 'desde a abertura' : periodo === 'semana' ? fmtRango(getRangoSemana(semanaOffset)) : `últimos ${periodo} dias`}
+                </p>
+              )}
             </div>
-            <p className={`text-xl font-bold ${c.cor}`}>
-              {loading ? '…' : (c.custom || fmt(c.valor))}
-            </p>
-            {c.pct !== null && c.pct !== undefined && resumoAnt && (
-              <p className={`text-[10px] mt-1 font-semibold ${
-                c.invertPct ? (c.pct <= 0 ? 'text-green-400' : 'text-red-400') : (c.pct >= 0 ? 'text-green-400' : 'text-red-400')
-              }`}>
-                {c.pct >= 0 ? '+' : ''}{c.pct.toFixed(0)}% vs sem. ant.
-              </p>
-            )}
-            {(!c.pct && c.pct !== 0) && (
-              <p className="text-[10px] text-[#444] mt-1">
-                {periodo === 0 ? 'desde a abertura' : periodo === 'semana' ? fmtRango(getRangoSemana(semanaOffset)) : `últimos ${periodo} dias`}
-              </p>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {/* Botões ação */}
-      <div className="flex gap-3 mb-3">
+      <div className="flex gap-2.5 mb-3">
         <button onClick={() => { abrirForm('receita'); setMostraWpp(false) }}
-          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20 font-semibold text-sm transition-all">
-          + Receita
+          className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+          style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)', color: '#34d399' }}>
+          <span className="text-base font-black">+</span> Receita
         </button>
         <button onClick={() => { abrirForm('despesa'); setMostraWpp(false) }}
-          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 font-semibold text-sm transition-all">
-          − Gasto
+          className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+          style={{ background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.15)', color: '#f87171' }}>
+          <span className="text-base font-black">−</span> Gasto
         </button>
         <button onClick={() => { setMostraWpp(v => !v); setMostraForm(null) }}
-          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-[#25d366]/30 bg-[#25d366]/10 text-[#25d366] hover:bg-[#25d366]/20 font-semibold text-sm transition-all">
-          📋 WhatsApp
+          className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+          style={{ background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.15)', color: '#25d366' }}>
+          📋 Importar
         </button>
       </div>
 
