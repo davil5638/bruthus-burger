@@ -123,6 +123,9 @@ export default function MensagensPage() {
   const [mensagens, setMensagens]     = useState([])
   const [diaMensagens, setDiaMensagens] = useState(null)
   const [toast, setToast]             = useState(null)
+  const [instrucaoLivre, setInstrucaoLivre] = useState('')
+  const [gerandoLivre, setGerandoLivre] = useState(false)
+  const [mensagensLivres, setMensagensLivres] = useState([])
 
   const diaConfig   = DIAS.find(d => d.id === diaAtivo)
   const temPromocao = !!diaConfig?.promocao
@@ -153,6 +156,24 @@ export default function MensagensPage() {
       setToast({ message: e.message, type: 'error' })
     } finally {
       setGerando(false)
+    }
+  }
+
+  async function gerarMensagensLivres() {
+    if (!instrucaoLivre.trim()) return
+    setGerandoLivre(true)
+    setMensagensLivres([])
+    try {
+      const data = await api.post('/mensagens/gerar', {
+        quantidade,
+        instrucaoLivre,
+      })
+      setMensagensLivres(data.mensagens || [])
+      setToast({ message: `${data.mensagens?.length} mensagens geradas! ✅`, type: 'success' })
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally {
+      setGerandoLivre(false)
     }
   }
 
@@ -309,6 +330,53 @@ export default function MensagensPage() {
           </p>
         </div>
       )}
+
+      {/* Divider */}
+      <div className="my-8 border-t border-[#1e1e1e]" />
+
+      {/* Instrução livre */}
+      <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-5">
+        <h3 className="text-sm font-bold text-white mb-1">✍️ Descreva o que você quer</h3>
+        <p className="text-xs text-[#666] mb-4">
+          Escreva em texto livre o tema, promoção ou contexto da mensagem. A IA vai criar {quantidade} opção{quantidade > 1 ? 'ões' : ''} baseadas exatamente no que você pediu.
+        </p>
+        <textarea
+          value={instrucaoLivre}
+          onChange={e => setInstrucaoLivre(e.target.value)}
+          placeholder='Ex: "Mensagem avisando que hoje tem promoção de aniversário, 20% OFF em tudo, válido só hoje"'
+          rows={4}
+          className="w-full bg-[#0f0f0f] border border-[#333] rounded-xl px-4 py-3 text-sm text-white placeholder-[#444] resize-none focus:outline-none focus:border-[#f97316] leading-relaxed mb-3"
+        />
+        <Button
+          onClick={gerarMensagensLivres}
+          loading={gerandoLivre}
+          disabled={!instrucaoLivre.trim()}
+          className="w-full mb-4"
+        >
+          {gerandoLivre ? '✨ Gerando...' : '✨ Gerar com minha descrição'}
+        </Button>
+
+        {gerandoLivre && (
+          <div className="text-center py-8">
+            <p className="text-2xl mb-2 animate-pulse">✍️</p>
+            <p className="text-sm text-[#555]">Gerando mensagens personalizadas...</p>
+          </div>
+        )}
+
+        {!gerandoLivre && mensagensLivres.length > 0 && (
+          <div className="space-y-4">
+            <p className="text-xs text-[#555] mb-2">{mensagensLivres.length} mensagens geradas — edite e copie</p>
+            {mensagensLivres.map((m, i) => (
+              <MensagemCard
+                key={i}
+                index={i}
+                mensagem={m}
+                cor="border-[#f97316]/20 bg-[#f97316]/5"
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

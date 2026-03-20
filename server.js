@@ -163,7 +163,44 @@ app.post("/post", async (req, res) => {
 
 app.post("/caption", async (req, res) => {
   try {
-    const { tipo, gatilho } = req.body;
+    const { tipo, gatilho, instrucaoLivre } = req.body;
+
+    if (instrucaoLivre && instrucaoLivre.trim()) {
+      const OpenAI = require("openai");
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
+      const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
+
+      const prompt = `Você é copywriter especialista em marketing para hamburguerias artesanais brasileiras.
+
+Você trabalha para a "${BUSINESS_NAME}", que funciona APENAS de Quinta a Domingo.
+
+O usuário quer a seguinte legenda para o Instagram:
+"${instrucaoLivre.trim()}"
+
+REGRAS OBRIGATÓRIAS:
+1. Crie uma legenda baseada exatamente no que foi pedido
+2. Use emojis estrategicamente (máx 8 emojis)
+3. Tom: casual, jovem, apetitoso
+4. Máximo 150 palavras
+5. NUNCA mencione WhatsApp — o pedido é 100% pelo site
+6. Termine SEMPRE com:
+
+Peça agora direto no site 👇
+${ORDER_LINK}
+
+Retorne APENAS a legenda, sem explicações.`;
+
+      const response = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 400,
+        temperature: 0.85,
+      });
+
+      return res.json({ sucesso: true, legenda: response.choices[0].message.content.trim() });
+    }
+
     const legenda = await generateCaption(tipo || "SMASH", gatilho);
     res.json({ sucesso: true, legenda });
   } catch (error) {
@@ -945,12 +982,7 @@ app.post("/mensagens/gerar", async (req, res) => {
     const OpenAI = require("openai");
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    const { dia = "quinta", quantidade = 3, comPromocao = true } = req.body;
-    const cfg = DIAS_CONFIG[dia];
-
-    if (!cfg) {
-      return res.status(400).json({ erro: "dia inválido. Use: quinta, sexta, sabado ou domingo" });
-    }
+    const { dia = "quinta", quantidade = 3, comPromocao = true, instrucaoLivre } = req.body;
 
     if (!process.env.OPENAI_API_KEY) {
       return res.status(500).json({ erro: "OPENAI_API_KEY não configurada no servidor" });
@@ -960,11 +992,46 @@ app.post("/mensagens/gerar", async (req, res) => {
     const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
     const qtd = Math.min(Math.max(parseInt(quantidade) || 3, 1), 5);
 
-    const promocaoInfo = (cfg.promocao && comPromocao)
-      ? `\nPROMOÇÃO DO DIA (OBRIGATÓRIO mencionar em todas as mensagens):\n- ${cfg.promocao}\n`
-      : "";
+    let prompt;
 
-    const prompt = `Você é o responsável pelo marketing do ${BUSINESS_NAME}, uma hamburgueria artesanal em Fortaleza, CE.
+    if (instrucaoLivre && instrucaoLivre.trim()) {
+      prompt = `Você é o responsável pelo marketing do ${BUSINESS_NAME}, uma hamburgueria artesanal em Fortaleza, CE.
+
+O usuário quer ${qtd} opções de mensagem para a lista de transmissão do WhatsApp com a seguinte instrução:
+"${instrucaoLivre.trim()}"
+
+Informações fixas:
+- Delivery e Retirada
+- Link para pedido: ${ORDER_LINK}
+- Cidade: Fortaleza, CE
+
+Diretrizes para cada mensagem:
+- Siga fielmente a instrução do usuário
+- Estilo informal, como se fosse um amigo falando
+- Máximo 5 linhas por mensagem
+- Usar emojis com moderação (não exagerar)
+- Incluir o link de pedido na última linha
+- NÃO usar asteriscos para negrito nem outros markdowns
+- Variar bastante entre as ${qtd} opções
+
+Retorne APENAS um JSON válido, sem explicações:
+{
+  "mensagens": [
+    { "texto": "mensagem aqui" },
+    { "texto": "mensagem aqui" }
+  ]
+}`;
+    } else {
+      const cfg = DIAS_CONFIG[dia];
+      if (!cfg) {
+        return res.status(400).json({ erro: "dia inválido. Use: quinta, sexta, sabado ou domingo" });
+      }
+
+      const promocaoInfo = (cfg.promocao && comPromocao)
+        ? `\nPROMOÇÃO DO DIA (OBRIGATÓRIO mencionar em todas as mensagens):\n- ${cfg.promocao}\n`
+        : "";
+
+      prompt = `Você é o responsável pelo marketing do ${BUSINESS_NAME}, uma hamburgueria artesanal em Fortaleza, CE.
 
 Crie ${qtd} opções de mensagem para a lista de transmissão do WhatsApp para ${cfg.nome}.
 
@@ -994,6 +1061,7 @@ Retorne APENAS um JSON válido, sem explicações:
     { "texto": "mensagem aqui" }
   ]
 }`;
+    }
 
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -1008,10 +1076,11 @@ Retorne APENAS um JSON válido, sem explicações:
 
     const data = JSON.parse(match[0]);
 
+    const cfg = instrucaoLivre?.trim() ? null : DIAS_CONFIG[dia];
     res.json({
       sucesso: true,
-      dia: cfg.nome,
-      emoji: cfg.emoji,
+      dia: cfg ? cfg.nome : "Livre",
+      emoji: cfg ? cfg.emoji : "✍️",
       mensagens: data.mensagens || [],
     });
   } catch (error) {
