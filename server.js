@@ -1149,7 +1149,9 @@ app.post("/webhook/olaclick", async (req, res) => {
 // MÍDIAS — Integração Google Drive → Cloudinary
 // ──────────────────────────────────────────────
 
-const { sincronizarDriveParaCloudinary, statusSync } = require("./scripts/googleDrive");
+const multer = require("multer");
+const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const { sincronizarDriveParaCloudinary, statusSync, uploadParaDrive } = require("./scripts/googleDrive");
 
 // Status da integração (Drive configurado, fotos sincronizadas, última sync)
 app.get("/midia/status", async (req, res) => {
@@ -1166,6 +1168,43 @@ app.post("/midia/sincronizar", async (req, res) => {
   try {
     const resultado = await sincronizarDriveParaCloudinary();
     res.json({ sucesso: true, ...resultado });
+  } catch (e) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+// Upload de foto do dashboard para o Drive e depois sincroniza pro Cloudinary
+app.post("/midia/upload", uploadMiddleware.array("fotos", 20), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0)
+      return res.status(400).json({ erro: "Nenhum arquivo enviado" });
+
+    const resultados = [];
+    const erros      = [];
+
+    for (const file of req.files) {
+      try {
+        const driveArq = await uploadParaDrive(file.buffer, file.mimetype, file.originalname);
+        resultados.push({ nome: driveArq.name, driveId: driveArq.id });
+      } catch (e) {
+        erros.push({ nome: file.originalname, erro: e.message });
+      }
+    }
+
+    // Sincroniza imediatamente pro Cloudinary
+    let sync = null;
+    if (resultados.length > 0) {
+      try { sync = await sincronizarDriveParaCloudinary(); } catch (e) { /* ignora erro de sync */ }
+    }
+
+    res.json({
+      sucesso: true,
+      enviados: resultados.length,
+      erros: erros.length,
+      arquivos: resultados,
+      arquivosErro: erros,
+      sync,
+    });
   } catch (e) {
     res.status(500).json({ erro: e.message });
   }

@@ -1,8 +1,10 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../../lib/api'
 import PageHeader from '../../components/PageHeader'
 import { Toast } from '../../components/Toast'
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://bruthus-burger.onrender.com'
 
 export default function MidiasPage() {
   const [fotos, setFotos]           = useState([])
@@ -11,6 +13,10 @@ export default function MidiasPage() {
   const [carregando, setCarreg]     = useState(true)
   const [toast, setToast]           = useState(null)
   const [fotoAmpliada, setAmpliada] = useState(null)
+  const [enviando, setEnviando]     = useState(false)
+  const [progresso, setProgresso]   = useState(null)
+  const [arrastando, setArrastando] = useState(false)
+  const inputRef                    = useRef(null)
 
   const mostrarToast = (msg, tipo = 'success') => {
     setToast({ msg, tipo })
@@ -59,26 +65,75 @@ export default function MidiasPage() {
     }
   }
 
+  async function enviarFotos(arquivos) {
+    if (!arquivos || arquivos.length === 0) return
+    setEnviando(true)
+    setProgresso(`Enviando ${arquivos.length} foto(s)...`)
+    try {
+      const form = new FormData()
+      Array.from(arquivos).forEach(f => form.append('fotos', f))
+
+      const token = localStorage.getItem('auth_token') || ''
+      const r = await fetch(`${API_BASE}/midia/upload`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.erro || 'Erro no upload')
+
+      const msg = data.enviados > 0
+        ? `${data.enviados} foto(s) enviada(s) e sincronizadas com sucesso!`
+        : 'Nenhuma foto foi enviada.'
+      mostrarToast(msg, data.enviados > 0 ? 'success' : 'error')
+      await carregarFotos()
+      await carregarStatus()
+    } catch (e) {
+      mostrarToast('Erro ao enviar: ' + e.message, 'error')
+    } finally {
+      setEnviando(false)
+      setProgresso(null)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  function onDrop(e) {
+    e.preventDefault()
+    setArrastando(false)
+    const arquivos = e.dataTransfer?.files
+    if (arquivos?.length) enviarFotos(arquivos)
+  }
+
+  async function baixarFoto(foto) {
+    try {
+      const r = await fetch(foto.url)
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = foto.nome || 'foto.jpg'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      // fallback: abre em nova aba
+      window.open(foto.url, '_blank')
+    }
+  }
+
   const formatarData = (iso) => {
     if (!iso) return '—'
     return new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza', dateStyle: 'short', timeStyle: 'short' })
-  }
-
-  const formatarBytes = (bytes) => {
-    if (!bytes) return ''
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`
   }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         title="Mídias"
-        subtitle="Fotos sincronizadas do Google Drive para o Cloudinary"
+        subtitle="Envie fotos direto do celular ou computador — vão para o Drive e Cloudinary"
         icon="🖼️"
       />
 
-      {/* ─── Status da integração ─── */}
+      {/* ─── Status ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatusCard
           label="Status"
@@ -86,46 +141,57 @@ export default function MidiasPage() {
           cor={status?.configurado ? 'text-green-400' : 'text-red-400'}
           icon={status?.configurado ? '✅' : '⚠️'}
         />
-        <StatusCard
-          label="No Drive"
-          valor={status?.totalNaPasta ?? '—'}
-          cor="text-blue-400"
-          icon="📁"
-        />
-        <StatusCard
-          label="Sincronizadas"
-          valor={status?.totalSincronizados ?? fotos.length}
-          cor="text-orange-400"
-          icon="☁️"
-        />
-        <StatusCard
-          label="Última Sync"
-          valor={formatarData(status?.ultimaSync)}
-          cor="text-[#888]"
-          icon="🕐"
-          small
-        />
+        <StatusCard label="No Drive"      valor={status?.totalNaPasta ?? '—'}               cor="text-blue-400"   icon="📁" />
+        <StatusCard label="Sincronizadas" valor={status?.totalSincronizados ?? fotos.length} cor="text-orange-400" icon="☁️" />
+        <StatusCard label="Última Sync"   valor={formatarData(status?.ultimaSync)}           cor="text-[#888]"     icon="🕐" small />
       </div>
 
       {/* ─── Aviso de configuração ─── */}
       {!carregando && !status?.configurado && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-300 space-y-2">
           <p className="font-semibold">⚠️ Integração não configurada</p>
-          <p>Adicione as seguintes variáveis de ambiente no Render para ativar a sincronização:</p>
+          <p>Adicione as variáveis de ambiente no Render para ativar:</p>
           <div className="bg-[#0a0a0a] rounded-lg p-3 font-mono text-xs space-y-1 text-[#ccc]">
             <p><span className="text-orange-400">GOOGLE_SERVICE_ACCOUNT_JSON</span>=<span className="text-green-400">{'{"type":"service_account",...}'}</span></p>
             <p><span className="text-orange-400">GOOGLE_DRIVE_FOLDER_ID</span>=<span className="text-green-400">1aBcDeFgHiJkLmNoP...</span></p>
           </div>
-          <p className="text-yellow-400/70 text-xs">Veja as instruções completas de configuração abaixo.</p>
         </div>
       )}
 
-      {/* ─── Botão de sincronização ─── */}
-      <div className="flex items-center gap-4">
+      {/* ─── Upload + Sincronizar ─── */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Botão upload */}
+        <label
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm cursor-pointer transition-all
+            ${status?.configurado && !enviando
+              ? 'bg-orange-500 hover:bg-orange-600 text-white'
+              : 'bg-[#1e1e1e] text-[#555] cursor-not-allowed'}`}
+        >
+          {enviando ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              {progresso || 'Enviando...'}
+            </>
+          ) : (
+            <>📤 Enviar fotos</>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            className="hidden"
+            disabled={!status?.configurado || enviando}
+            onChange={e => enviarFotos(e.target.files)}
+          />
+        </label>
+
+        {/* Botão sincronizar */}
         <button
           onClick={sincronizar}
           disabled={sincronizando || !status?.configurado}
-          className="flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all text-sm"
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#1a1a1a] border border-[#2a2a2a] hover:border-orange-500/40 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all text-sm"
         >
           {sincronizando ? (
             <>
@@ -133,17 +199,38 @@ export default function MidiasPage() {
               Sincronizando...
             </>
           ) : (
-            <>
-              🔄 Sincronizar agora
-            </>
+            <>🔄 Sincronizar Drive</>
           )}
         </button>
-        <p className="text-xs text-[#555]">
-          Busca fotos novas no Google Drive e envia para o Cloudinary automaticamente
+
+        <p className="text-xs text-[#444] hidden md:block">
+          Envie fotos direto daqui — elas vão pro Drive e Cloudinary automaticamente
         </p>
       </div>
 
-      {/* ─── Galeria de fotos ─── */}
+      {/* ─── Área de arrastar ─── */}
+      {status?.configurado && (
+        <div
+          onDragOver={e => { e.preventDefault(); setArrastando(true) }}
+          onDragLeave={() => setArrastando(false)}
+          onDrop={onDrop}
+          onClick={() => !enviando && inputRef.current?.click()}
+          className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all
+            ${arrastando
+              ? 'border-orange-500 bg-orange-500/10'
+              : 'border-[#2a2a2a] hover:border-orange-500/40 hover:bg-[#111]'}`}
+        >
+          <div className="text-3xl mb-2">{enviando ? '⏳' : '📁'}</div>
+          <p className="text-sm text-[#666]">
+            {enviando
+              ? progresso
+              : 'Arraste fotos aqui, ou clique para selecionar'}
+          </p>
+          <p className="text-xs text-[#444] mt-1">JPG, PNG, WEBP — até 20 MB por foto</p>
+        </div>
+      )}
+
+      {/* ─── Galeria ─── */}
       {fotos.length > 0 ? (
         <div>
           <h2 className="text-sm font-semibold text-[#888] mb-3 uppercase tracking-wider">
@@ -168,6 +255,14 @@ export default function MidiasPage() {
                     <p className="text-[#aaa] text-[9px]">{formatarData(foto.syncEm)}</p>
                   </div>
                 </div>
+                {/* Botão baixar direto no card */}
+                <button
+                  onClick={e => { e.stopPropagation(); baixarFoto(foto) }}
+                  className="absolute top-2 right-2 w-7 h-7 bg-black/70 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-orange-500"
+                  title="Baixar foto"
+                >
+                  ↓
+                </button>
               </div>
             ))}
           </div>
@@ -175,15 +270,15 @@ export default function MidiasPage() {
       ) : !carregando && (
         <div className="text-center py-16 text-[#444]">
           <div className="text-5xl mb-3">🖼️</div>
-          <p className="text-sm">Nenhuma foto sincronizada ainda.</p>
-          <p className="text-xs mt-1">Adicione fotos na sua pasta do Google Drive e clique em Sincronizar.</p>
+          <p className="text-sm">Nenhuma foto ainda.</p>
+          <p className="text-xs mt-1">Envie fotos acima ou sincronize com o Google Drive.</p>
         </div>
       )}
 
-      {/* ─── Instruções de configuração ─── */}
+      {/* ─── Instruções ─── */}
       <Instrucoes />
 
-      {/* ─── Modal de foto ampliada ─── */}
+      {/* ─── Modal foto ampliada ─── */}
       {fotoAmpliada && (
         <div
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
@@ -198,10 +293,17 @@ export default function MidiasPage() {
               alt={fotoAmpliada.nome}
               className="w-full max-h-[70vh] object-contain"
             />
-            <div className="p-4 space-y-1">
-              <p className="text-white font-medium text-sm">{fotoAmpliada.nome}</p>
-              <p className="text-[#555] text-xs font-mono">{fotoAmpliada.publicId}</p>
-              <p className="text-[#555] text-xs">Sincronizado em: {formatarData(fotoAmpliada.syncEm)}</p>
+            <div className="p-4 flex items-start justify-between gap-4">
+              <div className="space-y-1 min-w-0">
+                <p className="text-white font-medium text-sm truncate">{fotoAmpliada.nome}</p>
+                <p className="text-[#555] text-xs">Sincronizado em: {new Date(fotoAmpliada.syncEm).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })}</p>
+              </div>
+              <button
+                onClick={() => baixarFoto(fotoAmpliada)}
+                className="shrink-0 flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-all"
+              >
+                ⬇️ Baixar
+              </button>
             </div>
             <button
               onClick={() => setAmpliada(null)}
@@ -238,29 +340,25 @@ function Instrucoes() {
         onClick={() => setAberto(v => !v)}
         className="w-full flex items-center justify-between p-4 text-sm text-[#666] hover:text-white hover:bg-[#111] transition-all"
       >
-        <span>📋 Como configurar a integração com Google Drive</span>
+        <span>📋 Como usar as Mídias</span>
         <span>{aberto ? '▲' : '▼'}</span>
       </button>
       {aberto && (
         <div className="bg-[#0d0d0d] border-t border-[#1e1e1e] p-5 text-sm text-[#999] space-y-4">
-          <Passo n={1} titulo="Criar projeto no Google Cloud">
-            Acesse <span className="text-orange-400">console.cloud.google.com</span> → Novo Projeto → ative a <strong className="text-white">Google Drive API</strong>.
+          <Passo n={1} titulo="Enviar do celular">
+            Clique em <strong className="text-white">Enviar fotos</strong> — no celular isso abre a câmera ou galeria. A foto vai direto para o Drive e Cloudinary.
           </Passo>
-          <Passo n={2} titulo="Criar Service Account">
-            IAM &amp; Admin → Service Accounts → Criar → baixe o <strong className="text-white">JSON de chave</strong>.
+          <Passo n={2} titulo="Enviar do computador">
+            Clique em <strong className="text-white">Enviar fotos</strong> ou arraste arquivos para a área pontilhada. Múltiplos arquivos são suportados.
           </Passo>
-          <Passo n={3} titulo="Adicionar no Render">
-            Copie <strong className="text-white">todo o conteúdo</strong> do JSON e cole na variável <code className="text-orange-400 bg-[#111] px-1 rounded">GOOGLE_SERVICE_ACCOUNT_JSON</code>.
+          <Passo n={3} titulo="Sincronizar fotos já no Drive">
+            Se você adicionou fotos direto no Google Drive pelo celular, clique em <strong className="text-white">Sincronizar Drive</strong> para trazer para cá.
           </Passo>
-          <Passo n={4} titulo="Pegar o ID da pasta do Drive">
-            Abra sua pasta no Drive → olhe a URL: <code className="text-[#ccc] bg-[#111] px-1 rounded text-xs">drive.google.com/drive/folders/<span className="text-orange-400">ESTE_É_O_ID</span></code><br/>
-            Adicione como <code className="text-orange-400 bg-[#111] px-1 rounded">GOOGLE_DRIVE_FOLDER_ID</code> no Render.
+          <Passo n={4} titulo="Baixar fotos">
+            Clique em qualquer foto para ampliar, depois clique em <strong className="text-white">⬇️ Baixar</strong>. Ou passe o mouse sobre a foto e clique na seta.
           </Passo>
-          <Passo n={5} titulo="Compartilhar a pasta">
-            No Drive, clique com botão direito na pasta → Compartilhar → cole o <strong className="text-white">e-mail da Service Account</strong> (termina em <code className="text-[#aaa]">@...gserviceaccount.com</code>) → permissão de <strong className="text-white">Leitor</strong>.
-          </Passo>
-          <Passo n={6} titulo="Pronto!">
-            Tire fotos no celular, salve na pasta do Drive, e clique em <strong className="text-white">Sincronizar agora</strong>. As fotos vão para o Cloudinary e ficam disponíveis nas stories automáticas.
+          <Passo n={5} titulo="Fotos nas stories automáticas">
+            Todas as fotos enviadas aqui ficam disponíveis automaticamente para as stories automáticas da Bruthus Burger.
           </Passo>
         </div>
       )}

@@ -51,7 +51,10 @@ function criarAuthDrive() {
 
   const auth = new google.auth.GoogleAuth({
     credentials: creds,
-    scopes: ["https://www.googleapis.com/auth/drive.readonly"],
+    scopes: [
+      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/drive.file",
+    ],
   });
   return google.drive({ version: "v3", auth });
 }
@@ -205,4 +208,30 @@ async function statusSync() {
   };
 }
 
-module.exports = { sincronizarDriveParaCloudinary, statusSync, listarArquivosDrive };
+// ── Upload de arquivo (buffer) para o Google Drive ────────────────────────
+
+async function uploadParaDrive(buffer, mimetype, nome) {
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  if (!folderId) throw new Error("GOOGLE_DRIVE_FOLDER_ID não configurado");
+
+  const drive = criarAuthDrive();
+  const { Readable } = require("stream");
+
+  const stream = Readable.from(buffer);
+
+  const res = await drive.files.create({
+    requestBody: {
+      name: nome,
+      parents: [folderId],
+    },
+    media: {
+      mimeType: mimetype,
+      body: stream,
+    },
+    fields: "id, name, mimeType, size, createdTime",
+  });
+
+  return res.data;
+}
+
+module.exports = { sincronizarDriveParaCloudinary, statusSync, listarArquivosDrive, uploadParaDrive };
