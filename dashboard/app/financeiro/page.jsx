@@ -591,6 +591,63 @@ export default function FinanceiroPage() {
         </div>
       )}
 
+      {/* Comparativo mês a mês */}
+      {evolucao.length >= 2 && (
+        <div className="mb-6 rounded-xl border border-[#1e1e1e] bg-[#111] p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-white">📅 Comparativo Mês a Mês</h3>
+            <span className="text-[10px] text-[#555]">últimos {Math.min(evolucao.length, 3)} meses</span>
+          </div>
+          {(() => {
+            const meses = evolucao.slice(-3)
+            const maxVal = Math.max(...meses.flatMap(m => [m.faturamento, m.gastos, Math.abs(m.lucro)]), 1)
+            return (
+              <div className="space-y-3">
+                {meses.map((d, i) => {
+                  const ant = i > 0 ? meses[i - 1] : null
+                  const crescFat = ant ? pctDiff(d.faturamento, ant.faturamento) : null
+                  const margem = d.faturamento > 0 ? ((d.lucro / d.faturamento) * 100).toFixed(1) : '0.0'
+                  const isAtual = i === meses.length - 1
+                  return (
+                    <div key={d.mes} className={`p-4 rounded-xl border ${isAtual ? 'border-[#f97316]/20 bg-[#f97316]/5' : 'border-[#1a1a1a] bg-[#0f0f0f]'}`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white">{fmtMes(d.mes)}</span>
+                          {isAtual && <span className="text-[9px] bg-[#f97316]/20 text-[#f97316] px-1.5 py-0.5 rounded-full">atual</span>}
+                        </div>
+                        {crescFat !== null && (
+                          <span className={`text-[10px] font-semibold ${crescFat >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {crescFat >= 0 ? '↑' : '↓'} {Math.abs(crescFat).toFixed(1)}% vs {fmtMes(meses[i - 1].mes)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Faturamento', valor: d.faturamento, barVal: d.faturamento, cor: 'bg-green-500/60', txt: 'text-green-400', display: fmt(d.faturamento) },
+                          { label: 'Gastos',      valor: d.gastos,       barVal: d.gastos,       cor: 'bg-red-500/60',   txt: 'text-red-400',   display: fmt(d.gastos) },
+                          { label: 'Lucro',       valor: d.lucro,        barVal: Math.abs(d.lucro), cor: d.lucro >= 0 ? 'bg-blue-400/60' : 'bg-red-500/60', txt: d.lucro >= 0 ? 'text-blue-400' : 'text-red-400', display: (d.lucro >= 0 ? '+' : '-') + fmt(Math.abs(d.lucro)) },
+                        ].map(m => (
+                          <div key={m.label} className="flex items-center gap-2">
+                            <span className="text-[10px] text-[#555] w-20 shrink-0">{m.label}</span>
+                            <div className="flex-1 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                              <div className={`h-full ${m.cor} rounded-full transition-all`} style={{ width: `${maxVal > 0 ? (m.barVal / maxVal) * 100 : 0}%`, minWidth: m.barVal > 0 ? '4px' : '0' }} />
+                            </div>
+                            <span className={`text-[10px] font-bold ${m.txt} w-24 text-right shrink-0`}>{m.display}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className={`text-[10px] mt-2 ${parseFloat(margem) >= 30 ? 'text-green-400' : parseFloat(margem) >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
+                        Margem: {margem}%
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
       {/* DRE Mensal */}
       {evolucao.length > 0 && (
         <div className="mb-6 rounded-xl border border-[#1e1e1e] bg-[#111] overflow-hidden">

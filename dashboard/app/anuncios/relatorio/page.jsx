@@ -5,6 +5,13 @@ import PageHeader from '../../../components/PageHeader'
 import { Toast } from '../../../components/Toast'
 
 function fmt(v, decimals = 2) { return Number(v || 0).toFixed(decimals) }
+
+function lerHistoricoCampanhas() {
+  try { return JSON.parse(localStorage.getItem('bruthus_hist_campanhas') || '[]') } catch { return [] }
+}
+function salvarHistoricoCampanhas(lista) {
+  try { localStorage.setItem('bruthus_hist_campanhas', JSON.stringify(lista.slice(0, 50))) } catch {}
+}
 function fmtBRL(v) { return `R$ ${fmt(v)}` }
 function fmtNum(v) { return Number(v || 0).toLocaleString('pt-BR') }
 
@@ -468,6 +475,59 @@ function GraficoCampanhas({ campanhas }) {
   )
 }
 
+function SecaoHistoricoCampanhas() {
+  const [aberto, setAberto] = useState(false)
+  const [lista, setLista] = useState([])
+
+  useEffect(() => { setLista(lerHistoricoCampanhas()) }, [])
+
+  function limpar() {
+    if (!confirm('Limpar todo o histórico de campanhas encerradas?')) return
+    localStorage.removeItem('bruthus_hist_campanhas')
+    setLista([])
+  }
+
+  if (lista.length === 0) return null
+
+  const ordenada = [...lista].sort((a, b) => new Date(b._salvaEm || 0) - new Date(a._salvaEm || 0))
+
+  return (
+    <div className="mt-8">
+      <button
+        onClick={() => setAberto(!aberto)}
+        className="w-full flex items-center justify-between py-3 px-4 rounded-xl border border-[#1e1e1e] bg-[#0f0f0f] hover:bg-[#111] transition-colors mb-2"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-white">📦 Histórico de Campanhas Encerradas</span>
+          <span className="text-[10px] bg-[#1a1a1a] text-[#555] px-2 py-0.5 rounded-full">{lista.length}</span>
+        </div>
+        <span className="text-[#555]">{aberto ? '▲' : '▼'}</span>
+      </button>
+
+      {aberto && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[10px] text-[#555]">Salvo localmente no seu navegador</p>
+            <button onClick={limpar} className="text-[10px] text-red-400/60 hover:text-red-400 transition-colors">
+              🗑️ Limpar histórico
+            </button>
+          </div>
+          {ordenada.map((camp, i) => (
+            <div key={camp.id || i} className="relative">
+              {camp._salvaEm && (
+                <p className="text-[9px] text-[#333] mb-1 pl-1">
+                  Registrado em {new Date(camp._salvaEm).toLocaleString('pt-BR')}
+                </p>
+              )}
+              <CampanhaCard camp={camp} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SummaryCard({ label, explicacao, value, sub, cor = '#f97316' }) {
   return (
     <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-4">
@@ -502,6 +562,20 @@ export default function RelatorioPage() {
 
   // Auto-load ao abrir a página
   useEffect(() => { carregar(periodo) }, [])
+
+  // Salvar campanhas encerradas no histórico local
+  useEffect(() => {
+    if (!dados?.campanhas) return
+    const encerradas = dados.campanhas.filter(c => !c.erro && c.status !== 'ACTIVE' && c.gasto > 0)
+    if (encerradas.length === 0) return
+    const existing = lerHistoricoCampanhas()
+    const mapa = {}
+    existing.forEach(c => { if (c.id) mapa[c.id] = c })
+    encerradas.forEach(c => {
+      mapa[c.id] = { ...c, _salvaEm: mapa[c.id]?._salvaEm || new Date().toISOString() }
+    })
+    salvarHistoricoCampanhas(Object.values(mapa))
+  }, [dados])
 
   function trocarPeriodo(dias) {
     setPeriodo(dias)
@@ -769,6 +843,8 @@ export default function RelatorioPage() {
           </p>
         </>
       )}
+
+      <SecaoHistoricoCampanhas />
 
       {!loading && !dados && (
         <div className="text-center py-16 rounded-xl border border-[#1e1e1e] bg-[#111]">
