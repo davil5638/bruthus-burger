@@ -5,6 +5,38 @@ const PHONE  = process.env.WHATSAPP_PHONE;
 const APIKEY = process.env.CALLMEBOT_APIKEY;
 
 // ──────────────────────────────────────────────
+// Busca resumo de Ads da semana passada
+// ──────────────────────────────────────────────
+async function buscarResumoAds() {
+  try {
+    const { gerarRelatorioCompleto } = require("./createAds");
+    const campanhas = await gerarRelatorioCompleto(7);
+    const comDados = campanhas.filter(c => !c.erro && c.impressoes > 0);
+
+    if (comDados.length === 0) return null;
+
+    const totalGasto = comDados.reduce((s, c) => s + c.gasto, 0);
+    const totalCliques = comDados.reduce((s, c) => s + c.linkCliques, 0);
+    const ctrMedio = comDados.reduce((s, c) => s + c.ctr, 0) / comDados.length;
+    const cpcMedio = comDados.reduce((s, c) => s + c.cpc, 0) / comDados.length;
+    const ativas = campanhas.filter(c => c.status === "ACTIVE").length;
+
+    // Alertas
+    const alertas = [];
+    for (const c of comDados) {
+      if (c.status === "ACTIVE" && c.ctr < 1)      alertas.push(`⚠️ CTR baixo: ${c.nome.slice(0,20)}`);
+      if (c.status === "ACTIVE" && c.cpc > 3)       alertas.push(`⚠️ CPC alto: ${c.nome.slice(0,20)}`);
+      if (c.status === "ACTIVE" && c.frequencia > 3) alertas.push(`⚠️ Público saturado: ${c.nome.slice(0,20)}`);
+    }
+
+    return { totalGasto, totalCliques, ctrMedio, cpcMedio, ativas, total: campanhas.length, alertas };
+  } catch (e) {
+    console.warn("⚠️ Não foi possível buscar dados de Ads:", e.message);
+    return null;
+  }
+}
+
+// ──────────────────────────────────────────────
 // Retorna o range Ter→Seg da semana PASSADA
 // ──────────────────────────────────────────────
 function getRangoSemanaPassada() {
@@ -43,7 +75,10 @@ function fmtData(d) {
 // ──────────────────────────────────────────────
 async function gerarTextoResumo() {
   const { dataInicio, dataFim } = getRangoSemanaPassada();
-  const resumo = await calcularResumoCustom(dataInicio, dataFim);
+  const [resumo, ads] = await Promise.all([
+    calcularResumoCustom(dataInicio, dataFim),
+    buscarResumoAds(),
+  ]);
 
   const emoji  = resumo.lucro >= 0 ? "✅" : "⚠️";
   const periodo = `${fmtData(dataInicio)} → ${fmtData(dataFim)}`;
@@ -64,6 +99,21 @@ async function gerarTextoResumo() {
 
   if (resumo.totalEntradas === 0) {
     txt += `\n⚠️ Nenhum lançamento encontrado para essa semana.`;
+  }
+
+  // Seção de Ads (se houver dados)
+  if (ads) {
+    txt += `\n\n📣 *Meta Ads — últimos 7 dias*\n`;
+    txt += `💰 Investido:  *${fmtBR(ads.totalGasto)}*\n`;
+    txt += `🖱️ Cliques:    *${ads.totalCliques}*\n`;
+    txt += `📈 CTR médio:  *${ads.ctrMedio.toFixed(2)}%* ${ads.ctrMedio >= 1.5 ? "✅" : "⚠️"}\n`;
+    txt += `💸 CPC médio:  *${fmtBR(ads.cpcMedio)}* ${ads.cpcMedio <= 1.5 ? "✅" : "⚠️"}\n`;
+    txt += `📊 Campanhas:  ${ads.ativas} ativas de ${ads.total}\n`;
+
+    if (ads.alertas.length > 0) {
+      txt += `\n🚨 *Alertas:*\n`;
+      ads.alertas.forEach(a => { txt += `  ${a}\n`; });
+    }
   }
 
   return { texto: txt, resumo, periodo };

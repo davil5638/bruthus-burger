@@ -293,6 +293,201 @@ function StepIndicator({ step, total, labels }) {
   )
 }
 
+// ─── Score de Saúde ───────────────────────────────────────────────────────────
+
+function calcularScore(metricasMap) {
+  const comDados = Object.values(metricasMap).filter(c => c.impressoes > 0 && c.gasto > 0)
+  if (comDados.length === 0) return null
+  let pontos = 0, max = 0
+  for (const c of comDados) {
+    max += 5
+    if (c.ctr >= 2) pontos += 2; else if (c.ctr >= 1.5) pontos += 1.5; else if (c.ctr >= 1) pontos += 1
+    if (c.cpc <= 1.5) pontos += 2; else if (c.cpc <= 2.5) pontos += 1; else if (c.cpc <= 3.5) pontos += 0.5
+    if (c.frequencia >= 1.5 && c.frequencia <= 3) pontos += 1; else if (c.frequencia > 0) pontos += 0.5
+  }
+  return Math.round((pontos / max) * 100)
+}
+
+function HealthScore({ score }) {
+  if (score === null) return null
+  const cor = score >= 70 ? '#34d399' : score >= 45 ? '#fbbf24' : '#f87171'
+  const label = score >= 70 ? 'Boa' : score >= 45 ? 'Regular' : 'Fraca'
+  const desc  = score >= 70 ? 'Anúncios performando bem' : score >= 45 ? 'Pode melhorar — veja os alertas' : 'Performance ruim — ação necessária'
+  return (
+    <div className="flex items-center gap-4 p-4 rounded-xl border border-[#1e1e1e] bg-[#111] mb-5">
+      <div className="shrink-0 w-16 h-16 rounded-full border-4 flex items-center justify-center font-black text-xl" style={{ borderColor: cor, color: cor }}>
+        {score}
+      </div>
+      <div>
+        <p className="text-xs text-[#555] uppercase tracking-wider mb-0.5">Saúde dos Anúncios</p>
+        <p className="text-base font-bold text-white">{label}</p>
+        <p className="text-xs text-[#666]">{desc}</p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Alertas Automáticos ──────────────────────────────────────────────────────
+
+function Alertas({ metricasMap, campanhas }) {
+  const alertas = []
+  for (const c of Object.values(metricasMap)) {
+    const camp = campanhas.find(x => x.id === c.id)
+    if (!camp || camp.status !== 'ACTIVE') continue
+    if (c.ctr < 1 && c.impressoes > 500)
+      alertas.push({ id: c.id, tipo: 'error', msg: `CTR muito baixo (${Number(c.ctr).toFixed(2)}%) — troque a imagem ou o texto`, camp: c.nome })
+    else if (c.ctr < 1.5 && c.impressoes > 500)
+      alertas.push({ id: c.id, tipo: 'warn', msg: `CTR regular (${Number(c.ctr).toFixed(2)}%) — tente uma imagem mais chamativa`, camp: c.nome })
+    if (c.cpc > 3 && c.cliques > 5)
+      alertas.push({ id: c.id, tipo: 'error', msg: `CPC alto (R$${Number(c.cpc).toFixed(2)}) — revise o público ou o criativo`, camp: c.nome })
+    if (c.frequencia > 3 && c.frequencia > 0)
+      alertas.push({ id: c.id, tipo: 'warn', msg: `Público saturado (freq. ${Number(c.frequencia).toFixed(1)}x) — troque o criativo`, camp: c.nome })
+  }
+  if (alertas.length === 0) return null
+  return (
+    <div className="mb-5 space-y-2">
+      <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-2">🚨 Alertas de performance</p>
+      {alertas.map((a, i) => (
+        <div key={i} className={`flex items-start gap-3 p-3 rounded-xl border text-xs ${
+          a.tipo === 'error'
+            ? 'border-red-500/30 bg-red-500/10 text-red-300'
+            : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-300'
+        }`}>
+          <span className="shrink-0">{a.tipo === 'error' ? '❌' : '⚠️'}</span>
+          <div>
+            <p className="font-semibold text-[11px] opacity-60 truncate">{a.camp}</p>
+            <p>{a.msg}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Calculadora de ROI ───────────────────────────────────────────────────────
+
+function CalculadoraROI({ metricasMap }) {
+  const [ticket, setTicket]     = useState('35')
+  const [conversao, setConversao] = useState('3')
+
+  const totalGasto   = Object.values(metricasMap).reduce((s, c) => s + (c.gasto || 0), 0)
+  const totalCliques = Object.values(metricasMap).reduce((s, c) => s + (c.linkCliques || 0), 0)
+
+  const ticketN    = parseFloat(ticket) || 0
+  const conversaoN = parseFloat(conversao) / 100 || 0
+  const vendasEsp  = Math.round(totalCliques * conversaoN)
+  const receitaEsp = vendasEsp * ticketN
+  const roi        = totalGasto > 0 ? (((receitaEsp - totalGasto) / totalGasto) * 100).toFixed(0) : 0
+  const vendasBreak = totalGasto > 0 && ticketN > 0 ? Math.ceil(totalGasto / ticketN) : 0
+  const cliqBreak  = conversaoN > 0 ? Math.ceil(vendasBreak / conversaoN) : 0
+
+  return (
+    <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-4 mt-5">
+      <p className="text-xs font-bold text-white mb-1">🧮 Calculadora de ROI</p>
+      <p className="text-[11px] text-[#555] mb-4">Baseado nos cliques reais das suas campanhas ativas</p>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label className="text-[10px] text-[#666] uppercase tracking-wider block mb-1">Ticket médio (R$)</label>
+          <input type="number" value={ticket} onChange={e => setTicket(e.target.value)} min="1"
+            className="w-full bg-[#0f0f0f] border border-[#333] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f97316]" />
+        </div>
+        <div>
+          <label className="text-[10px] text-[#666] uppercase tracking-wider block mb-1">Taxa de conversão (%)</label>
+          <input type="number" value={conversao} onChange={e => setConversao(e.target.value)} min="0.1" step="0.1"
+            className="w-full bg-[#0f0f0f] border border-[#333] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f97316]" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {[
+          { label: 'Cliques reais',     value: totalCliques.toLocaleString('pt-BR'), cor: 'text-white' },
+          { label: 'Vendas esperadas',  value: vendasEsp,                             cor: 'text-[#f97316]' },
+          { label: 'Receita esperada',  value: `R$${receitaEsp.toFixed(2)}`,          cor: receitaEsp >= totalGasto ? 'text-green-400' : 'text-red-400' },
+          { label: 'ROI estimado',      value: `${roi}%`,                             cor: Number(roi) >= 0 ? 'text-green-400' : 'text-red-400' },
+        ].map(m => (
+          <div key={m.label} className="p-3 rounded-lg bg-[#0a0a0a] border border-[#1a1a1a] text-center">
+            <p className={`text-sm font-black ${m.cor}`}>{m.value}</p>
+            <p className="text-[10px] text-[#555] mt-0.5">{m.label}</p>
+          </div>
+        ))}
+      </div>
+      {vendasBreak > 0 && (
+        <p className="text-[11px] text-[#555] mt-3 text-center">
+          Para empatar: <span className="text-white font-semibold">{vendasBreak} vendas</span> ({cliqBreak} cliques necessários com {conversao}% de conversão)
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ─── Comparativo de Campanhas ─────────────────────────────────────────────────
+
+function Comparativo({ metricasMap }) {
+  const opcoes = Object.values(metricasMap).filter(c => c.impressoes > 0)
+  const [selA, setSelA] = useState('')
+  const [selB, setSelB] = useState('')
+
+  if (opcoes.length < 2) return null
+
+  const A = metricasMap[selA]
+  const B = metricasMap[selB]
+
+  function melhor(a, b, maior = true) {
+    if (!a || !b) return null
+    return maior ? (a > b ? 'A' : a < b ? 'B' : null) : (a < b ? 'A' : a > b ? 'B' : null)
+  }
+
+  const metricas = A && B ? [
+    { label: 'Gasto',      a: `R$${Number(A.gasto).toFixed(2)}`,       b: `R$${Number(B.gasto).toFixed(2)}`,       melhor: melhor(A.gasto, B.gasto, false) },
+    { label: 'Alcance',    a: Number(A.alcance).toLocaleString(),        b: Number(B.alcance).toLocaleString(),       melhor: melhor(A.alcance, B.alcance) },
+    { label: 'Cliques',    a: Number(A.linkCliques).toLocaleString(),    b: Number(B.linkCliques).toLocaleString(),   melhor: melhor(A.linkCliques, B.linkCliques) },
+    { label: 'CTR',        a: `${Number(A.ctr).toFixed(2)}%`,           b: `${Number(B.ctr).toFixed(2)}%`,           melhor: melhor(A.ctr, B.ctr) },
+    { label: 'CPC',        a: `R$${Number(A.cpc).toFixed(2)}`,          b: `R$${Number(B.cpc).toFixed(2)}`,          melhor: melhor(A.cpc, B.cpc, false) },
+    { label: 'Frequência', a: `${Number(A.frequencia).toFixed(1)}x`,    b: `${Number(B.frequencia).toFixed(1)}x`,   melhor: null },
+    { label: 'CPM',        a: `R$${Number(A.cpm).toFixed(2)}`,          b: `R$${Number(B.cpm).toFixed(2)}`,          melhor: melhor(A.cpm, B.cpm, false) },
+  ] : []
+
+  return (
+    <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-4 mt-5">
+      <p className="text-xs font-bold text-white mb-1">⚖️ Comparativo de Campanhas</p>
+      <p className="text-[11px] text-[#555] mb-4">Selecione duas campanhas para comparar lado a lado</p>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {[['A', selA, setSelA], ['B', selB, setSelB]].map(([lado, val, set]) => (
+          <div key={lado}>
+            <label className="text-[10px] text-[#666] uppercase tracking-wider block mb-1">Campanha {lado}</label>
+            <select value={val} onChange={e => set(e.target.value)}
+              className="w-full bg-[#0f0f0f] border border-[#333] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#f97316]">
+              <option value="">Selecionar...</option>
+              {opcoes.filter(c => c.id !== (lado === 'A' ? selB : selA)).map(c => (
+                <option key={c.id} value={c.id}>{c.nome?.slice(0, 35)}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+      {A && B && (
+        <div className="rounded-xl overflow-hidden border border-[#1a1a1a]">
+          <div className="grid grid-cols-3 text-[10px] font-bold uppercase tracking-wider text-[#555] bg-[#0a0a0a] px-3 py-2">
+            <span>Métrica</span>
+            <span className="text-center text-blue-400">A</span>
+            <span className="text-center text-purple-400">B</span>
+          </div>
+          {metricas.map(m => (
+            <div key={m.label} className="grid grid-cols-3 px-3 py-2.5 border-t border-[#1a1a1a] items-center">
+              <span className="text-[11px] text-[#666]">{m.label}</span>
+              <span className={`text-xs font-bold text-center ${m.melhor === 'A' ? 'text-green-400' : 'text-white'}`}>
+                {m.melhor === 'A' && '✓ '}{m.a}
+              </span>
+              <span className={`text-xs font-bold text-center ${m.melhor === 'B' ? 'text-green-400' : 'text-white'}`}>
+                {m.melhor === 'B' && '✓ '}{m.b}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Página Principal ─────────────────────────────────────────────────────────
 
 export default function AnunciosPage() {
@@ -515,6 +710,14 @@ export default function AnunciosPage() {
       ════════════════════════════════════════════════════════ */}
       {abaAtiva === 'campanhas' && (
         <div>
+          {/* Score + Alertas */}
+          {!loadingCamp && Object.keys(metricasMap).length > 0 && (
+            <>
+              <HealthScore score={calcularScore(metricasMap)} />
+              <Alertas metricasMap={metricasMap} campanhas={campanhas} />
+            </>
+          )}
+
           {/* Header cards de status */}
           {!loadingCamp && campanhas.length > 0 && (
             <div className="grid grid-cols-3 gap-3 mb-5">
@@ -1106,6 +1309,10 @@ export default function AnunciosPage() {
                   </div>
                 </div>
               )}
+
+              {/* ROI + Comparativo */}
+              <CalculadoraROI metricasMap={metricasMap} />
+              <Comparativo metricasMap={metricasMap} />
 
               {/* Análise IA expansível */}
               {analiseIA && (
