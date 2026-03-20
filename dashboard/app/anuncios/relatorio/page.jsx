@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../../../lib/api'
 import PageHeader from '../../../components/PageHeader'
 import { Toast } from '../../../components/Toast'
@@ -8,61 +8,30 @@ function fmt(v, decimals = 2) { return Number(v || 0).toFixed(decimals) }
 function fmtBRL(v) { return `R$ ${fmt(v)}` }
 function fmtNum(v) { return Number(v || 0).toLocaleString('pt-BR') }
 
-// ── Glossário das métricas em linguagem simples ──
+const PERIODOS = [
+  { value: 7,  label: '7 dias' },
+  { value: 14, label: '14 dias' },
+  { value: 30, label: '30 dias' },
+  { value: 90, label: '90 dias' },
+]
+
 const GLOSSARIO = {
-  impressoes: {
-    nome: '👁️ Quantas vezes foi exibido',
-    explicacao: 'Número de vezes que seu anúncio apareceu na tela de alguém no Instagram ou Facebook. Não significa que a pessoa clicou — só que viu.',
-  },
-  alcance: {
-    nome: '👥 Pessoas diferentes que viram',
-    explicacao: 'Quantas pessoas únicas viram seu anúncio. Se a mesma pessoa viu 3 vezes, conta como 1 aqui.',
-  },
-  frequencia: {
-    nome: '🔁 Vezes que cada pessoa viu',
-    explicacao: 'Média de vezes que cada pessoa viu seu anúncio. O ideal é entre 1,5 e 3 vezes. Abaixo disso é pouco. Acima de 3, as pessoas já ficam saturadas e param de prestar atenção.',
-    bom: 'Entre 1,5 e 3 vezes',
-    ruim_alto: 'Acima de 3 → troque a foto/vídeo do anúncio',
-    ruim_baixo: 'Abaixo de 1,5 → anúncio rodou pouco tempo',
-  },
-  cliques: {
-    nome: '🖱️ Total de cliques',
-    explicacao: 'Quantas vezes alguém clicou em qualquer parte do anúncio (foto, botão, link, nome da página, etc).',
-  },
-  linkCliques: {
-    nome: '🔗 Cliques no link',
-    explicacao: 'Só os cliques que levaram a pessoa até o seu site ou cardápio. É o número mais importante — mostra quantas pessoas realmente se interessaram em comprar.',
-  },
-  ctr: {
-    nome: '📈 Taxa de cliques (CTR)',
-    explicacao: 'De cada 100 pessoas que viram o anúncio, quantas clicaram. Ex: CTR de 2% = a cada 100 visualizações, 2 pessoas clicaram.',
-    bom: 'Acima de 1,5% é bom. Acima de 2% é ótimo.',
-    ruim: 'Abaixo de 1% significa que a imagem ou o texto não estão chamando atenção.',
-  },
-  cpc: {
-    nome: '💸 Custo por clique (CPC)',
-    explicacao: 'Quanto você pagou em média para cada pessoa que clicou no anúncio.',
-    bom: 'Abaixo de R$1,50 é ótimo para hamburguerias.',
-    ruim: 'Acima de R$3,00 está caro — mude a imagem ou o público.',
-  },
-  cpm: {
-    nome: '📢 Custo por 1.000 exibições (CPM)',
-    explicacao: 'Quanto custou para o anúncio ser exibido 1.000 vezes. Serve para comparar campanhas. Quanto menor, mais barato está sendo alcançar pessoas.',
-  },
-  gasto: {
-    nome: '💰 Total gasto',
-    explicacao: 'Valor total investido nesta campanha desde que foi criada.',
-  },
+  impressoes:  { nome: '👁️ Quantas vezes foi exibido',        explicacao: 'Número de vezes que seu anúncio apareceu na tela de alguém. Não significa que a pessoa clicou — só que viu.' },
+  alcance:     { nome: '👥 Pessoas diferentes que viram',     explicacao: 'Quantas pessoas únicas viram seu anúncio. Se a mesma pessoa viu 3 vezes, conta como 1 aqui.' },
+  frequencia:  { nome: '🔁 Vezes que cada pessoa viu',        explicacao: 'Média de vezes que cada pessoa viu seu anúncio. O ideal é entre 1,5 e 3 vezes.', bom: 'Entre 1,5 e 3 vezes', ruim_alto: 'Acima de 3 → troque a criativo do anúncio', ruim_baixo: 'Abaixo de 1,5 → anúncio rodou pouco tempo' },
+  cliques:     { nome: '🖱️ Total de cliques',                 explicacao: 'Quantas vezes alguém clicou em qualquer parte do anúncio.' },
+  linkCliques: { nome: '🔗 Cliques no link',                  explicacao: 'Só os cliques que levaram a pessoa até o seu site. É o número mais importante.' },
+  ctr:         { nome: '📈 Taxa de cliques (CTR)',             explicacao: 'De cada 100 pessoas que viram, quantas clicaram.', bom: 'Acima de 1,5% é bom. Acima de 2% é ótimo.', ruim: 'Abaixo de 1% — imagem ou texto não chamam atenção.' },
+  cpc:         { nome: '💸 Custo por clique (CPC)',            explicacao: 'Quanto você pagou em média para cada pessoa que clicou.', bom: 'Abaixo de R$1,50 é ótimo.', ruim: 'Acima de R$3,00 — mude imagem ou público.' },
+  cpm:         { nome: '📢 Custo por 1.000 exibições (CPM)',  explicacao: 'Quanto custou para o anúncio ser exibido 1.000 vezes.' },
+  gasto:       { nome: '💰 Total gasto',                      explicacao: 'Valor total investido nesta campanha.' },
 }
 
 function Tooltip({ texto }) {
   const [aberto, setAberto] = useState(false)
   return (
     <span className="relative inline-block">
-      <button
-        onClick={e => { e.stopPropagation(); setAberto(!aberto) }}
-        className="ml-1 text-[#555] hover:text-[#f97316] text-[10px] leading-none"
-      >ℹ️</button>
+      <button onClick={e => { e.stopPropagation(); setAberto(!aberto) }} className="ml-1 text-[#555] hover:text-[#f97316] text-[10px] leading-none">ℹ️</button>
       {aberto && (
         <div className="absolute bottom-full left-0 mb-2 w-56 bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-[11px] text-[#aaa] leading-relaxed z-50 shadow-xl">
           {texto}
@@ -75,10 +44,10 @@ function Tooltip({ texto }) {
 
 function statusBadge(status) {
   const map = {
-    ACTIVE:   { label: '🟢 Ativa',     cls: 'bg-green-500/20 text-green-400 border-green-500/30' },
-    PAUSED:   { label: '⏸️ Pausada',   cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-    ARCHIVED: { label: '📦 Arquivada', cls: 'bg-[#222] text-[#666] border-[#333]' },
-    DELETED:  { label: '🗑️ Deletada',  cls: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    ACTIVE:   { label: '🟢 Ativa',      cls: 'bg-green-500/20 text-green-400 border-green-500/30' },
+    PAUSED:   { label: '⏸️ Pausada',    cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+    ARCHIVED: { label: '📦 Arquivada',  cls: 'bg-[#222] text-[#666] border-[#333]' },
+    DELETED:  { label: '🗑️ Deletada',   cls: 'bg-red-500/20 text-red-400 border-red-500/30' },
   }
   const s = map[status] || { label: status, cls: 'bg-[#222] text-[#666]' }
   return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${s.cls}`}>{s.label}</span>
@@ -89,19 +58,14 @@ function avaliarCampanha(camp) {
   const cpc  = parseFloat(camp.cpc)
   const freq = parseFloat(camp.frequencia)
   const gasto = parseFloat(camp.gasto)
-
   if (gasto === 0) return { nota: '—', cor: 'text-[#555]', resumo: 'Sem gastos registrados ainda.' }
-
   let pontos = 0
-  if (ctr >= 2)   pontos += 2
-  else if (ctr >= 1) pontos += 1
-  if (cpc <= 1.5) pontos += 2
-  else if (cpc <= 3) pontos += 1
+  if (ctr >= 2) pontos += 2; else if (ctr >= 1) pontos += 1
+  if (cpc <= 1.5) pontos += 2; else if (cpc <= 3) pontos += 1
   if (freq >= 1.5 && freq <= 3) pontos += 1
-
-  if (pontos >= 4) return { nota: '🟢 Boa', cor: 'text-green-400', resumo: 'Campanha performando bem. Pessoas estão clicando com custo baixo.' }
-  if (pontos >= 2) return { nota: '🟡 Regular', cor: 'text-yellow-400', resumo: 'Campanha aceitável mas pode melhorar. Veja as métricas abaixo.' }
-  return { nota: '🔴 Fraca', cor: 'text-red-400', resumo: 'Campanha com performance ruim. Recomendamos ajustar imagem, texto ou público.' }
+  if (pontos >= 4) return { nota: '🟢 Boa',     cor: 'text-green-400',  resumo: 'Campanha performando bem. Pessoas estão clicando com custo baixo.' }
+  if (pontos >= 2) return { nota: '🟡 Regular', cor: 'text-yellow-400', resumo: 'Campanha aceitável mas pode melhorar.' }
+  return              { nota: '🔴 Fraca',   cor: 'text-red-400',    resumo: 'Campanha com performance ruim. Ajuste imagem, texto ou público.' }
 }
 
 function MetricaItem({ label, valor, glossKey, destaque = false }) {
@@ -120,23 +84,21 @@ function MetricaItem({ label, valor, glossKey, destaque = false }) {
 function AvaliacaoMetrica({ metrica, valor }) {
   const v = parseFloat(valor)
   const g = GLOSSARIO[metrica]
-
   let avaliacao = null
   if (metrica === 'ctr') {
-    if (v >= 2)   avaliacao = { icon: '✅', cor: 'text-green-400', texto: `${fmt(v)}% — Ótimo! A cada 100 pessoas que veem, ${Math.round(v)} clicam.` }
-    else if (v >= 1) avaliacao = { icon: '⚠️', cor: 'text-yellow-400', texto: `${fmt(v)}% — Regular. O ideal é acima de 1,5%. Tente uma foto mais chamativa.` }
-    else avaliacao = { icon: '❌', cor: 'text-red-400', texto: `${fmt(v)}% — Baixo. Poucas pessoas estão clicando. Mude a imagem ou o texto do anúncio.` }
+    if (v >= 2)   avaliacao = { icon: '✅', cor: 'text-green-400',  texto: `${fmt(v)}% — Ótimo! A cada 100 pessoas, ${Math.round(v)} clicam.` }
+    else if (v >= 1) avaliacao = { icon: '⚠️', cor: 'text-yellow-400', texto: `${fmt(v)}% — Regular. Ideal acima de 1,5%. Tente uma foto mais chamativa.` }
+    else avaliacao = { icon: '❌', cor: 'text-red-400', texto: `${fmt(v)}% — Baixo. Mude a imagem ou o texto.` }
   } else if (metrica === 'cpc') {
     if (v === 0) return null
-    if (v <= 1.5) avaliacao = { icon: '✅', cor: 'text-green-400', texto: `${fmtBRL(v)} por clique — Ótimo! Está barato para atrair clientes.` }
-    else if (v <= 3) avaliacao = { icon: '⚠️', cor: 'text-yellow-400', texto: `${fmtBRL(v)} por clique — Aceitável, mas pode melhorar. Tente segmentar melhor o público.` }
-    else avaliacao = { icon: '❌', cor: 'text-red-400', texto: `${fmtBRL(v)} por clique — Caro! Está pagando muito por cada visita. Mude a imagem ou reduza o público.` }
+    if (v <= 1.5) avaliacao = { icon: '✅', cor: 'text-green-400',  texto: `${fmtBRL(v)} por clique — Ótimo!` }
+    else if (v <= 3) avaliacao = { icon: '⚠️', cor: 'text-yellow-400', texto: `${fmtBRL(v)} por clique — Aceitável, pode melhorar.` }
+    else avaliacao = { icon: '❌', cor: 'text-red-400', texto: `${fmtBRL(v)} por clique — Caro! Mude a imagem ou reduza o público.` }
   } else if (metrica === 'frequencia') {
-    if (v >= 1.5 && v <= 3) avaliacao = { icon: '✅', cor: 'text-green-400', texto: `${fmt(v)}x — Ideal. Cada pessoa viu o anúncio umas ${Math.round(v)} vezes, o suficiente para lembrar.` }
-    else if (v > 3) avaliacao = { icon: '⚠️', cor: 'text-yellow-400', texto: `${fmt(v)}x — Público cansado. As pessoas já viram demais. Troque a foto ou vídeo do anúncio.` }
-    else if (v > 0) avaliacao = { icon: 'ℹ️', cor: 'text-[#888]', texto: `${fmt(v)}x — Frequência baixa. O anúncio rodou pouco tempo.` }
+    if (v >= 1.5 && v <= 3) avaliacao = { icon: '✅', cor: 'text-green-400', texto: `${fmt(v)}x — Ideal.` }
+    else if (v > 3) avaliacao = { icon: '⚠️', cor: 'text-yellow-400', texto: `${fmt(v)}x — Público cansado. Troque o criativo.` }
+    else if (v > 0) avaliacao = { icon: 'ℹ️', cor: 'text-[#888]', texto: `${fmt(v)}x — Frequência baixa.` }
   }
-
   if (!avaliacao) return null
   return (
     <div className={`flex items-start gap-2 text-xs ${avaliacao.cor} bg-[#111] rounded-lg p-2.5`}>
@@ -149,8 +111,176 @@ function AvaliacaoMetrica({ metrica, valor }) {
   )
 }
 
+// ── Modal de Relatório Final ──
+function RelatorioFinalModal({ camp, onClose }) {
+  const printRef = useRef(null)
+  const avaliacao = avaliarCampanha(camp)
+  const dataInicio = camp.iniciou ? new Date(camp.iniciou).toLocaleDateString('pt-BR') : '—'
+  const dataFim    = camp.encerrou ? new Date(camp.encerrou).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')
+  const dataCriada = camp.criada ? new Date(camp.criada).toLocaleDateString('pt-BR') : '—'
+
+  function imprimir() {
+    const conteudo = printRef.current?.innerHTML
+    const janela = window.open('', '_blank')
+    janela.document.write(`
+      <html><head><title>Relatório Final — ${camp.nome}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 32px; color: #111; max-width: 800px; margin: 0 auto; }
+        h1 { font-size: 20px; margin-bottom: 4px; }
+        h2 { font-size: 14px; color: #555; margin-top: 24px; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; text-align: center; }
+        .card .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+        .card .valor { font-size: 18px; font-weight: bold; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: bold; border: 1px solid #ddd; }
+        .avaliacao { padding: 12px; border-radius: 8px; margin: 12px 0; }
+        p { font-size: 13px; line-height: 1.6; }
+        .footer { margin-top: 32px; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 12px; }
+      </style></head>
+      <body>${conteudo}</body></html>
+    `)
+    janela.document.close()
+    janela.print()
+  }
+
+  function exportarCSV() {
+    const linhas = [
+      ['Campanha', camp.nome],
+      ['Status', camp.status],
+      ['Criada em', dataCriada],
+      ['Período', `${dataInicio} até ${dataFim}`],
+      ['', ''],
+      ['Métrica', 'Valor'],
+      ['Total gasto (R$)', fmt(camp.gasto)],
+      ['Impressões', camp.impressoes],
+      ['Alcance', camp.alcance],
+      ['Frequência', fmt(camp.frequencia)],
+      ['Cliques totais', camp.cliques],
+      ['Cliques no link', camp.linkCliques],
+      ['CTR (%)', fmt(camp.ctr)],
+      ['CPC (R$)', fmt(camp.cpc)],
+      ['CPM (R$)', fmt(camp.cpm)],
+      ['Avaliação', avaliacao.nota.replace(/[🟢🟡🔴]/g, '').trim()],
+    ]
+    const csv = linhas.map(l => l.join(';')).join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `relatorio-${camp.nome.replace(/\s+/g, '-')}-${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-[#1e1e1e] sticky top-0 bg-[#0f0f0f] z-10">
+          <div>
+            <p className="text-xs text-[#f97316] font-semibold uppercase tracking-wider mb-0.5">📄 Relatório Final</p>
+            <h2 className="text-sm font-bold text-white truncate max-w-xs">{camp.nome}</h2>
+          </div>
+          <button onClick={onClose} className="text-[#555] hover:text-white text-xl leading-none">×</button>
+        </div>
+
+        {/* Conteúdo imprimível */}
+        <div className="p-5 space-y-5" ref={printRef}>
+
+          {/* Info básica — versão print */}
+          <div style={{ display: 'none' }}>
+            <h1>Relatório Final — {camp.nome}</h1>
+            <p>Bruthus Burger | Gerado em {new Date().toLocaleString('pt-BR')}</p>
+          </div>
+
+          {/* Status + período */}
+          <div className="flex flex-wrap items-center gap-3">
+            {statusBadge(camp.status)}
+            <span className="text-xs text-[#666]">Criada em {dataCriada}</span>
+            {camp.orcamentoDiario > 0 && (
+              <span className="text-xs text-[#666]">Orçamento: {fmtBRL(camp.orcamentoDiario)}/dia</span>
+            )}
+          </div>
+
+          {/* Avaliação geral */}
+          <div className={`p-4 rounded-xl border ${
+            avaliacao.nota.includes('Boa') ? 'bg-green-500/10 border-green-500/20' :
+            avaliacao.nota.includes('Regular') ? 'bg-yellow-500/10 border-yellow-500/20' :
+            avaliacao.nota.includes('—') ? 'bg-[#1a1a1a] border-[#333]' :
+            'bg-red-500/10 border-red-500/20'
+          }`}>
+            <p className={`text-base font-bold ${avaliacao.cor}`}>{avaliacao.nota}</p>
+            <p className="text-xs text-[#aaa] mt-1">{avaliacao.resumo}</p>
+          </div>
+
+          {/* Métricas principais */}
+          <div>
+            <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-2">Resultados da campanha</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <MetricaItem label="Total gasto"      valor={fmtBRL(camp.gasto)}              glossKey="gasto" destaque />
+              <MetricaItem label="Pessoas alcançadas" valor={fmtNum(camp.alcance)}           glossKey="alcance" />
+              <MetricaItem label="Cliques no link"  valor={fmtNum(camp.linkCliques)}         glossKey="linkCliques" destaque />
+              <MetricaItem label="Impressões"        valor={fmtNum(camp.impressoes)}          glossKey="impressoes" />
+              <MetricaItem label="% que clicou"      valor={`${fmt(camp.ctr)}%`}             glossKey="ctr" destaque />
+              <MetricaItem label="Custo/clique"      valor={camp.cpc > 0 ? fmtBRL(camp.cpc) : '—'} glossKey="cpc" destaque />
+              <MetricaItem label="Frequência"        valor={`${fmt(camp.frequencia)}x`}      glossKey="frequencia" />
+              <MetricaItem label="Custo/1000 exib."  valor={fmtBRL(camp.cpm)}                glossKey="cpm" />
+            </div>
+          </div>
+
+          {/* Avaliação detalhada */}
+          {camp.gasto > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-2">Análise detalhada</p>
+              <div className="space-y-2">
+                <AvaliacaoMetrica metrica="ctr"        valor={camp.ctr} />
+                <AvaliacaoMetrica metrica="cpc"        valor={camp.cpc} />
+                <AvaliacaoMetrica metrica="frequencia" valor={camp.frequencia} />
+              </div>
+            </div>
+          )}
+
+          {/* Custo por resultado */}
+          {camp.gasto > 0 && camp.linkCliques > 0 && (
+            <div className="p-4 rounded-xl bg-[#111] border border-[#1e1e1e]">
+              <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-3">Resumo de custo</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] text-[#555]">Custo por visita ao cardápio</p>
+                  <p className="text-lg font-bold text-[#f97316]">{fmtBRL(camp.gasto / camp.linkCliques)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#555]">Custo por pessoa alcançada</p>
+                  <p className="text-lg font-bold text-white">{camp.alcance > 0 ? fmtBRL(camp.gasto / camp.alcance) : '—'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rodapé no print */}
+          <p className="text-[10px] text-[#444]">
+            Relatório gerado em {new Date().toLocaleString('pt-BR')} · Bruthus Burger
+          </p>
+        </div>
+
+        {/* Ações */}
+        <div className="flex gap-2 p-4 border-t border-[#1e1e1e]">
+          <button onClick={exportarCSV} className="flex-1 py-2.5 rounded-xl border border-[#333] text-[#888] hover:text-white hover:border-[#555] text-xs font-semibold transition-all">
+            📊 Exportar CSV
+          </button>
+          <button onClick={imprimir} className="flex-1 py-2.5 rounded-xl bg-[#f97316] hover:bg-[#ea6a0a] text-white text-xs font-semibold transition-all">
+            🖨️ Imprimir / Salvar PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CampanhaCard({ camp }) {
-  const [aberta, setAberta] = useState(false)
+  const [aberta, setAberta]               = useState(false)
+  const [verRelatorioFinal, setVerRelatorioFinal] = useState(false)
+  const encerrada = camp.status !== 'ACTIVE'
 
   if (camp.erro || !camp.impressoes) {
     return (
@@ -167,92 +297,98 @@ function CampanhaCard({ camp }) {
   const avaliacao = avaliarCampanha(camp)
 
   return (
-    <div className="rounded-xl border border-[#1e1e1e] bg-[#0f0f0f] overflow-hidden">
-      <button
-        onClick={() => setAberta(!aberta)}
-        className="w-full text-left p-4 hover:bg-[#111] transition-colors"
-      >
-        <div className="flex items-start gap-3 flex-wrap">
-          {statusBadge(camp.status)}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-white font-medium truncate">{camp.nome}</p>
-            <p className={`text-xs mt-0.5 font-bold ${avaliacao.cor}`}>{avaliacao.nota}</p>
-          </div>
-          <div className="flex items-center gap-3 ml-auto shrink-0">
-            <div className="text-right">
-              <p className="text-sm font-bold text-[#f97316]">{fmtBRL(camp.gasto)}</p>
-              <p className="text-[10px] text-[#555]">investido</p>
-            </div>
-            <span className="text-[#555]">{aberta ? '▲' : '▼'}</span>
-          </div>
-        </div>
-
-        {/* Mini resumo */}
-        <div className="grid grid-cols-4 gap-2 mt-3">
-          <div className="text-center">
-            <p className="text-[10px] text-[#555]">Pessoas que viram</p>
-            <p className="text-xs font-bold text-white">{fmtNum(camp.alcance)}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] text-[#555]">Cliques no link</p>
-            <p className="text-xs font-bold text-white">{fmtNum(camp.linkCliques)}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] text-[#555]">% que clicou</p>
-            <p className={`text-xs font-bold ${parseFloat(camp.ctr) >= 1.5 ? 'text-green-400' : parseFloat(camp.ctr) >= 1 ? 'text-yellow-400' : 'text-red-400'}`}>{fmt(camp.ctr)}%</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] text-[#555]">Custo/clique</p>
-            <p className={`text-xs font-bold ${parseFloat(camp.cpc) <= 1.5 ? 'text-green-400' : parseFloat(camp.cpc) <= 3 ? 'text-yellow-400' : 'text-red-400'}`}>{camp.cpc > 0 ? fmtBRL(camp.cpc) : '—'}</p>
-          </div>
-        </div>
-      </button>
-
-      {aberta && (
-        <div className="border-t border-[#1e1e1e] p-4 space-y-4">
-
-          {/* Resumo da avaliação */}
-          <div className={`p-3 rounded-lg border ${
-            avaliacao.nota.includes('Boa') ? 'bg-green-500/10 border-green-500/20' :
-            avaliacao.nota.includes('Regular') ? 'bg-yellow-500/10 border-yellow-500/20' :
-            'bg-red-500/10 border-red-500/20'
-          }`}>
-            <p className={`text-sm font-bold ${avaliacao.cor}`}>{avaliacao.nota}</p>
-            <p className="text-xs text-[#aaa] mt-1">{avaliacao.resumo}</p>
-          </div>
-
-          {/* Todas as métricas com explicação */}
-          <div>
-            <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-2">O que cada número significa</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <MetricaItem label="Exibições"     valor={fmtNum(camp.impressoes)}  glossKey="impressoes" />
-              <MetricaItem label="Pessoas"        valor={fmtNum(camp.alcance)}     glossKey="alcance" />
-              <MetricaItem label="Cliques totais" valor={fmtNum(camp.cliques)}     glossKey="cliques" />
-              <MetricaItem label="Cliques no link" valor={fmtNum(camp.linkCliques)} glossKey="linkCliques" destaque />
-              <MetricaItem label="% que clicou"   valor={`${fmt(camp.ctr)}%`}      glossKey="ctr" destaque />
-              <MetricaItem label="Custo/clique"   valor={camp.cpc > 0 ? fmtBRL(camp.cpc) : '—'} glossKey="cpc" destaque />
-              <MetricaItem label="Frequência"     valor={`${fmt(camp.frequencia)}x`} glossKey="frequencia" />
-              <MetricaItem label="Custo/1000 exib." valor={fmtBRL(camp.cpm)}       glossKey="cpm" />
-            </div>
-          </div>
-
-          {/* Avaliações detalhadas */}
-          <div>
-            <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-2">Avaliação detalhada</p>
-            <div className="space-y-2">
-              <AvaliacaoMetrica metrica="ctr"        valor={camp.ctr} />
-              <AvaliacaoMetrica metrica="cpc"        valor={camp.cpc} />
-              <AvaliacaoMetrica metrica="frequencia" valor={camp.frequencia} />
-            </div>
-          </div>
-
-          <p className="text-[10px] text-[#444]">
-            Criada em: {camp.criada ? new Date(camp.criada).toLocaleDateString('pt-BR') : '—'}
-            {camp.orcamentoDiario ? ` · Orçamento: ${fmtBRL(camp.orcamentoDiario)}/dia` : ''}
-          </p>
-        </div>
+    <>
+      {verRelatorioFinal && (
+        <RelatorioFinalModal camp={camp} onClose={() => setVerRelatorioFinal(false)} />
       )}
-    </div>
+
+      <div className="rounded-xl border border-[#1e1e1e] bg-[#0f0f0f] overflow-hidden">
+        <button onClick={() => setAberta(!aberta)} className="w-full text-left p-4 hover:bg-[#111] transition-colors">
+          <div className="flex items-start gap-3 flex-wrap">
+            {statusBadge(camp.status)}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-white font-medium truncate">{camp.nome}</p>
+              <p className={`text-xs mt-0.5 font-bold ${avaliacao.cor}`}>{avaliacao.nota}</p>
+            </div>
+            <div className="flex items-center gap-3 ml-auto shrink-0">
+              <div className="text-right">
+                <p className="text-sm font-bold text-[#f97316]">{fmtBRL(camp.gasto)}</p>
+                <p className="text-[10px] text-[#555]">investido</p>
+              </div>
+              <span className="text-[#555]">{aberta ? '▲' : '▼'}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 mt-3">
+            <div className="text-center">
+              <p className="text-[10px] text-[#555]">Pessoas que viram</p>
+              <p className="text-xs font-bold text-white">{fmtNum(camp.alcance)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-[#555]">Cliques no link</p>
+              <p className="text-xs font-bold text-white">{fmtNum(camp.linkCliques)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-[#555]">% que clicou</p>
+              <p className={`text-xs font-bold ${parseFloat(camp.ctr) >= 1.5 ? 'text-green-400' : parseFloat(camp.ctr) >= 1 ? 'text-yellow-400' : 'text-red-400'}`}>{fmt(camp.ctr)}%</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-[#555]">Custo/clique</p>
+              <p className={`text-xs font-bold ${parseFloat(camp.cpc) <= 1.5 ? 'text-green-400' : parseFloat(camp.cpc) <= 3 ? 'text-yellow-400' : 'text-red-400'}`}>{camp.cpc > 0 ? fmtBRL(camp.cpc) : '—'}</p>
+            </div>
+          </div>
+        </button>
+
+        {aberta && (
+          <div className="border-t border-[#1e1e1e] p-4 space-y-4">
+            <div className={`p-3 rounded-lg border ${
+              avaliacao.nota.includes('Boa') ? 'bg-green-500/10 border-green-500/20' :
+              avaliacao.nota.includes('Regular') ? 'bg-yellow-500/10 border-yellow-500/20' :
+              'bg-red-500/10 border-red-500/20'
+            }`}>
+              <p className={`text-sm font-bold ${avaliacao.cor}`}>{avaliacao.nota}</p>
+              <p className="text-xs text-[#aaa] mt-1">{avaliacao.resumo}</p>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-2">Todas as métricas</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <MetricaItem label="Exibições"       valor={fmtNum(camp.impressoes)}              glossKey="impressoes" />
+                <MetricaItem label="Pessoas"          valor={fmtNum(camp.alcance)}                 glossKey="alcance" />
+                <MetricaItem label="Cliques totais"   valor={fmtNum(camp.cliques)}                 glossKey="cliques" />
+                <MetricaItem label="Cliques no link"  valor={fmtNum(camp.linkCliques)}              glossKey="linkCliques" destaque />
+                <MetricaItem label="% que clicou"     valor={`${fmt(camp.ctr)}%`}                  glossKey="ctr" destaque />
+                <MetricaItem label="Custo/clique"     valor={camp.cpc > 0 ? fmtBRL(camp.cpc) : '—'} glossKey="cpc" destaque />
+                <MetricaItem label="Frequência"       valor={`${fmt(camp.frequencia)}x`}            glossKey="frequencia" />
+                <MetricaItem label="Custo/1000 exib." valor={fmtBRL(camp.cpm)}                      glossKey="cpm" />
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-2">Avaliação detalhada</p>
+              <div className="space-y-2">
+                <AvaliacaoMetrica metrica="ctr"        valor={camp.ctr} />
+                <AvaliacaoMetrica metrica="cpc"        valor={camp.cpc} />
+                <AvaliacaoMetrica metrica="frequencia" valor={camp.frequencia} />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-[#444]">
+                Criada em: {camp.criada ? new Date(camp.criada).toLocaleDateString('pt-BR') : '—'}
+                {camp.orcamentoDiario ? ` · ${fmtBRL(camp.orcamentoDiario)}/dia` : ''}
+              </p>
+              <button
+                onClick={() => setVerRelatorioFinal(true)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#f97316]/10 border border-[#f97316]/30 text-[#f97316] hover:bg-[#f97316]/20 transition-all"
+              >
+                📄 Relatório Final
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -271,29 +407,50 @@ function SummaryCard({ label, explicacao, value, sub, cor = '#f97316' }) {
 
 export default function RelatorioPage() {
   const [dados, setDados]           = useState(null)
-  const [loading, setLoading]       = useState(false)
+  const [loading, setLoading]       = useState(true)
+  const [periodo, setPeriodo]       = useState(30)
   const [toast, setToast]           = useState(null)
   const [verAnalise, setVerAnalise] = useState(false)
   const [verGlossario, setVerGlossario] = useState(false)
 
-  async function carregar() {
+  async function carregar(dias = periodo) {
     setLoading(true)
     setDados(null)
     try {
-      const d = await api.get('/ads/relatorio')
+      const d = await api.get(`/ads/relatorio?dias=${dias}`)
       setDados(d)
     } catch (e) {
       setToast({ message: e.message, type: 'error' })
     } finally { setLoading(false) }
   }
 
-  function exportarJSON() {
+  // Auto-load ao abrir a página
+  useEffect(() => { carregar(periodo) }, [])
+
+  function trocarPeriodo(dias) {
+    setPeriodo(dias)
+    carregar(dias)
+  }
+
+  function exportarCSV() {
     if (!dados) return
-    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `relatorio-ads-${new Date().toISOString().slice(0,10)}.json`
+    const linhas = [
+      ['Campanha', 'Status', 'Gasto (R$)', 'Impressões', 'Alcance', 'Cliques link', 'CTR (%)', 'CPC (R$)', 'CPM (R$)', 'Frequência', 'Avaliação'],
+      ...dados.campanhas.filter(c => !c.erro).map(c => {
+        const av = avaliarCampanha(c)
+        return [
+          c.nome, c.status, fmt(c.gasto), c.impressoes || 0, c.alcance || 0,
+          c.linkCliques || 0, fmt(c.ctr), fmt(c.cpc), fmt(c.cpm), fmt(c.frequencia),
+          av.nota.replace(/[🟢🟡🔴—]/g, '').trim(),
+        ]
+      })
+    ]
+    const csv = linhas.map(l => l.join(';')).join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `relatorio-ads-${new Date().toISOString().slice(0,10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -307,31 +464,45 @@ export default function RelatorioPage() {
       <PageHeader
         emoji="📊"
         title="Relatório de Campanhas"
-        description="Veja como seus anúncios estão performando — em linguagem simples"
+        description="Análise completa dos seus anúncios do Meta Ads — em linguagem simples"
       />
 
-      {/* Botão gerar */}
-      <button
-        onClick={carregar}
-        disabled={loading}
-        className="w-full mb-4 py-3 rounded-xl bg-[#f97316] hover:bg-[#ea6a0a] disabled:opacity-50 text-white font-bold text-sm transition-all flex items-center justify-center gap-2"
-      >
-        {loading
-          ? <><span className="animate-spin">⟳</span> Buscando dados do Meta Ads...</>
-          : '📊 Gerar Relatório Completo'}
-      </button>
+      {/* Seletor de período */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs text-[#555]">Período:</span>
+        {PERIODOS.map(p => (
+          <button
+            key={p.value}
+            onClick={() => trocarPeriodo(p.value)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              periodo === p.value
+                ? 'bg-[#f97316] text-white'
+                : 'bg-[#1a1a1a] text-[#666] border border-[#333] hover:text-white'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+        <button
+          onClick={() => carregar(periodo)}
+          disabled={loading}
+          className="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1a1a1a] border border-[#333] text-[#666] hover:text-white transition-all disabled:opacity-50"
+        >
+          {loading ? '⟳ Atualizando...' : '🔄 Atualizar'}
+        </button>
+      </div>
 
-      {/* Glossário rápido */}
+      {/* Glossário */}
       <button
         onClick={() => setVerGlossario(!verGlossario)}
-        className="w-full mb-6 py-2 rounded-xl border border-[#222] text-[#666] hover:text-[#aaa] text-xs transition-all"
+        className="w-full mb-5 py-2 rounded-xl border border-[#222] text-[#666] hover:text-[#aaa] text-xs transition-all"
       >
-        {verGlossario ? '▲ Fechar glossário' : '📖 O que significa cada termo? (clique para ver)'}
+        {verGlossario ? '▲ Fechar glossário' : '📖 O que significa cada termo?'}
       </button>
 
       {verGlossario && (
         <div className="mb-6 rounded-xl border border-[#1e1e1e] bg-[#0f0f0f] p-4 space-y-3">
-          <p className="text-xs font-bold text-white mb-3">📖 Guia rápido — o que cada métrica significa</p>
+          <p className="text-xs font-bold text-white mb-3">📖 Guia rápido</p>
           {Object.entries(GLOSSARIO).map(([key, g]) => (
             <div key={key} className="border-b border-[#1a1a1a] pb-3 last:border-0">
               <p className="text-xs font-semibold text-[#f97316]">{g.nome}</p>
@@ -343,14 +514,25 @@ export default function RelatorioPage() {
         </div>
       )}
 
-      {dados && (
+      {/* Loading */}
+      {loading && (
+        <div className="text-center py-16 rounded-xl border border-[#1e1e1e] bg-[#111]">
+          <p className="text-3xl mb-3 animate-pulse">📊</p>
+          <p className="text-sm text-[#555]">Buscando dados do Meta Ads...</p>
+          <p className="text-[11px] text-[#333] mt-1">Isso pode levar alguns segundos</p>
+        </div>
+      )}
+
+      {!loading && dados && (
         <>
           {/* Resumo geral */}
-          <p className="text-xs font-semibold text-[#888] uppercase tracking-wider mb-3">Resumo geral — todas as campanhas</p>
+          <p className="text-xs font-semibold text-[#888] uppercase tracking-wider mb-3">
+            Resumo geral — últimos {periodo} dias
+          </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             <SummaryCard
               label="Total Investido"
-              explicacao="Soma de tudo que você gastou em anúncios desde o início."
+              explicacao="Soma de tudo que você gastou em anúncios no período."
               value={`R$ ${fmt(r.totalGasto)}`}
               sub={`em ${r.totalCampanhas} campanhas`}
             />
@@ -363,28 +545,28 @@ export default function RelatorioPage() {
             />
             <SummaryCard
               label="Cliques no link"
-              explicacao="Quantas vezes alguém clicou e foi até o seu cardápio/site."
+              explicacao="Quantas vezes alguém clicou e foi até o seu cardápio."
               value={fmtNum(r.totalCliques)}
               sub="visitas geradas"
               cor="#34d399"
             />
             <SummaryCard
-              label="% que clicou (CTR)"
-              explicacao="De cada 100 pessoas que viram o anúncio, quantas clicaram. Acima de 1,5% é bom."
+              label="CTR médio"
+              explicacao="De cada 100 pessoas que viram, quantas clicaram. Acima de 1,5% é bom."
               value={`${fmt(r.ctrMedio)}%`}
-              sub={parseFloat(r.ctrMedio) >= 1.5 ? '✅ acima do ideal' : '⚠️ abaixo do ideal (1,5%)'}
+              sub={parseFloat(r.ctrMedio) >= 1.5 ? '✅ acima do ideal' : '⚠️ abaixo de 1,5%'}
               cor={parseFloat(r.ctrMedio) >= 1.5 ? '#34d399' : '#f87171'}
             />
             <SummaryCard
-              label="Custo por clique (CPC)"
-              explicacao="Quanto você pagou em média para cada pessoa que clicou. Abaixo de R$1,50 é ótimo."
+              label="CPC médio"
+              explicacao="Quanto você pagou em média por clique. Abaixo de R$1,50 é ótimo."
               value={`R$ ${fmt(r.cpcMedio)}`}
-              sub={parseFloat(r.cpcMedio) <= 1.5 ? '✅ custo baixo, ótimo!' : '⚠️ acima de R$1,50'}
+              sub={parseFloat(r.cpcMedio) <= 1.5 ? '✅ custo baixo!' : '⚠️ acima de R$1,50'}
               cor={parseFloat(r.cpcMedio) <= 1.5 ? '#34d399' : '#f87171'}
             />
             <SummaryCard
               label="Campanhas ativas"
-              explicacao="Campanhas que estão rodando agora e gastando orçamento."
+              explicacao="Campanhas rodando agora."
               value={r.campanhasAtivas}
               sub={`de ${r.totalCampanhas} no total`}
               cor="#a78bfa"
@@ -402,10 +584,7 @@ export default function RelatorioPage() {
           {/* Análise IA */}
           {dados.analise && (
             <div className="rounded-xl border border-[#f97316]/20 bg-[#f97316]/5 p-5 mb-6">
-              <button
-                onClick={() => setVerAnalise(!verAnalise)}
-                className="w-full flex items-center justify-between"
-              >
+              <button onClick={() => setVerAnalise(!verAnalise)} className="w-full flex items-center justify-between">
                 <p className="text-sm font-bold text-[#f97316]">🤖 Análise da IA — O que fazer agora</p>
                 <span className="text-[#f97316]">{verAnalise ? '▲' : '▼'}</span>
               </button>
@@ -419,18 +598,40 @@ export default function RelatorioPage() {
 
           {/* Ações */}
           <div className="flex gap-3">
-            <button onClick={exportarJSON} className="flex-1 py-2.5 rounded-xl border border-[#333] text-[#888] hover:text-white hover:border-[#555] text-sm transition-all">
-              💾 Salvar relatório
+            <button onClick={exportarCSV} className="flex-1 py-2.5 rounded-xl border border-[#333] text-[#888] hover:text-white hover:border-[#555] text-sm transition-all">
+              📊 Exportar CSV
             </button>
-            <button onClick={carregar} className="flex-1 py-2.5 rounded-xl border border-[#333] text-[#888] hover:text-white hover:border-[#555] text-sm transition-all">
-              🔄 Atualizar dados
+            <button
+              onClick={() => {
+                const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `relatorio-ads-${new Date().toISOString().slice(0,10)}.json`
+                a.click()
+                URL.revokeObjectURL(url)
+              }}
+              className="flex-1 py-2.5 rounded-xl border border-[#333] text-[#888] hover:text-white hover:border-[#555] text-sm transition-all"
+            >
+              💾 Exportar JSON
             </button>
           </div>
 
           <p className="text-[10px] text-[#444] text-center mt-4">
-            Gerado em {new Date(dados.geradoEm).toLocaleString('pt-BR')}
+            Atualizado em {new Date(dados.geradoEm).toLocaleString('pt-BR')}
           </p>
         </>
+      )}
+
+      {!loading && !dados && (
+        <div className="text-center py-16 rounded-xl border border-[#1e1e1e] bg-[#111]">
+          <p className="text-4xl mb-3">📊</p>
+          <p className="text-sm text-[#555]">Não foi possível carregar os dados</p>
+          <p className="text-[11px] text-[#333] mt-1">Verifique se o META_ACCESS_TOKEN está atualizado no Render</p>
+          <button onClick={() => carregar(periodo)} className="mt-4 px-4 py-2 rounded-lg bg-[#f97316] text-white text-xs font-semibold">
+            Tentar novamente
+          </button>
+        </div>
       )}
     </div>
   )
