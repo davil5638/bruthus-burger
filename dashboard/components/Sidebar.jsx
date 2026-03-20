@@ -16,6 +16,7 @@ const nav = [
   { href: '/stories',    label: 'Stories',      icon: '📱' },
   { href: '/mensagens',  label: 'Transmissão',  icon: '💬' },
   { href: '/financeiro', label: 'Financeiro',   icon: '💰' },
+  { href: '/midias',     label: 'Mídias',       icon: '🖼️' },
 ]
 
 export default function Sidebar() {

@@ -1146,6 +1146,52 @@ app.post("/webhook/olaclick", async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// MÍDIAS — Integração Google Drive → Cloudinary
+// ──────────────────────────────────────────────
+
+const { sincronizarDriveParaCloudinary, statusSync } = require("./scripts/googleDrive");
+
+// Status da integração (Drive configurado, fotos sincronizadas, última sync)
+app.get("/midia/status", async (req, res) => {
+  try {
+    const status = await statusSync();
+    res.json({ sucesso: true, ...status });
+  } catch (e) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+// Dispara sincronização: busca fotos novas no Drive e envia para o Cloudinary
+app.post("/midia/sincronizar", async (req, res) => {
+  try {
+    const resultado = await sincronizarDriveParaCloudinary();
+    res.json({ sucesso: true, ...resultado });
+  } catch (e) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+// Lista fotos já sincronizadas (do arquivo drive_sync.json local)
+app.get("/midia/fotos", (req, res) => {
+  try {
+    const syncPath = path.resolve(__dirname, "data/drive_sync.json");
+    if (!fs.existsSync(syncPath)) return res.json({ sucesso: true, fotos: [], total: 0 });
+    const estado = JSON.parse(fs.readFileSync(syncPath, "utf-8"));
+    const fotos = (estado.sincronizados || []).map(f => ({
+      id:       f.driveId,
+      nome:     f.nome,
+      publicId: f.publicId,
+      url:      f.url,
+      syncEm:   f.syncEm,
+      urlThumb: `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME || "duchjjeaw"}/image/upload/w_400,h_400,c_fill/${f.publicId}`,
+    })).reverse(); // mais recentes primeiro
+    res.json({ sucesso: true, fotos, total: fotos.length, ultimaSync: estado.ultimaSync });
+  } catch (e) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 // PING — keep-alive para Render free tier
 // ──────────────────────────────────────────────
 app.get("/ping", (req, res) => {
