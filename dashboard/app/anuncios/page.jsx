@@ -259,75 +259,6 @@ function StepIndicator({ step, total, labels }) {
   )
 }
 
-// ─── Score Card Análise ────────────────────────────────────────────────────────
-
-function AnaliseCard({ analise }) {
-  if (!analise) return null
-
-  const score     = analise.score || 0
-  const recomenda = analise.recomenda || 'SIM'
-
-  const config = {
-    SIM:    { cor: 'border-green-500/40 bg-green-500/5',   badge: 'bg-green-500/20 text-green-400 border-green-500/30',   icon: '🟢', label: 'Recomendado' },
-    TALVEZ: { cor: 'border-yellow-500/40 bg-yellow-500/5', badge: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: '🟡', label: 'Pode funcionar' },
-    NAO:    { cor: 'border-red-500/40 bg-red-500/5',       badge: 'bg-red-500/20 text-red-400 border-red-500/30',         icon: '🔴', label: 'Não recomendado' },
-  }[recomenda] || {}
-
-  return (
-    <div className={`rounded-xl border-2 p-4 ${config.cor}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{config.icon}</span>
-          <span className={`text-xs font-bold px-2 py-1 rounded-full border ${config.badge}`}>{config.label}</span>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-black text-white">{score}<span className="text-sm text-[#555] font-normal">/10</span></div>
-          <div className="text-[10px] text-[#555]">Score IA</div>
-        </div>
-      </div>
-
-      {analise.motivos?.length > 0 && (
-        <div className="mb-3">
-          <p className="text-[10px] font-bold text-[#888] uppercase tracking-wide mb-1.5">Motivos</p>
-          <ul className="space-y-1">
-            {analise.motivos.map((m, i) => (
-              <li key={i} className="text-xs text-[#aaa] flex gap-1.5">
-                <span className="text-[#f97316] shrink-0">•</span> {m}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {analise.dicas?.length > 0 && (
-        <div className="mb-3">
-          <p className="text-[10px] font-bold text-[#888] uppercase tracking-wide mb-1.5">Dicas</p>
-          <ul className="space-y-1">
-            {analise.dicas.map((d, i) => (
-              <li key={i} className="text-xs text-[#aaa] flex gap-1.5">
-                <span className="text-blue-400 shrink-0">💡</span> {d}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {analise.alertas?.length > 0 && (
-        <div>
-          <p className="text-[10px] font-bold text-[#888] uppercase tracking-wide mb-1.5">Alertas</p>
-          <ul className="space-y-1">
-            {analise.alertas.map((a, i) => (
-              <li key={i} className="text-xs text-yellow-400 flex gap-1.5">
-                <span className="shrink-0">⚠️</span> {a}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── Página Principal ─────────────────────────────────────────────────────────
 
 export default function AnunciosPage() {
@@ -360,9 +291,7 @@ export default function AnunciosPage() {
   const [orcamento, setOrcamento]       = useState(2000)
   const [duracao, setDuracao]           = useState(5)
 
-  // Step 4 – Análise + Criar
-  const [analise, setAnalise]           = useState(null)
-  const [analisando, setAnalisando]     = useState(false)
+  // Step 4 – Criar
   const [criando, setCriando]           = useState(false)
   const [campanhaCriada, setCriada]     = useState(null)
 
@@ -432,18 +361,6 @@ export default function AnunciosPage() {
     } finally { setGerando(false) }
   }
 
-  // ── Analisar ──
-  async function analisarAnuncio() {
-    setAnalisando(true); setAnalise(null)
-    try {
-      const data = await api.post('/ads/analisar', { orcamentoDiario: orcamento, tipo: tipoIA })
-      setAnalise(data)
-    } catch (e) {
-      if (isAuthError(e)) triggerSetup()
-      setToast({ message: e.message, type: 'error' })
-    } finally { setAnalisando(false) }
-  }
-
   // ── Criar Campanha ──
   async function criarCampanha() {
     if (!imageUrl)         { setToast({ message: 'Envie a imagem primeiro!', type: 'error' }); return }
@@ -484,7 +401,7 @@ export default function AnunciosPage() {
     setImageUrl(''); setPreview(null)
     setTitulo(''); setCorpo(''); setTipoIA('SMASH')
     setOrcamento(2000); setDuracao(5)
-    setAnalise(null); setCriada(null)
+    setCriada(null)
   }
 
   // ── Métricas agregadas ──
@@ -666,7 +583,7 @@ export default function AnunciosPage() {
               <StepIndicator
                 step={stepAtual}
                 total={4}
-                labels={['Imagem', 'Texto', 'Orçamento', 'Analisar']}
+                labels={['Imagem', 'Texto', 'Orçamento', 'Criar']}
               />
 
               {/* ── Step 1: Imagem ── */}
@@ -919,7 +836,7 @@ export default function AnunciosPage() {
                     </div>
 
                     <Button onClick={() => setStepAtual(4)} variant="primary" className="w-full">
-                      Próximo: Análise IA →
+                      Próximo: Criar →
                     </Button>
                   </div>
                 )}
@@ -937,7 +854,7 @@ export default function AnunciosPage() {
                     4
                   </span>
                   <p className={`text-sm font-semibold ${stepAtual === 4 ? 'text-white' : 'text-[#777]'}`}>
-                    Análise IA + Criar
+                    Criar campanha
                   </p>
                   <span className="text-[#555] text-xs ml-auto">{stepAtual === 4 ? '▲' : '▼'}</span>
                 </button>
@@ -961,16 +878,10 @@ export default function AnunciosPage() {
                       ))}
                     </div>
 
-                    <Button onClick={analisarAnuncio} loading={analisando} variant="secondary" className="w-full">
-                      🔍 Analisar com IA
-                    </Button>
-
-                    {analise && <AnaliseCard analise={analise} />}
-
                     <Button
                       onClick={criarCampanha}
                       loading={criando}
-                      disabled={!analise || !imageUrl || !titulo || !corpo}
+                      disabled={!imageUrl || !titulo || !corpo}
                       variant="primary"
                       size="lg"
                       className="w-full"
@@ -978,12 +889,7 @@ export default function AnunciosPage() {
                       📣 Criar Campanha
                     </Button>
 
-                    {!analise && (
-                      <p className="text-[11px] text-[#555] text-center">
-                        Analise primeiro para desbloquear a criação da campanha
-                      </p>
-                    )}
-                    {analise && !imageUrl && (
+                    {!imageUrl && (
                       <p className="text-[11px] text-yellow-500 text-center">
                         ⚠️ Volte ao Step 1 e envie a imagem
                       </p>
