@@ -119,7 +119,7 @@ function SetupGuideCard() {
 
 // ─── Campanha Card ────────────────────────────────────────────────────────────
 
-function CampanhaCard({ campanha, onAtualizar, onSetupError }) {
+function CampanhaCard({ campanha, metricas, onAtualizar, onSetupError }) {
   const [loadingAcao, setLoadingAcao] = useState(null)
   const [editandoOrc, setEditandoOrc] = useState(false)
   const [novoOrc, setNovoOrc]         = useState('')
@@ -127,7 +127,15 @@ function CampanhaCard({ campanha, onAtualizar, onSetupError }) {
 
   const statusCfg = STATUS_CONFIG[campanha.status] || STATUS_CONFIG.PAUSED
   const adSet     = campanha.adSets?.[0]
-  const orcAtual  = adSet ? `R$${(parseInt(adSet.daily_budget || 0) / 100).toFixed(2)}/dia` : '—'
+
+  // Orçamento: tenta adset, depois nível de campanha
+  const orcCentavos = parseInt(adSet?.daily_budget || 0) || parseInt(campanha.daily_budget || 0)
+  const orcAtual    = orcCentavos > 0 ? `R$${(orcCentavos / 100).toFixed(2)}/dia` : '—'
+
+  // Data de encerramento
+  const encerra = campanha.stop_time
+    ? new Date(campanha.stop_time).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    : null
 
   async function acao(tipo) {
     setLoadingAcao(tipo)
@@ -144,11 +152,16 @@ function CampanhaCard({ campanha, onAtualizar, onSetupError }) {
   }
 
   async function salvarOrcamento() {
-    if (!adSet?.id || !novoOrc) return
+    if (!novoOrc) return
     setLoadingAcao('orc')
     try {
       const centavos = Math.round(parseFloat(novoOrc) * 100)
-      await api.patch(`/ads/adset/${adSet.id}/orcamento`, { orcamentoDiario: centavos })
+      // tenta adset, senão campanha
+      if (adSet?.id) {
+        await api.patch(`/ads/adset/${adSet.id}/orcamento`, { orcamentoDiario: centavos })
+      } else {
+        await api.patch(`/ads/${campanha.id}/orcamento`, { orcamentoDiario: centavos })
+      }
       setToast({ message: `Orçamento atualizado: R$${novoOrc}/dia`, type: 'success' })
       setEditandoOrc(false)
       onAtualizar()
@@ -162,19 +175,42 @@ function CampanhaCard({ campanha, onAtualizar, onSetupError }) {
     <div className="rounded-xl border border-[#222] bg-[#111] p-4 hover:border-[#333] transition-colors">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
+      {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-white truncate">{campanha.name}</p>
-          <p className="text-[10px] text-[#444] font-mono mt-0.5">{campanha.id}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-[10px] text-[#444] font-mono">{campanha.id}</p>
+            {encerra && (
+              <span className="text-[10px] text-[#555]">· encerra {encerra}</span>
+            )}
+          </div>
         </div>
         <span className={`text-[10px] font-bold px-2 py-1 rounded-full border shrink-0 ${statusCfg.cor}`}>
           {statusCfg.label}
         </span>
       </div>
 
+      {/* Mini métricas inline */}
+      {metricas && (metricas.impressoes > 0 || metricas.gasto > 0) && (
+        <div className="grid grid-cols-4 gap-1.5 mb-3">
+          {[
+            { label: 'Gasto',      value: `R$${parseFloat(metricas.gasto || 0).toFixed(2)}`,          cor: 'text-[#f97316]' },
+            { label: 'Impressões', value: parseInt(metricas.impressoes || 0).toLocaleString('pt-BR'), cor: 'text-white'      },
+            { label: 'Cliques',    value: parseInt(metricas.cliques || 0).toLocaleString('pt-BR'),    cor: 'text-white'      },
+            { label: 'CTR',        value: `${parseFloat(metricas.ctr || 0).toFixed(2)}%`,             cor: parseFloat(metricas.ctr || 0) >= 1.5 ? 'text-green-400' : parseFloat(metricas.ctr || 0) >= 0.8 ? 'text-yellow-400' : 'text-red-400' },
+          ].map(m => (
+            <div key={m.label} className="p-2 rounded-lg bg-[#0a0a0a] border border-[#1a1a1a] text-center">
+              <div className={`text-xs font-bold ${m.cor}`}>{m.value}</div>
+              <div className="text-[9px] text-[#444] mt-0.5">{m.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Orçamento inline */}
-      <div className="flex items-center gap-2 mb-4 p-2.5 rounded-lg bg-[#0f0f0f] border border-[#1a1a1a]">
-        <span className="text-xs text-[#555]">💰 Orçamento:</span>
+      <div className="flex items-center gap-2 mb-3 p-2.5 rounded-lg bg-[#0f0f0f] border border-[#1a1a1a]">
+        <span className="text-xs text-[#555]">💰</span>
         {editandoOrc ? (
           <div className="flex items-center gap-1 flex-1">
             <span className="text-xs text-[#888]">R$</span>
@@ -193,10 +229,8 @@ function CampanhaCard({ campanha, onAtualizar, onSetupError }) {
         ) : (
           <div className="flex items-center gap-2 flex-1">
             <span className="text-xs font-bold text-white">{orcAtual}</span>
-            {adSet && (
-              <button onClick={() => { setEditandoOrc(true); setNovoOrc('') }}
-                className="text-[10px] text-[#f97316] hover:underline ml-auto">Alterar</button>
-            )}
+            <button onClick={() => { setEditandoOrc(true); setNovoOrc('') }}
+              className="text-[10px] text-[#f97316] hover:underline ml-auto">Alterar</button>
           </div>
         )}
       </div>
@@ -269,6 +303,7 @@ export default function AnunciosPage() {
 
   // ── Campanhas ──
   const [campanhas, setCampanhas]       = useState([])
+  const [metricasMap, setMetricasMap]   = useState({})
   const [loadingCamp, setLoadingCamp]   = useState(false)
 
   // ── Nova Campanha: Steps ──
@@ -298,9 +333,9 @@ export default function AnunciosPage() {
   // ── Performance ──
   const [relatorio, setRelatorio]       = useState(null)
   const [loadingRel, setLoadingRel]     = useState(false)
-  const [diasRel, setDiasRel]           = useState(7)
+  const [diasRel, setDiasRel]           = useState(30)
   const [analiseIA, setAnaliseIA]       = useState(null)
-  const [expandirIA, setExpandirIA]     = useState(false)
+  const [expandirIA, setExpandirIA]     = useState(true)
 
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -311,8 +346,18 @@ export default function AnunciosPage() {
   const carregarCampanhas = useCallback(async () => {
     setLoadingCamp(true)
     try {
-      const data = await api.get('/ads/campanhas')
-      setCampanhas(data.campanhas || [])
+      const [dataCamp, dataRel] = await Promise.allSettled([
+        api.get('/ads/campanhas'),
+        api.get('/ads/relatorio?dias=90'),
+      ])
+      if (dataCamp.status === 'fulfilled') {
+        setCampanhas(dataCamp.value.campanhas || [])
+      }
+      if (dataRel.status === 'fulfilled') {
+        const map = {}
+        for (const c of (dataRel.value.campanhas || [])) map[c.id] = c
+        setMetricasMap(map)
+      }
     } catch (e) {
       if (isAuthError(e)) triggerSetup()
       setToast({ message: e.message, type: 'error' })
@@ -322,6 +367,10 @@ export default function AnunciosPage() {
   useEffect(() => {
     if (abaAtiva === 'campanhas') carregarCampanhas()
   }, [abaAtiva, carregarCampanhas])
+
+  useEffect(() => {
+    if (abaAtiva === 'performance') carregarRelatorio()
+  }, [abaAtiva])
 
   // ── Upload ──
   async function handleFile(file) {
@@ -518,6 +567,7 @@ export default function AnunciosPage() {
                 <CampanhaCard
                   key={c.id}
                   campanha={c}
+                  metricas={metricasMap[c.id] || null}
                   onAtualizar={carregarCampanhas}
                   onSetupError={triggerSetup}
                 />
@@ -969,26 +1019,86 @@ export default function AnunciosPage() {
                   <p className="text-xs text-[#555] mb-3 uppercase tracking-wide font-semibold">Por campanha</p>
                   <div className="space-y-3">
                     {relatorio.map((camp, i) => {
-                      const gasto   = parseFloat(camp.spend || 0)
-                      const cliques = parseInt(camp.clicks || 0)
+                      const gasto   = parseFloat(camp.gasto || camp.spend || 0)
+                      const cliques = parseInt(camp.cliques || camp.clicks || 0)
+                      const impr    = parseInt(camp.impressoes || camp.impressions || 0)
+                      const ctr     = parseFloat(camp.ctr || 0)
                       const cpc     = cliques > 0 ? (gasto / cliques).toFixed(2) : null
+                      const alcance = parseInt(camp.alcance || camp.reach || 0)
+                      const freq    = parseFloat(camp.frequencia || camp.frequency || 0)
+
+                      // avaliação de CTR
+                      const ctrCor  = ctr >= 1.5 ? 'text-green-400' : ctr >= 0.8 ? 'text-yellow-400' : 'text-red-400'
+                      const cpcCor  = !cpc ? 'text-white' : parseFloat(cpc) <= 1.5 ? 'text-green-400' : parseFloat(cpc) <= 2.5 ? 'text-yellow-400' : 'text-red-400'
+
+                      // campanha correspondente na lista (para ações)
+                      const campObj = campanhas.find(c => c.id === camp.id)
+
                       return (
                         <div key={i} className="p-4 rounded-xl bg-[#111] border border-[#222] hover:border-[#333] transition-colors">
-                          <p className="text-xs font-semibold text-white mb-3 truncate">{camp.campaign_name}</p>
-                          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center">
+                          {/* Nome + status + ações */}
+                          <div className="flex items-center justify-between gap-2 mb-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-white truncate">{camp.nome || camp.campaign_name}</p>
+                              {camp.status && (
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border mt-1 inline-block ${(STATUS_CONFIG[camp.status] || STATUS_CONFIG.PAUSED).cor}`}>
+                                  {(STATUS_CONFIG[camp.status] || STATUS_CONFIG.PAUSED).label}
+                                </span>
+                              )}
+                            </div>
+                            {/* Ações rápidas */}
+                            {campObj && (
+                              <div className="flex gap-1.5 shrink-0">
+                                {campObj.status === 'ACTIVE' ? (
+                                  <button
+                                    onClick={async () => { try { await api.post(`/ads/${campObj.id}/pausar`); carregarRelatorio(); carregarCampanhas() } catch(e) { setToast({ message: e.message, type: 'error' }) } }}
+                                    className="text-[10px] px-2 py-1 rounded-lg border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition"
+                                  >⏸️ Pausar</button>
+                                ) : campObj.status === 'PAUSED' ? (
+                                  <button
+                                    onClick={async () => { try { await api.post(`/ads/${campObj.id}/ativar`); carregarRelatorio(); carregarCampanhas() } catch(e) { setToast({ message: e.message, type: 'error' }) } }}
+                                    className="text-[10px] px-2 py-1 rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20 transition"
+                                  >▶️ Ativar</button>
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Métricas */}
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
                             {[
-                              ['👁️', 'Impressões', fmt(parseInt(camp.impressions || 0))],
-                              ['🖱️', 'Cliques',    fmt(cliques)],
-                              ['📈', 'CTR',        `${parseFloat(camp.ctr || 0).toFixed(2)}%`],
-                              ['💰', 'Gasto',      fmtBrl(gasto)],
-                              ['💵', 'CPC',        cpc ? `R$${cpc}` : '—'],
-                            ].map(([emoji, label, value]) => (
+                              ['👁️', 'Impressões', fmt(impr),              'text-white'  ],
+                              ['👥', 'Alcance',    fmt(alcance),            'text-white'  ],
+                              ['🔁', 'Frequência', freq > 0 ? freq.toFixed(1) + 'x' : '—', freq >= 1.5 && freq <= 3 ? 'text-green-400' : freq > 3 ? 'text-red-400' : 'text-yellow-400'],
+                              ['🖱️', 'Cliques',    fmt(cliques),            'text-white'  ],
+                              ['📈', 'CTR',        `${ctr.toFixed(2)}%`,   ctrCor        ],
+                              ['💰', 'Gasto',      fmtBrl(gasto),          'text-[#f97316]'],
+                            ].map(([emoji, label, value, cor]) => (
                               <div key={label} className="p-2 rounded-lg bg-[#0f0f0f]">
                                 <div className="text-sm">{emoji}</div>
                                 <div className="text-[9px] text-[#555] mt-0.5">{label}</div>
-                                <div className="text-xs font-bold text-white mt-0.5">{value}</div>
+                                <div className={`text-xs font-bold mt-0.5 ${cor}`}>{value}</div>
                               </div>
                             ))}
+                          </div>
+
+                          {/* Benchmarks */}
+                          <div className="mt-2.5 flex flex-wrap gap-2">
+                            {ctr > 0 && (
+                              <span className={`text-[9px] px-2 py-0.5 rounded-full border ${ctr >= 1.5 ? 'border-green-500/30 bg-green-500/10 text-green-400' : ctr >= 0.8 ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>
+                                CTR {ctr >= 1.5 ? '✓ Bom' : ctr >= 0.8 ? '~ Regular' : '✗ Baixo'} (ideal ≥1.5%)
+                              </span>
+                            )}
+                            {cpc && (
+                              <span className={`text-[9px] px-2 py-0.5 rounded-full border ${cpcCor === 'text-green-400' ? 'border-green-500/30 bg-green-500/10 text-green-400' : cpcCor === 'text-yellow-400' ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>
+                                CPC {parseFloat(cpc) <= 1.5 ? '✓ Bom' : parseFloat(cpc) <= 2.5 ? '~ Regular' : '✗ Alto'} (ideal ≤R$1,50)
+                              </span>
+                            )}
+                            {freq > 0 && (
+                              <span className={`text-[9px] px-2 py-0.5 rounded-full border ${freq >= 1.5 && freq <= 3 ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400'}`}>
+                                Freq. {freq >= 1.5 && freq <= 3 ? '✓ Ideal' : freq < 1.5 ? '~ Baixa' : '⚠ Alta'} (ideal 1.5–3x)
+                              </span>
+                            )}
                           </div>
                         </div>
                       )

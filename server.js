@@ -509,7 +509,8 @@ Retorne APENAS este JSON (sem markdown):
 // ── RELATÓRIO DE CAMPANHAS ──
 app.get("/ads/relatorio", async (req, res) => {
   try {
-    const campanhas = await gerarRelatorioCompleto();
+    const dias = parseInt(req.query.dias) || 90;
+    const campanhas = await gerarRelatorioCompleto(dias);
 
     const comDados = campanhas.filter(c => !c.erro && c.impressoes > 0);
     const totalGasto       = comDados.reduce((s, c) => s + c.gasto, 0);
@@ -650,6 +651,18 @@ app.patch("/ads/adset/:id/orcamento", async (req, res) => {
     if (!orcamentoDiario) return res.status(400).json({ erro: "orcamentoDiario é obrigatório (em centavos)" });
     await atualizarOrcamento(req.params.id, orcamentoDiario);
     res.json({ sucesso: true, mensagem: `Orçamento atualizado: R$${(orcamentoDiario / 100).toFixed(2)}/dia` });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Atualizar orçamento no nível de campanha (CBO)
+app.patch("/ads/:id/orcamento", async (req, res) => {
+  try {
+    const { orcamentoDiario } = req.body;
+    if (!orcamentoDiario) return res.status(400).json({ erro: "orcamentoDiario é obrigatório (em centavos)" });
+    await atualizarOrcamento(req.params.id, orcamentoDiario);
+    res.json({ sucesso: true, mensagem: `Orçamento da campanha atualizado: R$${(orcamentoDiario / 100).toFixed(2)}/dia` });
   } catch (error) {
     res.status(500).json({ erro: error.message });
   }

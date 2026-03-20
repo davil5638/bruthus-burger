@@ -540,13 +540,13 @@ async function atualizarOrcamento(adSetId, novoOrcamentoCentavos) {
 /**
  * Busca métricas completas de todas as campanhas (período máximo)
  */
-async function gerarRelatorioCompleto() {
+async function gerarRelatorioCompleto(dias = 90) {
   validarConfig();
 
   // 1. Buscar todas as campanhas
   const { data: campData } = await axios.get(`${GRAPH_API}/${AD_ACCOUNT_ID}/campaigns`, {
     params: {
-      fields: 'id,name,status,objective,created_time,daily_budget,lifetime_budget',
+      fields: 'id,name,status,objective,created_time,daily_budget,lifetime_budget,start_time,stop_time',
       limit: 100,
       access_token: ACCESS_TOKEN,
     }
@@ -555,13 +555,18 @@ async function gerarRelatorioCompleto() {
   const campanhas = campData.data || [];
   console.log(`📊 ${campanhas.length} campanhas encontradas`);
 
+  const dataInicio = new Date();
+  dataInicio.setDate(dataInicio.getDate() - dias);
+  const dataFim = new Date();
+  const formatDate = (d) => d.toISOString().slice(0, 10);
+
   const dados = [];
   for (const camp of campanhas) {
     try {
       const { data: insData } = await axios.get(`${GRAPH_API}/${camp.id}/insights`, {
         params: {
           fields: 'impressions,clicks,ctr,cpc,cpm,spend,reach,frequency,actions,cost_per_action_type,unique_clicks,unique_ctr',
-          date_preset: 'maximum',
+          time_range: JSON.stringify({ since: formatDate(dataInicio), until: formatDate(dataFim) }),
           access_token: ACCESS_TOKEN,
         }
       });
@@ -577,6 +582,7 @@ async function gerarRelatorioCompleto() {
         status: camp.status,
         objetivo: camp.objective,
         criada: camp.created_time,
+        encerra: camp.stop_time || null,
         orcamentoDiario: camp.daily_budget ? parseFloat(camp.daily_budget) / 100 : null,
         impressoes: parseInt(ins.impressions || 0),
         cliques: parseInt(ins.clicks || 0),
