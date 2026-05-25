@@ -34,6 +34,21 @@ const TIPOS_IA = [
   { id: 'FAMILIA', label: '❤️ Família'     },
 ]
 
+const OBJETIVOS = [
+  {
+    id: 'OUTCOME_TRAFFIC',
+    label: '🖱️ Tráfego',
+    desc: 'Maximiza visitas ao site',
+    detalhe: 'Bom para começar. Otimiza por pessoas que carregam a página de pedido.',
+  },
+  {
+    id: 'OUTCOME_SALES',
+    label: '💰 Conversões',
+    desc: 'Otimiza por compras (Pixel)',
+    detalhe: 'Recomendado quando você já tem histórico de compras no pixel. Meta encontra quem tem mais chance de comprar.',
+  },
+]
+
 const STATUS_CONFIG = {
   ACTIVE:   { label: 'Ativa',     cor: 'bg-green-500/20 text-green-400 border-green-500/30'   },
   PAUSED:   { label: 'Pausada',   cor: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
@@ -516,6 +531,7 @@ export default function AnunciosPage() {
   const [titulo, setTitulo]             = useState('')
   const [corpo, setCorpo]               = useState('')
   const [gerando, setGerando]           = useState(false)
+  const [objetivo, setObjetivo]         = useState('OUTCOME_TRAFFIC')
 
   // Step 3 – Orçamento
   const [orcamento, setOrcamento]       = useState(2000)
@@ -618,6 +634,7 @@ export default function AnunciosPage() {
         orcamentoDiario:     orcamento,
         duracaoDias:         duracao,
         registrarFinanceiro: true,
+        objetivo,
       })
       setCriada(data.resultado)
       setToast({ message: 'Campanha criada com sucesso!', type: 'success' })
@@ -628,12 +645,15 @@ export default function AnunciosPage() {
   }
 
   // ── Relatório ──
+  const [resumoPixel, setResumoPixel] = useState(null)
+
   async function carregarRelatorio() {
-    setLoadingRel(true); setRelatorio(null); setAnaliseIA(null)
+    setLoadingRel(true); setRelatorio(null); setAnaliseIA(null); setResumoPixel(null)
     try {
       const data = await api.get(`/ads/relatorio?dias=${diasRel}`)
-      setRelatorio(data.dados || [])
-      setAnaliseIA(data.analiseIA || null)
+      setRelatorio(data.campanhas || data.dados || [])
+      setAnaliseIA(data.analise || data.analiseIA || null)
+      if (data.resumo) setResumoPixel(data.resumo)
     } catch (e) {
       if (isAuthError(e)) triggerSetup()
       setToast({ message: e.message, type: 'error' })
@@ -645,6 +665,7 @@ export default function AnunciosPage() {
     setImageUrl(''); setPreview(null)
     setTitulo(''); setCorpo(''); setTipoIA('SMASH')
     setOrcamento(2000); setDuracao(5)
+    setObjetivo('OUTCOME_TRAFFIC')
     setCriada(null)
   }
 
@@ -693,6 +714,7 @@ export default function AnunciosPage() {
           { id: 'campanhas',  label: '📊 Campanhas'       },
           { id: 'nova',       label: '➕ Nova Campanha'    },
           { id: 'performance',label: '📈 Performance'      },
+          { id: 'guia',       label: '🎯 Guia'             },
         ].map(a => (
           <button key={a.id} onClick={() => setAbaAtiva(a.id)}
             className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -1026,6 +1048,32 @@ export default function AnunciosPage() {
 
                 {stepAtual === 3 && (
                   <div className="px-4 pb-4 space-y-4">
+                    {/* Objetivo da campanha */}
+                    <div>
+                      <p className="text-xs text-[#555] mb-2">Objetivo da campanha</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {OBJETIVOS.map(o => (
+                          <button
+                            key={o.id}
+                            onClick={() => setObjetivo(o.id)}
+                            className={`p-3 rounded-xl border text-left transition-all ${
+                              objetivo === o.id
+                                ? 'border-[#f97316] bg-[#f97316]/10'
+                                : 'border-[#222] bg-[#1a1a1a] hover:border-[#333]'
+                            }`}
+                          >
+                            <div className={`text-xs font-bold ${objetivo === o.id ? 'text-[#f97316]' : 'text-white'}`}>
+                              {o.label}
+                            </div>
+                            <div className="text-[10px] text-[#555] mt-0.5">{o.desc}</div>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-[#666] mt-2 leading-relaxed">
+                        {OBJETIVOS.find(o => o.id === objetivo)?.detalhe}
+                      </p>
+                    </div>
+
                     {/* Orçamento diário */}
                     <div>
                       <p className="text-xs text-[#555] mb-2">Orçamento diário</p>
@@ -1119,6 +1167,7 @@ export default function AnunciosPage() {
                       <p className="text-[10px] text-[#555] uppercase tracking-wide mb-2">Resumo da campanha</p>
                       {[
                         ['Tipo',          TIPOS_IA.find(t => t.id === tipoIA)?.label || tipoIA],
+                        ['Objetivo',      OBJETIVOS.find(o => o.id === objetivo)?.label || objetivo],
                         ['Orçamento',     `R$${(orcamento / 100).toFixed(0)}/dia por ${duracao} dias`],
                         ['Total',         `R$${totalCusto.toFixed(2)}`],
                         ['Alcance est.',  `${(alcanceEst.min/1000).toFixed(1)}k–${(alcanceEst.max/1000).toFixed(1)}k pessoas`],
@@ -1196,6 +1245,20 @@ export default function AnunciosPage() {
           {/* Dados carregados */}
           {relatorio && !loadingRel && (
             <div className="space-y-5">
+              {/* Pixel banner — só aparece se houver dados de compras */}
+              {resumoPixel?.totalPixelCompras > 0 && (
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-green-500/30 bg-green-500/5 mb-1">
+                  <span className="text-lg">🎯</span>
+                  <div>
+                    <p className="text-xs font-bold text-green-400">Pixel ativo — {resumoPixel.totalPixelCompras} compra{resumoPixel.totalPixelCompras !== 1 ? 's' : ''} rastreada{resumoPixel.totalPixelCompras !== 1 ? 's' : ''}</p>
+                    <p className="text-[10px] text-[#666]">
+                      {resumoPixel.totalPixelCheckouts > 0 && `${resumoPixel.totalPixelCheckouts} checkouts iniciados · `}
+                      {resumoPixel.custoPorCompra && `Custo/compra: R$${resumoPixel.custoPorCompra}`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Summary cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {[
@@ -1204,7 +1267,10 @@ export default function AnunciosPage() {
                   { label: 'Cliques',           value: fmt(metricas.cliques),                       emoji: '🖱️' },
                   { label: 'CTR médio',         value: `${metricas.ctr.toFixed(2)}%`,               emoji: '📈' },
                   { label: 'CPC médio',         value: metricas.cliques > 0 ? fmtBrl(metricas.gasto / metricas.cliques) : '—', emoji: '💵' },
-                  { label: 'Campanhas',         value: relatorio.length.toString(),                 emoji: '📣' },
+                  ...(resumoPixel?.totalPixelCompras > 0
+                    ? [{ label: 'Compras (Pixel)', value: fmt(resumoPixel.totalPixelCompras), emoji: '🛒' }]
+                    : [{ label: 'Campanhas', value: relatorio.length.toString(), emoji: '📣' }]
+                  ),
                 ].map(m => (
                   <div key={m.label} className="p-4 rounded-xl border border-[#1e1e1e] bg-[#111] text-center">
                     <div className="text-xl mb-1">{m.emoji}</div>
@@ -1268,22 +1334,31 @@ export default function AnunciosPage() {
                           </div>
 
                           {/* Métricas */}
-                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
-                            {[
+                          {(() => {
+                            const compras   = camp.pixelCompras || 0
+                            const checkouts = camp.pixelCheckouts || 0
+                            const cols = compras > 0 ? 'grid-cols-3 sm:grid-cols-7' : 'grid-cols-3 sm:grid-cols-6'
+                            const items = [
                               ['👁️', 'Impressões', fmt(impr),              'text-white'  ],
                               ['👥', 'Alcance',    fmt(alcance),            'text-white'  ],
                               ['🔁', 'Frequência', freq > 0 ? freq.toFixed(1) + 'x' : '—', freq >= 1.5 && freq <= 3 ? 'text-green-400' : freq > 3 ? 'text-red-400' : 'text-yellow-400'],
                               ['🖱️', 'Cliques',    fmt(cliques),            'text-white'  ],
                               ['📈', 'CTR',        `${ctr.toFixed(2)}%`,   ctrCor        ],
                               ['💰', 'Gasto',      fmtBrl(gasto),          'text-[#f97316]'],
-                            ].map(([emoji, label, value, cor]) => (
-                              <div key={label} className="p-2 rounded-lg bg-[#0f0f0f]">
-                                <div className="text-sm">{emoji}</div>
-                                <div className="text-[9px] text-[#555] mt-0.5">{label}</div>
-                                <div className={`text-xs font-bold mt-0.5 ${cor}`}>{value}</div>
+                              ...(compras > 0 ? [['🛒', 'Compras', fmt(compras), 'text-green-400']] : []),
+                            ]
+                            return (
+                              <div className={`grid ${cols} gap-2 text-center`}>
+                                {items.map(([emoji, label, value, cor]) => (
+                                  <div key={label} className="p-2 rounded-lg bg-[#0f0f0f]">
+                                    <div className="text-sm">{emoji}</div>
+                                    <div className="text-[9px] text-[#555] mt-0.5">{label}</div>
+                                    <div className={`text-xs font-bold mt-0.5 ${cor}`}>{value}</div>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
+                            )
+                          })()}
 
                           {/* Benchmarks */}
                           <div className="mt-2.5 flex flex-wrap gap-2">
@@ -1371,6 +1446,280 @@ export default function AnunciosPage() {
           )}
         </div>
       )}
+
+      {/* ════════════════════════════════════════════════════════
+          ABA: GUIA
+      ════════════════════════════════════════════════════════ */}
+      {abaAtiva === 'guia' && <GuiaAnuncios />}
+    </div>
+  )
+}
+
+// ─── Componente Guia ──────────────────────────────────────────────────────────
+
+function Secao({ emoji, titulo, children }) {
+  const [aberta, setAberta] = useState(true)
+  return (
+    <div className="rounded-xl border border-[#1e1e1e] bg-[#111] overflow-hidden mb-4">
+      <button
+        onClick={() => setAberta(v => !v)}
+        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[#161616] transition-colors text-left"
+      >
+        <span className="text-lg shrink-0">{emoji}</span>
+        <span className="text-sm font-bold text-white flex-1">{titulo}</span>
+        <span className="text-[#444] text-xs">{aberta ? '▲' : '▼'}</span>
+      </button>
+      {aberta && <div className="px-4 pb-4 pt-1">{children}</div>}
+    </div>
+  )
+}
+
+function Tag({ cor, children }) {
+  const cores = {
+    verde:    'bg-green-500/10 text-green-400 border-green-500/20',
+    vermelho: 'bg-red-500/10 text-red-400 border-red-500/20',
+    amarelo:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+    azul:     'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    laranja:  'bg-[#f97316]/10 text-[#f97316] border-[#f97316]/20',
+  }
+  return (
+    <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${cores[cor] || cores.azul}`}>
+      {children}
+    </span>
+  )
+}
+
+function Item({ icon, texto, sub, destaque }) {
+  return (
+    <div className={`flex items-start gap-3 py-2.5 border-b border-[#1a1a1a] last:border-0 ${destaque ? 'bg-[#f97316]/5 -mx-4 px-4 rounded-lg' : ''}`}>
+      <span className="text-base shrink-0 mt-0.5">{icon}</span>
+      <div>
+        <p className="text-xs text-white leading-relaxed">{texto}</p>
+        {sub && <p className="text-[11px] text-[#555] mt-0.5 leading-relaxed">{sub}</p>}
+      </div>
+    </div>
+  )
+}
+
+function MetricaRef({ label, bom, ruim, dica }) {
+  return (
+    <div className="p-3 rounded-xl border border-[#1a1a1a] bg-[#0f0f0f]">
+      <p className="text-xs font-bold text-white mb-2">{label}</p>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-green-400 font-semibold w-10">Bom</span>
+          <span className="text-[11px] text-[#aaa]">{bom}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-red-400 font-semibold w-10">Ruim</span>
+          <span className="text-[11px] text-[#aaa]">{ruim}</span>
+        </div>
+        {dica && (
+          <div className="flex items-start gap-2 pt-1 border-t border-[#1a1a1a] mt-1">
+            <span className="text-[10px] text-[#f97316] font-semibold w-10 shrink-0">Dica</span>
+            <span className="text-[11px] text-[#777]">{dica}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Passo({ numero, titulo, children }) {
+  return (
+    <div className="flex gap-3 mb-4 last:mb-0">
+      <div className="shrink-0 w-7 h-7 rounded-full bg-[#f97316] text-black text-xs font-black flex items-center justify-center mt-0.5">
+        {numero}
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-bold text-white mb-1.5">{titulo}</p>
+        <div className="text-xs text-[#888] leading-relaxed space-y-1">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function GuiaAnuncios() {
+  return (
+    <div className="space-y-1">
+
+      {/* Intro */}
+      <div className="rounded-xl border border-[#f97316]/20 bg-[#f97316]/5 p-4 mb-4">
+        <p className="text-xs text-[#ccc] leading-relaxed">
+          Este guia é baseado em como as melhores hamburguerias e restaurantes do Brasil gerenciam os próprios anúncios.
+          Siga a ordem — cada etapa depende da anterior.
+        </p>
+      </div>
+
+      <Secao emoji="🗓️" titulo="Quando criar a campanha">
+        <div className="mb-3 p-3 rounded-xl bg-[#0f0f0f] border border-[#1a1a1a]">
+          <p className="text-[10px] font-bold text-[#f97316] uppercase tracking-wider mb-2">Regra de ouro para restaurantes</p>
+          <p className="text-xs text-[#ccc] leading-relaxed">
+            Crie a campanha na <strong className="text-white">Quarta ou Quinta de manhã</strong>.
+            Isso dá 24–48h para o algoritmo da Meta aprender antes do fim de semana.
+          </p>
+        </div>
+        <Item icon="✅" texto="Quarta ou Quinta até o meio-dia — campanha aprende antes do fim de semana" destaque />
+        <Item icon="✅" texto="Crie pausada, revise tudo, ative só depois de conferir" />
+        <Item icon="❌" texto="Sexta à noite não" sub="A Meta não tem tempo de otimizar — você gasta dinheiro sem resultado" />
+        <Item icon="❌" texto="Não edite a campanha nas primeiras 24h após ativar" sub="Qualquer edição reseta a fase de aprendizado — a Meta recomeça do zero" />
+        <Item icon="⏱️" texto="Duração mínima: 5 dias" sub="Menos que isso não gera dados suficientes para o algoritmo aprender" />
+      </Secao>
+
+      <Secao emoji="🖼️" titulo="A imagem — o que funciona de verdade">
+        <div className="mb-3 p-3 rounded-xl bg-green-500/5 border border-green-500/20">
+          <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1">O que hamburguerias de sucesso fazem</p>
+          <p className="text-xs text-[#ccc] leading-relaxed">
+            A imagem é responsável por <strong className="text-white">80% do resultado</strong> do anúncio.
+            Texto ruim com imagem boa converte. Texto bom com imagem ruim não converte.
+          </p>
+        </div>
+        <Item icon="🍔" texto="Close no hambúrguer — mostre o produto em destaque, sem distrações de fundo" sub="A pessoa precisa sentir fome em 2 segundos" destaque />
+        <Item icon="🌟" texto="Iluminação natural ou luz de cima — evite flash direto que deixa a comida 'plástica'" />
+        <Item icon="🤳" texto="Foto real > foto de estúdio" sub="Autenticidade converte mais. Fotos do dia a dia do restaurante geram identificação" />
+        <Item icon="🎬" texto="Vídeo (Reels) tem 2–3x mais alcance que foto" sub="Não precisa ser produção profissional — 15 segundos mostrando o burger sendo montado já funciona" />
+        <Item icon="🧡" texto="Cores quentes funcionam: laranja, vermelho, amarelo" sub="São as cores que estimulam fome. Evite fundo branco frio ou verde escuro" />
+        <Item icon="❌" texto="Não use imagens de banco (stock photos)" sub="A Meta penaliza e o público ignora — parece propaganda genérica" />
+        <Item icon="❌" texto="Não coloque texto na imagem" sub="A Meta reduz o alcance de imagens com mais de 20% de texto" />
+        <div className="mt-3 p-3 rounded-xl bg-[#0f0f0f] border border-[#1a1a1a]">
+          <p className="text-[10px] font-bold text-[#f97316] mb-1">💡 Dica prática</p>
+          <p className="text-[11px] text-[#888]">Teste 2 imagens diferentes na mesma semana: crie 2 campanhas com orçamentos iguais, mesmo texto, imagens diferentes. Depois de 500 impressões, pause a pior. Repita todo mês.</p>
+        </div>
+      </Secao>
+
+      <Secao emoji="✍️" titulo="O texto — fórmula que funciona para hamburguerias">
+        <Passo numero="1" titulo="Gancho — a primeira linha (a mais importante)">
+          <p>A primeira frase precisa parar o scroll. Use uma dessas abordagens:</p>
+          <div className="mt-2 space-y-1.5">
+            {[
+              { tipo: 'Pergunta',       ex: '"Você já comeu um Smash de verdade?"' },
+              { tipo: 'Afirmação forte', ex: '"O hambúrguer que mudou Canindé."' },
+              { tipo: 'Urgência',       ex: '"Só abre Qui–Dom. E vale cada minuto de espera."' },
+              { tipo: 'Provocação',     ex: '"Carne de qualidade não tem molho industrial."' },
+            ].map(g => (
+              <div key={g.tipo} className="flex items-start gap-2">
+                <Tag cor="laranja">{g.tipo}</Tag>
+                <span className="text-[11px] text-[#999] italic">{g.ex}</span>
+              </div>
+            ))}
+          </div>
+        </Passo>
+        <Passo numero="2" titulo="Corpo — 2 a 3 linhas">
+          <p>Descreva o produto com palavras que ativam os sentidos:</p>
+          <p className="mt-1 italic text-[#aaa]">"Smash 80g, cheddar derretido, bacon crocante, molho da casa. Feito na hora, sem pressa."</p>
+          <p className="mt-1">Use emojis com moderação: <strong className="text-white">máximo 4 por texto</strong>. Mais que isso parece spam.</p>
+        </Passo>
+        <Passo numero="3" titulo="CTA — chamada para ação">
+          <p>Sempre termine com uma ação clara e o link:</p>
+          <p className="mt-1 italic text-[#aaa]">"Peça agora no site 👇 [link]"</p>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            {['Peça agora ✓', 'Garanta o seu ✓', 'Clique e peça ✓', 'Ver cardápio ✓'].map(c => (
+              <div key={c} className="text-[10px] text-green-400 bg-green-500/10 border border-green-500/20 rounded px-2 py-1 text-center">{c}</div>
+            ))}
+            {['Compre ✗', 'Acesse ✗', 'Saiba mais ✗', 'Clique aqui ✗'].map(c => (
+              <div key={c} className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1 text-center">{c}</div>
+            ))}
+          </div>
+        </Passo>
+      </Secao>
+
+      <Secao emoji="💰" titulo="Orçamento — quanto investir">
+        <div className="space-y-3 mb-3">
+          {[
+            { faixa: 'R$20/dia',   label: 'Mínimo viável',  cor: 'border-yellow-500/30 bg-yellow-500/5', txt: 'text-yellow-300', desc: 'Suficiente para o algoritmo aprender. Bom para testar imagens novas.' },
+            { faixa: 'R$30–50/dia',label: 'Recomendado',    cor: 'border-green-500/30 bg-green-500/5',   txt: 'text-green-300',  desc: 'Alcance relevante para raio de 2–5km. Melhor custo-benefício para hamburguerias locais.' },
+            { faixa: 'R$70+/dia',  label: 'Escalar',        cor: 'border-blue-500/30 bg-blue-500/5',     txt: 'text-blue-300',   desc: 'Use só quando uma campanha já provou que funciona (CTR > 1.5%). Escalar campanha ruim = jogar dinheiro fora.' },
+          ].map(o => (
+            <div key={o.faixa} className={`p-3 rounded-xl border ${o.cor}`}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`text-sm font-black ${o.txt}`}>{o.faixa}</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${o.cor} ${o.txt}`}>{o.label}</span>
+              </div>
+              <p className="text-[11px] text-[#888]">{o.desc}</p>
+            </div>
+          ))}
+        </div>
+        <Item icon="⚠️" texto="Nunca aumente o orçamento mais de 20–30% de uma vez" sub="Aumentar muito de repente reseta o aprendizado. Aumente devagar, a cada 3 dias." />
+        <Item icon="💡" texto="Comece com R$20/dia × 5 dias = R$100 para testar" sub="Se CTR > 1.5%, duplique. Se não, troque a imagem antes de aumentar." />
+      </Secao>
+
+      <Secao emoji="🎯" titulo="Objetivo da campanha — quando usar cada um">
+        <Item icon="🖱️" texto="Tráfego (Landing Page Views) — use agora" sub="Você está começando. A Meta ainda não tem dados de compra do seu pixel. Essa opção manda pessoas para o site e coleta dados. Use por pelo menos 30 dias ou até ter 50 compras registradas." destaque />
+        <Item icon="💰" texto="Conversões (Compras via Pixel) — use depois de ter histórico" sub="Quando o pixel tiver 50+ compras, troque para esse objetivo. A Meta encontra automaticamente quem tem mais chance de comprar — CTR pode dobrar." />
+        <div className="mt-3 p-3 rounded-xl bg-[#0f0f0f] border border-[#1a1a1a]">
+          <p className="text-[10px] font-bold text-[#f97316] mb-1">Como checar quantas compras o pixel tem</p>
+          <p className="text-[11px] text-[#777]">Gerenciador de Eventos do Facebook → Events Manager → seu pixel → aba Visão Geral → evento "Purchase". Quando chegar em 50, troque o objetivo aqui na aba Nova Campanha.</p>
+        </div>
+      </Secao>
+
+      <Secao emoji="📊" titulo="Como ler os números — referência rápida">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <MetricaRef label="📈 CTR — Taxa de cliques" bom="Acima de 1.5% → anúncio chamando atenção" ruim="Abaixo de 1% → imagem ou texto não funcionam" dica="Se ficar ruim, troque a imagem primeiro. Texto depois." />
+          <MetricaRef label="💸 CPC — Custo por clique" bom="Abaixo de R$1,50 → eficiente" ruim="Acima de R$3,00 → mude criativo ou público" dica="CPC alto + CTR baixo = problema na imagem/texto" />
+          <MetricaRef label="🔁 Frequência" bom="Entre 1.5 e 3x → saudável" ruim="Acima de 3x → público saturado, troque criativo" dica="Quando passar de 3x, pause e crie anúncio novo" />
+          <MetricaRef label="👥 Alcance" bom="Crescendo a cada dia → entrega ativa" ruim="Parado ou caindo → aprendizado ou orçamento baixo" dica="Aguarde 48h antes de julgar o alcance" />
+        </div>
+        <div className="p-3 rounded-xl bg-[#f97316]/5 border border-[#f97316]/20">
+          <p className="text-[10px] font-bold text-[#f97316] mb-2">⏱️ Quando agir</p>
+          <div className="space-y-1.5">
+            {[
+              ['Primeiras 48h', 'não mexa em nada, deixe a Meta aprender'],
+              ['Após 500 impressões', 'avalie CTR. Se < 1%, pause e troque imagem'],
+              ['A cada semana', 'cheque frequência. Se > 3x, crie criativo novo'],
+              ['A cada mês', 'teste uma imagem nova mesmo que esteja indo bem'],
+            ].map(([quando, acao]) => (
+              <p key={quando} className="text-[11px] text-[#999]">
+                • <strong className="text-white">{quando}:</strong> {acao}
+              </p>
+            ))}
+          </div>
+        </div>
+      </Secao>
+
+      <Secao emoji="❌" titulo="Erros que custam dinheiro — o que não fazer">
+        {[
+          { icon: '🚫', texto: 'Criar campanha e ficar editando todo dia', sub: 'Cada edição reseta o aprendizado. Crie, ative e aguarde 48h antes de qualquer ajuste.' },
+          { icon: '🚫', texto: 'Pausar a campanha antes de 5 dias', sub: 'O algoritmo precisa de tempo. Campanhas interrompidas cedo nunca chegam a otimizar.' },
+          { icon: '🚫', texto: 'Público muito específico (muitos interesses)', sub: 'Público muito pequeno = custo alto. Deixe o algoritmo da Meta trabalhar com público amplo.' },
+          { icon: '🚫', texto: 'Anunciar nos dias que o restaurante está fechado', sub: 'Segunda, Terça e Quarta: pause ou não crie campanhas. Dinheiro gasto sem venda possível.' },
+          { icon: '🚫', texto: 'Escalar orçamento de campanha ruim', sub: 'Se o CTR está baixo, mais dinheiro só aumenta o prejuízo. Primeiro resolva o criativo.' },
+          { icon: '🚫', texto: 'Desistir após 1 campanha que não funcionou', sub: 'Os melhores anunciantes têm taxa de sucesso de 30–40%. Testar é o processo normal.' },
+        ].map((e, i) => <Item key={i} icon={e.icon} texto={e.texto} sub={e.sub} />)}
+      </Secao>
+
+      <Secao emoji="🔄" titulo="Rotina semanal recomendada">
+        <div className="space-y-2">
+          {[
+            { dia: 'Quarta', cor: 'text-purple-300 bg-purple-500/20', acoes: ['Escolha a foto do fim de semana', 'Crie a campanha (deixe pausada)', 'Gere o texto com a IA'] },
+            { dia: 'Quinta', cor: 'text-blue-300 bg-blue-500/20',     acoes: ['Revise a campanha criada', 'Ative a campanha de manhã', 'Não mexa mais nada'] },
+            { dia: 'Sexta',  cor: 'text-orange-300 bg-orange-500/20', acoes: ['Verifique se a campanha está rodando', 'Observe CTR (não aja ainda)'] },
+            { dia: 'Sábado', cor: 'text-yellow-300 bg-yellow-500/20', acoes: ['Se frequência > 3x: pause e crie criativo novo', 'Registre o faturamento no Financeiro'] },
+            { dia: 'Domingo',cor: 'text-green-300 bg-green-500/20',   acoes: ['Registre faturamento', 'Avalie CTR e CPC da semana'] },
+            { dia: 'Segunda',cor: 'text-gray-300 bg-gray-500/20',     acoes: ['Pause as campanhas (restaurante fechado)', 'Analise o relatório da semana', 'Decida: mesma imagem ou trocar?'] },
+          ].map(d => (
+            <div key={d.dia} className="flex items-start gap-3 p-3 rounded-xl bg-[#0f0f0f] border border-[#1a1a1a]">
+              <span className={`text-[10px] font-black px-2 py-1 rounded-lg shrink-0 ${d.cor}`}>{d.dia}</span>
+              <ul className="space-y-0.5">
+                {d.acoes.map((a, i) => (
+                  <li key={i} className="text-[11px] text-[#888] flex items-start gap-1.5">
+                    <span className="text-[#333] mt-0.5">•</span>{a}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </Secao>
+
+      <Secao emoji="🏆" titulo="O que os melhores restaurantes fazem diferente">
+        <Item icon="📸" texto="Constância na qualidade visual" sub="Toda semana uma foto boa do produto. Não precisa ser profissional — precisa ser apetitosa." destaque />
+        <Item icon="🔬" texto="Sempre testando 2 criativos ao mesmo tempo" sub="Nunca ficam com a mesma imagem por mais de 2–3 semanas. O algoritmo precisa de estímulos novos." />
+        <Item icon="📅" texto="Planejam com antecedência" sub="Já sabem na quarta o que vão anunciar no fim de semana. Nunca criam campanhas de última hora." />
+        <Item icon="🎯" texto="Focam num produto por vez" sub="Smash, Combo ou Família — um por campanha. Anúncio focado converte muito mais que anúncio genérico." />
+        <Item icon="📊" texto="Leem 3 números por semana" sub="CTR, frequência e gasto. Com esses 3 números já tomam as decisões certas sem precisar entender tudo." />
+        <Item icon="🔁" texto="Impulsionam posts orgânicos que já performaram" sub="Quando um post do Instagram tem engajamento alto organicamente, criam um anúncio a partir dele — resultado melhor com menos esforço." />
+      </Secao>
+
     </div>
   )
 }

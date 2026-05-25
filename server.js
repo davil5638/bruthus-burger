@@ -13,7 +13,7 @@ const {
   criarCampanhaCompleta, impulsionarPost, listarPostsInstagram,
   relatorioPerformance, listarCampanhas, listarAdSets,
   pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
-  gerarRelatorioCompleto, testarConexaoMeta,
+  gerarRelatorioCompleto, testarConexaoMeta, PIXEL_ID,
 } = require("./scripts/createAds");
 const { iniciarAgendador, testarStory, pausarAgendador, retomarAgendador, isAgendadorPausado } = require("./scheduler/scheduler");
 const { gerarTextoStory, sortearFotoStory } = require("./scripts/storyImage");
@@ -113,6 +113,7 @@ app.get("/status", (req, res) => {
     META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN ? "✅ Configurado" : "❌ Não configurado",
     IG_USER_ID: process.env.IG_USER_ID ? "✅ Configurado" : "❌ Não configurado",
     AD_ACCOUNT_ID: process.env.AD_ACCOUNT_ID ? "✅ Configurado" : "❌ Não configurado",
+    PIXEL_ID: PIXEL_ID ? `✅ ${PIXEL_ID}` : "❌ Não configurado",
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ? "✅ Configurado" : "❌ Não configurado",
     ORDER_LINK: process.env.ORDER_LINK || "❌ Não configurado",
   };
@@ -375,7 +376,7 @@ Sem explicações. Só o JSON.`;
 
 app.post("/ads", async (req, res) => {
   try {
-    const { imageUrl, titulo, corpo, orcamentoDiario, registrarFinanceiro } = req.body;
+    const { imageUrl, titulo, corpo, orcamentoDiario, registrarFinanceiro, objetivo } = req.body;
 
     if (!imageUrl) {
       return res.status(400).json({ erro: "imageUrl é obrigatório" });
@@ -388,6 +389,7 @@ app.post("/ads", async (req, res) => {
       titulo,
       corpo,
       orcamentoDiario: orcamento,
+      objetivo: objetivo || "OUTCOME_TRAFFIC",
     });
 
     // Registra o gasto no sistema financeiro automaticamente
@@ -428,10 +430,10 @@ app.get("/ads/posts-instagram", async (req, res) => {
 // Impulsiona um post existente do Instagram como anúncio
 app.post("/ads/impulsionar-post", async (req, res) => {
   try {
-    const { mediaId, orcamentoDiario, registrarFinanceiro } = req.body;
+    const { mediaId, orcamentoDiario, registrarFinanceiro, objetivo } = req.body;
     if (!mediaId) return res.status(400).json({ erro: "mediaId é obrigatório" });
 
-    const resultado = await impulsionarPost({ mediaId, orcamentoDiario: orcamentoDiario || 1000 });
+    const resultado = await impulsionarPost({ mediaId, orcamentoDiario: orcamentoDiario || 1000, objetivo: objetivo || "OUTCOME_TRAFFIC" });
 
     if (registrarFinanceiro !== false) {
       try {
@@ -557,6 +559,10 @@ app.get("/ads/relatorio", async (req, res) => {
     const ctrMedio         = comDados.length ? comDados.reduce((s, c) => s + c.ctr, 0) / comDados.length : 0;
     const cpcMedio         = comDados.length ? comDados.reduce((s, c) => s + c.cpc, 0) / comDados.length : 0;
     const cpmMedio         = comDados.length ? comDados.reduce((s, c) => s + c.cpm, 0) / comDados.length : 0;
+    // Totais do Pixel
+    const totalPixelCompras   = comDados.reduce((s, c) => s + (c.pixelCompras || 0), 0);
+    const totalPixelCheckouts = comDados.reduce((s, c) => s + (c.pixelCheckouts || 0), 0);
+    const custoPorCompra      = totalPixelCompras > 0 ? (totalGasto / totalPixelCompras).toFixed(2) : null;
 
     // Análise IA
     let analise = null;
@@ -599,6 +605,11 @@ Use linguagem direta e prática. Formato markdown.`;
         ctrMedio:        ctrMedio.toFixed(2),
         cpcMedio:        cpcMedio.toFixed(2),
         cpmMedio:        cpmMedio.toFixed(2),
+        // Pixel
+        totalPixelCompras,
+        totalPixelCheckouts,
+        custoPorCompra,
+        pixelId:         PIXEL_ID,
       },
       campanhas,
       analise,

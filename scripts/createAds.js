@@ -12,6 +12,7 @@ const AD_ACCOUNT_ID = _RAW_AD_ACCOUNT_ID.startsWith("act_")
 const IG_USER_ID = process.env.IG_USER_ID;
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 const BUSINESS_NAME = process.env.BUSINESS_NAME || "Bruthus Burger";
+const PIXEL_ID = process.env.PIXEL_ID || "1208231056917141";
 const GRAPH_API = "https://graph.facebook.com/v21.0";
 
 // ──────────────────────────────────────────────
@@ -98,26 +99,36 @@ async function criarCampanha(nomeCampanha, objetivo = "OUTCOME_TRAFFIC", orcamen
 /**
  * Cria o conjunto de anúncios com segmentação.
  * Sem orçamento aqui — budget fica na campanha (CBO).
- * Isso elimina o campo is_adset_budget_sharing_enabled.
+ * Com pixel: OUTCOME_SALES usa OFFSITE_CONVERSIONS (otimiza por compra).
+ * Com tráfego: usa LANDING_PAGE_VIEWS (melhor que LINK_CLICKS — exige que a página carregue).
  */
-async function criarAdSet(campanhaId, nomeAdSet) {
+async function criarAdSet(campanhaId, nomeAdSet, objetivo = "OUTCOME_TRAFFIC") {
   const url = `${GRAPH_API}/${AD_ACCOUNT_ID}/adsets`;
 
+  const usandoConversoes = objetivo === "OUTCOME_SALES";
   console.log(`\n🎯 Criando Ad Set: "${nomeAdSet}"...`);
   console.log(`   📍 Raio: 2km | Idade: 18-55 anos`);
+  console.log(`   🎯 Otimização: ${usandoConversoes ? "OFFSITE_CONVERSIONS (Compras via Pixel)" : "LANDING_PAGE_VIEWS"}`);
 
-  // CBO: sem daily_budget no ad set — budget já está na campanha
-  const response = await axios.post(url, null, {
-    params: {
-      name:              nomeAdSet,
-      campaign_id:       campanhaId,
-      billing_event:     "IMPRESSIONS",
-      optimization_goal: "LINK_CLICKS",
-      targeting:         JSON.stringify(SEGMENTACAO_PADRAO),
-      status:            "PAUSED",
-      access_token:      ACCESS_TOKEN,
-    },
-  });
+  const params = {
+    name:              nomeAdSet,
+    campaign_id:       campanhaId,
+    billing_event:     "IMPRESSIONS",
+    optimization_goal: usandoConversoes ? "OFFSITE_CONVERSIONS" : "LANDING_PAGE_VIEWS",
+    targeting:         JSON.stringify(SEGMENTACAO_PADRAO),
+    status:            "PAUSED",
+    access_token:      ACCESS_TOKEN,
+  };
+
+  // Pixel obrigatório para OFFSITE_CONVERSIONS — diz à Meta para otimizar por compras no site
+  if (usandoConversoes) {
+    params.promoted_object = JSON.stringify({
+      pixel_id:          PIXEL_ID,
+      custom_event_type: "PURCHASE",
+    });
+  }
+
+  const response = await axios.post(url, null, { params });
 
   console.log(`✅ Ad Set criado: ${response.data.id}`);
   return response.data.id;
@@ -258,6 +269,7 @@ async function criarCampanhaCompleta(config = {}) {
     titulo = "🍔 Bruthus Burger — Peça Agora!",
     corpo = "Hamburguer artesanal feito na hora, perto de você. Clique e peça direto no site — entrega rápida! 🔥",
     orcamentoDiario = ORCAMENTO_DIARIO_CENTAVOS,
+    objetivo = "OUTCOME_TRAFFIC",
   } = config;
 
   validarConfig();
@@ -276,14 +288,15 @@ async function criarCampanhaCompleta(config = {}) {
     // 1. Campanha — orçamento fica aqui (CBO)
     const campanhaId = await criarCampanha(
       `${nomeCampanha} - ${timestamp}`,
-      "OUTCOME_TRAFFIC",
+      objetivo,
       orcamentoDiario
     );
 
     // 2. Ad Set — sem orçamento (herdado da campanha via CBO)
     const adSetId = await criarAdSet(
       campanhaId,
-      `AdSet — 2km | Instagram — ${timestamp}`
+      `AdSet — 2km | Instagram — ${timestamp}`,
+      objetivo
     );
 
     // 3. Criativo
@@ -364,6 +377,7 @@ async function impulsionarPost(config = {}) {
     mediaId,
     nomeCampanha = `${BUSINESS_NAME} — Post Impulsionado`,
     orcamentoDiario = ORCAMENTO_DIARIO_CENTAVOS,
+    objetivo = "OUTCOME_TRAFFIC",
   } = config;
 
   validarConfig();
@@ -371,8 +385,8 @@ async function impulsionarPost(config = {}) {
 
   const timestamp = new Date().toISOString().slice(0, 10);
 
-  const campanhaId  = await criarCampanha(`${nomeCampanha} - ${timestamp}`, "OUTCOME_TRAFFIC", orcamentoDiario);
-  const adSetId     = await criarAdSet(campanhaId, `AdSet — 2km | Instagram — ${timestamp}`);
+  const campanhaId  = await criarCampanha(`${nomeCampanha} - ${timestamp}`, objetivo, orcamentoDiario);
+  const adSetId     = await criarAdSet(campanhaId, `AdSet — 2km | Instagram — ${timestamp}`, objetivo);
   const creativoId  = await criarCreativoDePostExistente(`Criativo Post ${mediaId} - ${timestamp}`, mediaId);
   const anuncioId   = await criarAnuncio(adSetId, creativoId, `Anúncio Post - ${timestamp}`);
 
@@ -573,8 +587,15 @@ async function gerarRelatorioCompleto(dias = 90) {
 
       const ins = insData.data?.[0] || {};
       const actions = ins.actions || [];
-      const linkClicks = actions.find(a => a.action_type === 'link_click')?.value || '0';
-      const postEngagement = actions.find(a => a.action_type === 'post_engagement')?.value || '0';
+      const costPerAction = ins.cost_per_action_type || [];
+
+      const linkClicks      = actions.find(a => a.action_type === 'link_click')?.value || '0';
+      const postEngagement  = actions.find(a => a.action_type === 'post_engagement')?.value || '0';
+      // Conversões rastreadas pelo Pixel
+      const pixelCompras    = actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || '0';
+      const pixelCheckouts  = actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_initiate_checkout')?.value || '0';
+      const pixelVisualizacoes = actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_view_content')?.value || '0';
+      const custoPorCompra  = costPerAction.find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || null;
 
       dados.push({
         id: camp.id,
@@ -594,6 +615,11 @@ async function gerarRelatorioCompleto(dias = 90) {
         ctr: parseFloat(ins.ctr || 0),
         cpc: parseFloat(ins.cpc || 0),
         cpm: parseFloat(ins.cpm || 0),
+        // Conversões do Pixel
+        pixelCompras: parseInt(pixelCompras),
+        pixelCheckouts: parseInt(pixelCheckouts),
+        pixelVisualizacoes: parseInt(pixelVisualizacoes),
+        custoPorCompra: custoPorCompra ? parseFloat(custoPorCompra) : null,
       });
     } catch (e) {
       console.warn(`⚠️ Erro insights campanha ${camp.id}:`, e.message);
@@ -627,5 +653,5 @@ module.exports = {
   criarCampanhaCompleta, impulsionarPost, listarPostsInstagram,
   relatorioPerformance, criarCampanha, criarAdSet,
   listarCampanhas, listarAdSets, pausarCampanha, ativarCampanha, excluirCampanha, atualizarOrcamento,
-  gerarRelatorioCompleto, testarConexaoMeta,
+  gerarRelatorioCompleto, testarConexaoMeta, PIXEL_ID,
 };

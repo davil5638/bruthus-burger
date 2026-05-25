@@ -93,6 +93,13 @@ export default function FinanceiroPage() {
   const [resumoWpp, setResumoWpp]       = useState(null)
   const [enviandoWpp, setEnviandoWpp]   = useState(false)
 
+  // Sincronizar Meta Ads
+  const [mostraSyncMeta, setMostraSyncMeta] = useState(false)
+  const [syncMetaDias, setSyncMetaDias]     = useState(30)
+  const [syncMetaDados, setSyncMetaDados]   = useState(null)
+  const [syncMetaLoading, setSyncMetaLoading] = useState(false)
+  const [syncMetaSalvando, setSyncMetaSalvando] = useState(false)
+
   // ── Load configs localStorage ──
   useEffect(() => {
     setMetaSemanal(parseFloat(localStorage.getItem('metaSemanal') || '0'))
@@ -255,6 +262,37 @@ export default function FinanceiroPage() {
     }
     setMostraConfigs(false)
     setToast({ message: 'Configurações salvas!', type: 'success' })
+  }
+
+  // ── Sync Meta Ads ──
+  async function buscarGastoMeta() {
+    setSyncMetaLoading(true); setSyncMetaDados(null)
+    try {
+      const data = await api.get(`/ads/relatorio?dias=${syncMetaDias}`)
+      const campanhas = data.campanhas || []
+      const total = campanhas.reduce((s, c) => s + (c.gasto || 0), 0)
+      setSyncMetaDados({ total, campanhas, dias: syncMetaDias })
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally { setSyncMetaLoading(false) }
+  }
+
+  async function registrarGastoMeta() {
+    if (!syncMetaDados || syncMetaDados.total <= 0) return
+    setSyncMetaSalvando(true)
+    try {
+      await api.post('/financeiro', {
+        tipo: 'despesa',
+        valor: syncMetaDados.total,
+        categoria: 'Marketing / Anúncios',
+        descricao: `Meta Ads — gasto real últimos ${syncMetaDados.dias} dias (${syncMetaDados.campanhas.length} campanhas)`,
+        data: new Date().toISOString().slice(0, 10),
+      })
+      setToast({ message: `Gasto de ${fmt(syncMetaDados.total)} registrado!`, type: 'success' })
+      setMostraSyncMeta(false); setSyncMetaDados(null); carregar()
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally { setSyncMetaSalvando(false) }
   }
 
   // ── Entradas filtradas ──
@@ -426,7 +464,7 @@ export default function FinanceiroPage() {
         </button>
       </div>
 
-      <div className="flex gap-3 mb-6">
+      <div className="flex gap-3 mb-6 flex-wrap">
         <button onClick={exportarCSV}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#333] bg-[#111] text-[#888] hover:text-white font-semibold text-sm transition-all">
           ⬇️ Exportar CSV
@@ -438,6 +476,10 @@ export default function FinanceiroPage() {
         <button onClick={enviarResumoAgora} disabled={enviandoWpp}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#25d366]/30 bg-[#25d366]/10 text-[#25d366] hover:bg-[#25d366]/20 font-semibold text-sm transition-all disabled:opacity-50">
           {enviandoWpp ? '…' : '📲 Enviar WPP'}
+        </button>
+        <button onClick={() => { setMostraSyncMeta(v => !v); setMostraForm(null); setMostraWpp(false) }}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-blue-500/30 bg-blue-500/5 text-blue-400 hover:bg-blue-500/10 font-semibold text-sm transition-all">
+          📡 Sync Meta Ads
         </button>
       </div>
 
@@ -531,6 +573,63 @@ export default function FinanceiroPage() {
           <Button onClick={salvarWpp} loading={salvandoWpp} variant="danger" disabled={wppValores.length === 0} className="w-full">
             Salvar Gasto Total ({wppValores.length > 0 ? fmt(wppValores.reduce((s, v) => s + v, 0)) : 'R$ 0,00'})
           </Button>
+        </div>
+      )}
+
+      {/* Sync Meta Ads */}
+      {mostraSyncMeta && (
+        <div className="mb-6 rounded-xl border border-blue-500/30 bg-blue-500/5 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-white text-sm">📡 Sincronizar gasto real do Meta Ads</h3>
+            <button onClick={() => { setMostraSyncMeta(false); setSyncMetaDados(null) }} className="text-[#555] hover:text-white text-lg">×</button>
+          </div>
+
+          <div className="flex gap-2 mb-4">
+            {[7, 14, 30].map(d => (
+              <button key={d} onClick={() => { setSyncMetaDias(d); setSyncMetaDados(null) }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                  syncMetaDias === d
+                    ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                    : 'bg-[#1a1a1a] border-[#333] text-[#666] hover:text-white'
+                }`}>
+                {d} dias
+              </button>
+            ))}
+            <Button onClick={buscarGastoMeta} loading={syncMetaLoading} variant="secondary" size="sm">
+              🔍 Buscar
+            </Button>
+          </div>
+
+          {syncMetaDados && (
+            <>
+              <div className="mb-4 p-3 rounded-lg bg-[#111] border border-[#1e1e1e]">
+                <p className="text-xs text-[#666] mb-2">Gasto real nos últimos {syncMetaDados.dias} dias:</p>
+                <div className="space-y-1.5 mb-3">
+                  {syncMetaDados.campanhas.filter(c => c.gasto > 0).map(c => (
+                    <div key={c.id} className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-[#888] truncate flex-1">{c.nome}</span>
+                      <span className="text-[11px] font-semibold text-red-400 shrink-0">{fmt(c.gasto)}</span>
+                    </div>
+                  ))}
+                  {syncMetaDados.campanhas.filter(c => c.gasto > 0).length === 0 && (
+                    <p className="text-xs text-[#555]">Nenhum gasto encontrado no período.</p>
+                  )}
+                </div>
+                {syncMetaDados.total > 0 && (
+                  <div className="border-t border-[#1e1e1e] pt-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">Total gasto</span>
+                    <span className="text-base font-black text-red-400">{fmt(syncMetaDados.total)}</span>
+                  </div>
+                )}
+              </div>
+
+              {syncMetaDados.total > 0 && (
+                <Button onClick={registrarGastoMeta} loading={syncMetaSalvando} variant="danger" className="w-full">
+                  Registrar {fmt(syncMetaDados.total)} como despesa de Marketing
+                </Button>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -722,34 +821,59 @@ export default function FinanceiroPage() {
 
       {/* Projeção de fechamento */}
       {(() => {
+        // Conta dias de operação (Qui=4, Sex=5, Sáb=6, Dom=0) num intervalo
+        function contarDiasOp(inicio, fim) {
+          let n = 0
+          const d = new Date(inicio)
+          while (d <= fim) {
+            if ([0, 4, 5, 6].includes(d.getDay())) n++
+            d.setDate(d.getDate() + 1)
+          }
+          return n
+        }
+
         const hoje = new Date()
         const mesAtual = hoje.toISOString().slice(0, 7)
         const entradasMes = entradas.filter(e => e.data && e.data.startsWith(mesAtual))
-        const diaDoMes = hoje.getDate()
-        const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()
-        const diasRestantes = diasNoMes - diaDoMes
-        if (diaDoMes < 3 || entradasMes.length === 0) return null
+        if (entradasMes.length === 0) return null
+
+        const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+        const fimMes    = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
+        const amanha    = new Date(hoje); amanha.setDate(hoje.getDate() + 1)
+
+        const diasOpAteHoje     = contarDiasOp(inicioMes, hoje)
+        const diasOpRestantes   = contarDiasOp(amanha, fimMes)
+        const diasOpNoMes       = diasOpAteHoje + diasOpRestantes
+
+        if (diasOpAteHoje < 2 || diasOpNoMes === 0) return null
+
         const fat = entradasMes.filter(e => e.tipo === 'receita').reduce((s, e) => s + e.valor, 0)
         const gas = entradasMes.filter(e => e.tipo === 'despesa').reduce((s, e) => s + e.valor, 0)
-        const fatDiario = fat / diaDoMes
-        const gasDiario = gas / diaDoMes
-        const fatProj = fat + fatDiario * diasRestantes
-        const gasProj = gas + gasDiario * diasRestantes
+
+        // Média por dia de operação (não por dia corrido)
+        const fatPorDiaOp = fat / diasOpAteHoje
+        const gasPorDiaOp = gas / diasOpAteHoje
+
+        const fatProj   = fat + fatPorDiaOp * diasOpRestantes
+        const gasProj   = gas + gasPorDiaOp * diasOpRestantes
         const lucroProj = fatProj - gasProj
         const margemProj = fatProj > 0 ? ((lucroProj / fatProj) * 100).toFixed(1) : '0.0'
         const isPositivo = lucroProj >= 0
+
         return (
           <div className="mb-6 rounded-xl border border-[#f97316]/20 bg-[#f97316]/5 p-5">
             <div className="flex items-center gap-2 mb-4">
               <span className="text-lg">🔮</span>
               <div>
                 <h3 className="text-sm font-bold text-white">Projeção de fechamento do mês</h3>
-                <p className="text-[11px] text-[#666]">Baseada nos últimos {diaDoMes} dias — {diasRestantes} dias restantes no mês</p>
+                <p className="text-[11px] text-[#666]">
+                  {diasOpAteHoje} dias de operação registrados — {diasOpRestantes} dias (Qui–Dom) restantes
+                </p>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: 'Faturamento proj.', valor: fmt(fatProj), cor: 'text-green-400' },
+                { label: 'Faturamento proj.', valor: fmt(fatProj),  cor: 'text-green-400' },
                 { label: 'Gastos proj.',      valor: fmt(gasProj),  cor: 'text-red-400'   },
                 { label: 'Lucro proj.',       valor: (isPositivo ? '+' : '') + fmt(lucroProj), cor: isPositivo ? 'text-blue-400' : 'text-red-400' },
                 { label: 'Margem proj.',      valor: `${margemProj}%`, cor: parseFloat(margemProj) >= 30 ? 'text-green-400' : parseFloat(margemProj) >= 15 ? 'text-yellow-400' : 'text-red-400' },
@@ -761,7 +885,7 @@ export default function FinanceiroPage() {
               ))}
             </div>
             <p className="text-[10px] text-[#555] mt-3 text-center">
-              ⚠️ Estimativa baseada na média diária atual — valores reais podem variar
+              Média de {fmt(fatPorDiaOp)}/dia de operação · {diasOpNoMes} dias de operação no mês
             </p>
           </div>
         )

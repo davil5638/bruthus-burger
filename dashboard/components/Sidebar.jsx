@@ -11,14 +11,6 @@ const navGroups = [
     ]
   },
   {
-    label: 'Conteúdo',
-    items: [
-      { href: '/legendas',  label: 'Legendas',    icon: '✍️' },
-      { href: '/stories',   label: 'Stories',     icon: '📱' },
-      { href: '/mensagens', label: 'Transmissão', icon: '💬' },
-    ]
-  },
-  {
     label: 'Anúncios',
     items: [
       { href: '/anuncios',           label: 'Anúncios',      icon: '📣' },
@@ -28,7 +20,6 @@ const navGroups = [
   {
     label: 'Gestão',
     items: [
-      { href: '/agendador',  label: 'Agendador',  icon: '📅' },
       { href: '/financeiro', label: 'Financeiro', icon: '💰' },
     ]
   },
