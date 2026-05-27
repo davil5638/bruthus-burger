@@ -21,6 +21,7 @@ const navGroups = [
     label: 'Gestão',
     items: [
       { href: '/financeiro', label: 'Financeiro', icon: '💰' },
+      { href: '/clientes',   label: 'Clientes',   icon: '👥' },
     ]
   },
 ]
