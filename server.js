@@ -1205,48 +1205,65 @@ app.get("/olaclick/debug", (req, res) => {
 app.post("/webhook/olaclick", async (req, res) => {
   try {
     const payload = req.body;
-    const tipo    = payload?.event_type || payload?.type || "";
-    const pedido  = payload?.order || payload?.data || payload;
+    // OlaClick envia ORDER_CREATED em maiúsculo
+    const tipo    = (payload?.event_type || payload?.type || "").toUpperCase();
+    // Dados do pedido sempre em payload.data
+    const pedido  = payload?.data || payload?.order || payload;
 
     // Salva payload completo para inspeção (os 10 mais recentes)
     _olaPayloads.unshift({ recebidoEm: new Date().toISOString(), tipo, payload });
     if (_olaPayloads.length > 10) _olaPayloads.pop();
 
-    console.log(`[OlaClick Webhook] evento: ${tipo}`, JSON.stringify(payload));
+    console.log(`[OlaClick Webhook] evento: ${tipo} | pedido: ${pedido?.public_id || pedido?.id}`);
 
-    if (tipo !== "order_created" && tipo !== "order_updated") {
-      return res.status(200).json({ ok: true, ignorado: true });
+    if (tipo !== "ORDER_CREATED" && tipo !== "ORDER_UPDATED") {
+      return res.status(200).json({ ok: true, ignorado: tipo });
     }
-    if (tipo === "order_updated") {
-      return res.status(200).json({ ok: true, ignorado: "order_updated" });
+    if (tipo === "ORDER_UPDATED") {
+      return res.status(200).json({ ok: true, ignorado: "ORDER_UPDATED" });
     }
 
-    const valor = parseFloat(
-      pedido?.total || pedido?.total_price || pedido?.amount ||
-      pedido?.subtotal || pedido?.grand_total || 0
-    );
+    // Valor total (OlaClick usa pedido.total)
+    const valor = parseFloat(pedido?.total || pedido?.total_price || 0);
     if (!valor || valor <= 0) {
-      console.warn("[OlaClick Webhook] valor não encontrado:", JSON.stringify(pedido).slice(0, 200));
+      console.warn("[OlaClick Webhook] valor zero ou não encontrado:", pedido?.public_id);
       return res.status(200).json({ ok: true, aviso: "valor não encontrado" });
     }
 
-    const orderId = pedido?.id || pedido?.order_id || pedido?.code || `OC-${Date.now()}`;
-    const data    = new Date().toISOString().slice(0, 10);
+    // IDs e data
+    const orderId    = pedido?.public_id || pedido?.id || `OC-${Date.now()}`;
+    const dataPedido = pedido?.created_at ? new Date(pedido.created_at) : new Date();
+    const dataBR     = dataPedido.toISOString().slice(0, 10);
 
-    // 1) Continua registrando receita no financeiro
+    // 1) Registra receita no financeiro
     await fin.adicionarEntrada({
       tipo: "receita", valor, categoria: "Delivery",
-      descricao: `OlaClick — Pedido #${orderId}`, data,
+      descricao: `OlaClick — Pedido ${orderId}`, data: dataBR,
     });
 
-    // 2) Captura cliente + pedido (best-effort, não derruba o webhook)
+    // 2) Captura cliente + pedido — campos confirmados pelo payload real
     try {
-      const cust = pedido?.customer || pedido?.client || payload?.customer || {};
-      const telefone = cust.phone || cust.telephone || cust.mobile || cust.whatsapp;
-      const nome     = cust.name  || cust.full_name || [cust.first_name, cust.last_name].filter(Boolean).join(" ") || null;
+      const cust     = pedido?.client || {};
+      // phone_number = "85991375628" (sem DDI), country_calling_code = "55"
+      const telRaw   = cust.phone_number || cust.phone || cust.telephone || null;
+      const telefone = telRaw
+        ? (String(telRaw).startsWith("55") ? String(telRaw) : "55" + String(telRaw))
+        : null;
+      const nome     = cust.name || null;
       const email    = cust.email || null;
-      const itens    = pedido?.items || pedido?.products || null;
-      const cupom    = pedido?.coupon?.code || pedido?.discount?.code || pedido?.promo_code || null;
+
+      // Itens: OlaClick chama de "combos"
+      const itens = (pedido?.combos || []).map(c => ({
+        nome:       c.product_name,
+        categoria:  c.product_category_name,
+        quantidade: c.quantity,
+        valor:      c.combo_price || c.variant_price,
+      }));
+
+      // Cupom: discounts é array de objetos
+      const cupom = pedido?.discounts?.[0]?.code
+        || pedido?.discounts?.[0]?.promo_code
+        || null;
 
       if (telefone) {
         const cliente = await clientesDb.upsertCliente({ telefone, nome, email });
@@ -1255,22 +1272,20 @@ app.post("/webhook/olaclick", async (req, res) => {
             clienteId:  cliente.id,
             externalId: String(orderId),
             origem:     "olaclick",
-            dataPedido: pedido?.created_at || pedido?.date || new Date(),
+            dataPedido,
             valor,
-            itens,
+            itens:      itens.length ? itens : null,
             cupom,
             payload,
           });
-          // recalcula só este cliente (rápido)
           await customerScoring.recalcularCliente(cliente.id).catch(e =>
             console.warn("[OlaClick] recalcular falhou:", e.message)
           );
-          // marca recuperação se havia envio aberto
           await clientesDb.marcarRecuperacao(cliente.id, valor).catch(() => {});
-          console.log(`✅ [OlaClick] cliente ${cliente.id} (${telefone}) + pedido #${orderId} salvo`);
+          console.log(`✅ [OlaClick] ${orderId} | ${nome} (${telefone}) | R$ ${valor}`);
         }
       } else {
-        console.log(`[OlaClick] pedido #${orderId} sem telefone — só receita registrada`);
+        console.log(`[OlaClick] ${orderId} sem telefone — só receita registrada`);
       }
     } catch (e) {
       console.warn("[OlaClick] captura de cliente falhou (receita já registrada):", e.message);
