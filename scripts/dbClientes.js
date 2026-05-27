@@ -117,7 +117,7 @@ async function registrarPedido({
   const { rows } = await pool.query(
     `INSERT INTO pedidos (cliente_id, external_id, origem, data_pedido, valor, itens, cupom, payload)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     ON CONFLICT (origem, external_id) DO NOTHING
+     ON CONFLICT (origem, external_id) WHERE external_id IS NOT NULL DO NOTHING
      RETURNING *`,
     [
       clienteId,
