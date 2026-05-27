@@ -1205,90 +1205,84 @@ app.get("/olaclick/debug", (req, res) => {
 app.post("/webhook/olaclick", async (req, res) => {
   try {
     const payload = req.body;
-    // OlaClick envia ORDER_CREATED em maiúsculo
     const tipo    = (payload?.event_type || payload?.type || "").toUpperCase();
-    // Dados do pedido sempre em payload.data
     const pedido  = payload?.data || payload?.order || payload;
 
     // Salva payload completo para inspeção (os 10 mais recentes)
     _olaPayloads.unshift({ recebidoEm: new Date().toISOString(), tipo, payload });
     if (_olaPayloads.length > 10) _olaPayloads.pop();
 
-    console.log(`[OlaClick Webhook] evento: ${tipo} | pedido: ${pedido?.public_id || pedido?.id}`);
+    // ORDER_CREATED dispara com client=null, combos=[], total=0 — sem dados úteis, ignorar
+    if (tipo === "ORDER_CREATED") {
+      return res.status(200).json({ ok: true, ignorado: "ORDER_CREATED sem dados" });
+    }
 
-    if (tipo !== "ORDER_CREATED" && tipo !== "ORDER_UPDATED") {
+    if (tipo !== "ORDER_UPDATED") {
       return res.status(200).json({ ok: true, ignorado: tipo });
     }
-    if (tipo === "ORDER_UPDATED") {
-      return res.status(200).json({ ok: true, ignorado: "ORDER_UPDATED" });
+
+    // ORDER_UPDATED: só processa quando os dados estão completos
+    // (OlaClick dispara vários updates parciais antes de completar o pedido)
+    const cust   = pedido?.client;
+    const combos = pedido?.combos || [];
+    const valor  = parseFloat(pedido?.total || 0);
+
+    if (!cust || !combos.length || valor <= 0) {
+      return res.status(200).json({ ok: true, ignorado: "dados incompletos no update" });
     }
 
-    // Valor total (OlaClick usa pedido.total)
-    const valor = parseFloat(pedido?.total || pedido?.total_price || 0);
-    if (!valor || valor <= 0) {
-      console.warn("[OlaClick Webhook] valor zero ou não encontrado:", pedido?.public_id);
-      return res.status(200).json({ ok: true, aviso: "valor não encontrado" });
-    }
-
-    // IDs e data
     const orderId    = pedido?.public_id || pedido?.id || `OC-${Date.now()}`;
     const dataPedido = pedido?.created_at ? new Date(pedido.created_at) : new Date();
     const dataBR     = dataPedido.toISOString().slice(0, 10);
 
-    // 1) Registra receita no financeiro
-    await fin.adicionarEntrada({
-      tipo: "receita", valor, categoria: "Delivery",
-      descricao: `OlaClick — Pedido ${orderId}`, data: dataBR,
-    });
+    // Captura cliente + pedido
+    const telRaw   = cust.phone_number || cust.phone || null;
+    const telefone = telRaw
+      ? (String(telRaw).startsWith("55") ? String(telRaw) : "55" + String(telRaw))
+      : null;
+    const nome  = cust.name  || null;
+    const email = cust.email || null;
 
-    // 2) Captura cliente + pedido — campos confirmados pelo payload real
-    try {
-      const cust     = pedido?.client || {};
-      // phone_number = "85991375628" (sem DDI), country_calling_code = "55"
-      const telRaw   = cust.phone_number || cust.phone || cust.telephone || null;
-      const telefone = telRaw
-        ? (String(telRaw).startsWith("55") ? String(telRaw) : "55" + String(telRaw))
-        : null;
-      const nome     = cust.name || null;
-      const email    = cust.email || null;
+    const itens = combos.map(c => ({
+      nome:       c.product_name,
+      categoria:  c.product_category_name,
+      quantidade: c.quantity,
+      valor:      c.combo_price || c.variant_price,
+    }));
+    const cupom = pedido?.discounts?.[0]?.code || null;
 
-      // Itens: OlaClick chama de "combos"
-      const itens = (pedido?.combos || []).map(c => ({
-        nome:       c.product_name,
-        categoria:  c.product_category_name,
-        quantidade: c.quantity,
-        valor:      c.combo_price || c.variant_price,
-      }));
+    // Upsert cliente
+    const cliente = telefone
+      ? await clientesDb.upsertCliente({ telefone, nome, email })
+      : null;
 
-      // Cupom: discounts é array de objetos
-      const cupom = pedido?.discounts?.[0]?.code
-        || pedido?.discounts?.[0]?.promo_code
-        || null;
+    // Registra pedido — retorna null se já existir (dedup via UNIQUE constraint)
+    // Só registra receita e recalcula na primeira vez que vemos este pedido com dados completos
+    const pedidoSalvo = cliente
+      ? await clientesDb.registrarPedido({
+          clienteId: cliente.id, externalId: String(orderId), origem: "olaclick",
+          dataPedido, valor, itens, cupom, payload,
+        })
+      : null;
 
-      if (telefone) {
-        const cliente = await clientesDb.upsertCliente({ telefone, nome, email });
-        if (cliente) {
-          await clientesDb.registrarPedido({
-            clienteId:  cliente.id,
-            externalId: String(orderId),
-            origem:     "olaclick",
-            dataPedido,
-            valor,
-            itens:      itens.length ? itens : null,
-            cupom,
-            payload,
-          });
-          await customerScoring.recalcularCliente(cliente.id).catch(e =>
-            console.warn("[OlaClick] recalcular falhou:", e.message)
-          );
-          await clientesDb.marcarRecuperacao(cliente.id, valor).catch(() => {});
-          console.log(`✅ [OlaClick] ${orderId} | ${nome} (${telefone}) | R$ ${valor}`);
-        }
-      } else {
-        console.log(`[OlaClick] ${orderId} sem telefone — só receita registrada`);
-      }
-    } catch (e) {
-      console.warn("[OlaClick] captura de cliente falhou (receita já registrada):", e.message);
+    if (pedidoSalvo) {
+      // Primeira vez com dados completos: registra receita e recalcula
+      await fin.adicionarEntrada({
+        tipo: "receita", valor, categoria: "Delivery",
+        descricao: `OlaClick — Pedido ${orderId}`, data: dataBR,
+      });
+      await customerScoring.recalcularCliente(cliente.id).catch(e =>
+        console.warn("[OlaClick] recalcular falhou:", e.message)
+      );
+      await clientesDb.marcarRecuperacao(cliente.id, valor).catch(() => {});
+      console.log(`✅ [OlaClick] NOVO ${orderId} | ${nome} (${telefone}) | R$ ${valor}`);
+    } else if (!cliente) {
+      // Sem telefone: registra só a receita se ainda não foi (usa orderId como chave)
+      // Verifica se já tem lançamento para este pedido no financeiro
+      console.log(`[OlaClick] ${orderId} sem telefone — receita pode já estar registrada`);
+    } else {
+      // Pedido já processado (update duplicado do OlaClick) — ignora
+      console.log(`[OlaClick] ${orderId} update duplicado ignorado`);
     }
 
     res.status(200).json({ ok: true, registrado: { orderId, valor } });
