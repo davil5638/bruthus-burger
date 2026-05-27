@@ -1186,55 +1186,100 @@ app.post("/financeiro/enviar-resumo-whatsapp", async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
-// WEBHOOK OLACLICK — registra pedidos como receita
+// WEBHOOK OLACLICK — registra receita + cliente + pedido
 // ──────────────────────────────────────────────
+const clientesDb = require("./scripts/dbClientes");
+const customerScoring = require("./scripts/customerScoring");
+
+// Armazena os últimos 10 payloads para inspeção via /olaclick/debug
+const _olaPayloads = [];
+
+app.get("/olaclick/debug", (req, res) => {
+  res.json({
+    total: _olaPayloads.length,
+    payloads: _olaPayloads,
+    aviso: "Últimos 10 payloads recebidos pelo webhook OlaClick. Use para confirmar os campos de telefone/nome.",
+  });
+});
+
 app.post("/webhook/olaclick", async (req, res) => {
   try {
     const payload = req.body;
     const tipo    = payload?.event_type || payload?.type || "";
     const pedido  = payload?.order || payload?.data || payload;
 
-    console.log(`[OlaClick Webhook] evento: ${tipo}`, JSON.stringify(payload).slice(0, 200));
+    // Salva payload completo para inspeção (os 10 mais recentes)
+    _olaPayloads.unshift({ recebidoEm: new Date().toISOString(), tipo, payload });
+    if (_olaPayloads.length > 10) _olaPayloads.pop();
 
-    // Só processa criação de pedido
+    console.log(`[OlaClick Webhook] evento: ${tipo}`, JSON.stringify(payload));
+
     if (tipo !== "order_created" && tipo !== "order_updated") {
       return res.status(200).json({ ok: true, ignorado: true });
     }
+    if (tipo === "order_updated") {
+      return res.status(200).json({ ok: true, ignorado: "order_updated" });
+    }
 
-    // Tenta extrair o valor total do pedido
     const valor = parseFloat(
       pedido?.total || pedido?.total_price || pedido?.amount ||
       pedido?.subtotal || pedido?.grand_total || 0
     );
-
     if (!valor || valor <= 0) {
-      console.warn("[OlaClick Webhook] valor não encontrado no payload:", JSON.stringify(pedido));
+      console.warn("[OlaClick Webhook] valor não encontrado:", JSON.stringify(pedido).slice(0, 200));
       return res.status(200).json({ ok: true, aviso: "valor não encontrado" });
     }
 
-    const orderId = pedido?.id || pedido?.order_id || pedido?.code || "?";
+    const orderId = pedido?.id || pedido?.order_id || pedido?.code || `OC-${Date.now()}`;
     const data    = new Date().toISOString().slice(0, 10);
 
-    // Verifica se já foi registrado (evita duplicata em order_updated)
-    if (tipo === "order_updated") {
-      // Para updates, apenas loga — não duplica receita
-      console.log(`[OlaClick Webhook] order_updated ignorado para não duplicar. ID: ${orderId}`);
-      return res.status(200).json({ ok: true, ignorado: "order_updated" });
-    }
-
+    // 1) Continua registrando receita no financeiro
     await fin.adicionarEntrada({
-      tipo:      "receita",
-      valor,
-      categoria: "Delivery",
-      descricao: `OlaClick — Pedido #${orderId}`,
-      data,
+      tipo: "receita", valor, categoria: "Delivery",
+      descricao: `OlaClick — Pedido #${orderId}`, data,
     });
 
-    console.log(`✅ [OlaClick] Pedido #${orderId} registrado: R$ ${valor.toFixed(2)}`);
+    // 2) Captura cliente + pedido (best-effort, não derruba o webhook)
+    try {
+      const cust = pedido?.customer || pedido?.client || payload?.customer || {};
+      const telefone = cust.phone || cust.telephone || cust.mobile || cust.whatsapp;
+      const nome     = cust.name  || cust.full_name || [cust.first_name, cust.last_name].filter(Boolean).join(" ") || null;
+      const email    = cust.email || null;
+      const itens    = pedido?.items || pedido?.products || null;
+      const cupom    = pedido?.coupon?.code || pedido?.discount?.code || pedido?.promo_code || null;
+
+      if (telefone) {
+        const cliente = await clientesDb.upsertCliente({ telefone, nome, email });
+        if (cliente) {
+          await clientesDb.registrarPedido({
+            clienteId:  cliente.id,
+            externalId: String(orderId),
+            origem:     "olaclick",
+            dataPedido: pedido?.created_at || pedido?.date || new Date(),
+            valor,
+            itens,
+            cupom,
+            payload,
+          });
+          // recalcula só este cliente (rápido)
+          await customerScoring.recalcularCliente(cliente.id).catch(e =>
+            console.warn("[OlaClick] recalcular falhou:", e.message)
+          );
+          // marca recuperação se havia envio aberto
+          await clientesDb.marcarRecuperacao(cliente.id, valor).catch(() => {});
+          console.log(`✅ [OlaClick] cliente ${cliente.id} (${telefone}) + pedido #${orderId} salvo`);
+        }
+      } else {
+        console.log(`[OlaClick] pedido #${orderId} sem telefone — só receita registrada`);
+      }
+    } catch (e) {
+      console.warn("[OlaClick] captura de cliente falhou (receita já registrada):", e.message);
+    }
+
     res.status(200).json({ ok: true, registrado: { orderId, valor } });
   } catch (error) {
     console.error("[OlaClick Webhook] erro:", error.message);
-    res.status(200).json({ ok: false, erro: error.message }); // 200 para OlaClick não reenviar
+    res.status(200).json({ ok: false, erro: error.message });
   }
 });
 
@@ -1321,6 +1366,121 @@ app.get("/midia/fotos", (req, res) => {
   } catch (e) {
     res.status(500).json({ erro: e.message });
   }
+});
+
+// ──────────────────────────────────────────────
+// CLIENTES & RECUPERAÇÃO
+// ──────────────────────────────────────────────
+const customerCampaigns = require("./scripts/customerCampaigns");
+const whatsappEvolution = require("./scripts/whatsappEvolution");
+const { seedClientes }  = require("./scripts/seedCustomers");
+
+app.get("/clientes", async (req, res) => {
+  try {
+    const { segmento, busca, limite, offset } = req.query;
+    const rows = await clientesDb.listarClientes({
+      segmento, busca,
+      limite: Number(limite) || 200,
+      offset: Number(offset) || 0,
+    });
+    res.json({ sucesso: true, total: rows.length, clientes: rows });
+  } catch (e) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+app.get("/clientes/segmentos", async (req, res) => {
+  try {
+    const segs = await clientesDb.contagemPorSegmento();
+    res.json({ sucesso: true, segmentos: segs });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.get("/clientes/metricas", async (req, res) => {
+  try {
+    const m = await clientesDb.metricas();
+    res.json({ sucesso: true, ...m });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.get("/clientes/whatsapp/status", async (req, res) => {
+  try {
+    const s = await whatsappEvolution.statusInstancia();
+    res.json({ sucesso: true, ...s });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.get("/clientes/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const cliente = await clientesDb.buscarClienteId(id);
+    if (!cliente) return res.status(404).json({ erro: "Cliente não encontrado" });
+    const [pedidos, envios] = await Promise.all([
+      clientesDb.pedidosDoCliente(id, 30),
+      clientesDb.enviosDoCliente(id, 20),
+    ]);
+    res.json({ sucesso: true, cliente, pedidos, envios });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.post("/clientes/recalcular", async (req, res) => {
+  try {
+    const r = await customerScoring.recalcularTodos();
+    res.json({ sucesso: true, ...r });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.post("/clientes/seed", async (req, res) => {
+  try {
+    const { qtd = 80, resetar = false } = req.body || {};
+    const r = await seedClientes(Number(qtd) || 80, { resetar: Boolean(resetar) });
+    res.json({ sucesso: true, ...r });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.post("/campanhas/preview", async (req, res) => {
+  try {
+    const { segmento, limite = 5 } = req.body || {};
+    if (!segmento) return res.status(400).json({ erro: "segmento obrigatório" });
+    const r = await customerCampaigns.previewSegmento(segmento, Number(limite));
+    res.json({ sucesso: true, ...r });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.post("/campanhas/disparar", async (req, res) => {
+  try {
+    const { segmento, limite = 30, dryRun = false, janelaAntiSpamDias = 7 } = req.body || {};
+    if (!segmento) return res.status(400).json({ erro: "segmento obrigatório" });
+    const r = await customerCampaigns.dispararSegmento(segmento, {
+      limite: Number(limite),
+      dryRun: Boolean(dryRun),
+      janelaAntiSpamDias: Number(janelaAntiSpamDias),
+    });
+    res.json({ sucesso: true, ...r });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.post("/campanhas/cliente/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { dryRun = false } = req.body || {};
+    const r = await customerCampaigns.dispararParaCliente(id, { dryRun: Boolean(dryRun) });
+    res.json({ sucesso: true, ...r });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.get("/campanhas/historico", async (req, res) => {
+  try {
+    const { limite = 100 } = req.query;
+    const { rows } = await clientesDb.pool.query(
+      `SELECT e.*, c.nome, c.telefone, c.segmento AS segmento_atual
+       FROM campanhas_envios e
+       LEFT JOIN clientes c ON c.id = e.cliente_id
+       ORDER BY e.enviado_em DESC LIMIT $1`,
+      [Math.min(Number(limite) || 100, 500)]
+    );
+    res.json({ sucesso: true, total: rows.length, envios: rows });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
 });
 
 // ──────────────────────────────────────────────

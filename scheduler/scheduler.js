@@ -108,7 +108,33 @@ function iniciarAgendador() {
       console.error("❌ Erro no resumo WhatsApp:", e.message);
     }
   }, tz);
-  console.log("  📱 Resumo WhatsApp: Terça às 10h\n");
+  console.log("  📱 Resumo WhatsApp: Terça às 10h");
+
+  // ── Recálculo diário de scores de clientes — 00h30 ──
+  cron.schedule("30 0 * * *", async () => {
+    console.log("\n🧮 Recalculando scores de clientes (cron diário)...");
+    try {
+      const { recalcularTodos } = require("../scripts/customerScoring");
+      await recalcularTodos();
+    } catch (e) {
+      console.error("❌ Erro no recálculo:", e.message);
+    }
+  }, tz);
+  console.log("  🧮 Recálculo scores: diário às 00h30");
+
+  // ── Disparo semanal automático para "em_risco" — sextas 16h ──
+  cron.schedule("0 16 * * 5", async () => {
+    if (_pausado) { console.log("⏸️  Disparo em_risco ignorado — agendador pausado."); return; }
+    console.log("\n📨 Disparo semanal de recuperação para em_risco...");
+    try {
+      const { dispararSegmento } = require("../scripts/customerCampaigns");
+      const r = await dispararSegmento("em_risco", { limite: 30 });
+      console.log(`✅ Disparo concluído: ${r.enviados} enviados / ${r.falhas} falhas`);
+    } catch (e) {
+      console.error("❌ Erro no disparo em_risco:", e.message);
+    }
+  }, tz);
+  console.log("  📨 Disparo em_risco: Sexta às 16h\n");
 
   console.log("═".repeat(55));
   console.log("🚀 Rodando! Pressione Ctrl+C para parar.\n");
