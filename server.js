@@ -1212,17 +1212,14 @@ app.post("/webhook/olaclick", async (req, res) => {
     _olaPayloads.unshift({ recebidoEm: new Date().toISOString(), tipo, payload });
     if (_olaPayloads.length > 10) _olaPayloads.pop();
 
-    // ORDER_CREATED dispara com client=null, combos=[], total=0 — sem dados úteis, ignorar
-    if (tipo === "ORDER_CREATED") {
-      return res.status(200).json({ ok: true, ignorado: "ORDER_CREATED sem dados" });
-    }
-
-    if (tipo !== "ORDER_UPDATED") {
+    if (tipo !== "ORDER_CREATED" && tipo !== "ORDER_UPDATED") {
       return res.status(200).json({ ok: true, ignorado: tipo });
     }
 
-    // ORDER_UPDATED: só processa quando os dados estão completos
-    // (OlaClick dispara vários updates parciais antes de completar o pedido)
+    // Processa quando os dados estiverem completos — independente do evento
+    // INBOUND (cliente pelo site): ORDER_CREATED já vem completo
+    // OUTBOUND (lojista cria manual): ORDER_CREATED vem vazio, dados chegam no UPDATE
+    // O banco deduplica automaticamente via UNIQUE(origem, external_id)
     const cust   = pedido?.client;
     const combos = pedido?.combos || [];
     const valor  = parseFloat(pedido?.total || 0);
