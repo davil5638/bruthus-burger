@@ -4,18 +4,24 @@ const TOKEN_COOKIE = 'bb_session'
 const LOGIN_PATH   = '/login'
 const API_AUTH     = '/api/auth'
 
+// Rotas que exigem senha
+const ROTAS_PROTEGIDAS = ['/clientes']
+
 export function middleware(request) {
   const { pathname } = request.nextUrl
 
-  // Libera login e a rota de autenticação
+  // Libera login e API de auth sempre
   if (pathname === LOGIN_PATH || pathname.startsWith(API_AUTH)) {
     return NextResponse.next()
   }
 
+  // Só verifica autenticação nas rotas protegidas
+  const protegida = ROTAS_PROTEGIDAS.some(r => pathname === r || pathname.startsWith(r + '/'))
+  if (!protegida) return NextResponse.next()
+
   const token    = request.cookies.get(TOKEN_COOKIE)?.value
   const expected = process.env.DASHBOARD_TOKEN
 
-  // Sem token configurado no Vercel → avisa mas não bloqueia (facilita setup)
   if (!expected) return NextResponse.next()
 
   if (token !== expected) {
