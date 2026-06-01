@@ -563,6 +563,13 @@ app.get("/ads/relatorio", async (req, res) => {
     const totalPixelCompras   = comDados.reduce((s, c) => s + (c.pixelCompras || 0), 0);
     const totalPixelCheckouts = comDados.reduce((s, c) => s + (c.pixelCheckouts || 0), 0);
     const custoPorCompra      = totalPixelCompras > 0 ? (totalGasto / totalPixelCompras).toFixed(2) : null;
+    const totalPixelReceita   = comDados.some(c => c.pixelReceita != null)
+      ? comDados.reduce((s, c) => s + (c.pixelReceita || 0), 0)
+      : null;
+    const roas = totalPixelReceita != null && totalGasto > 0
+      ? +(totalPixelReceita / totalGasto).toFixed(2)
+      : null;
+    const lucroAds = totalPixelReceita != null ? +(totalPixelReceita - totalGasto).toFixed(2) : null;
 
     // Análise IA
     let analise = null;
@@ -609,6 +616,9 @@ Use linguagem direta e prática. Formato markdown.`;
         totalPixelCompras,
         totalPixelCheckouts,
         custoPorCompra,
+        totalPixelReceita,
+        roas,
+        lucroAds,
         pixelId:         PIXEL_ID,
       },
       campanhas,
@@ -1426,6 +1436,30 @@ app.get("/clientes/:id", async (req, res) => {
       clientesDb.enviosDoCliente(id, 20),
     ]);
     res.json({ sucesso: true, cliente, pedidos, envios });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.post("/clientes/:id/pedidos", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { valor, descricao, dataPedido } = req.body || {};
+    if (!valor || isNaN(Number(valor)) || Number(valor) <= 0)
+      return res.status(400).json({ erro: "valor deve ser um número positivo" });
+    const cliente = await clientesDb.buscarClienteId(id);
+    if (!cliente) return res.status(404).json({ erro: "Cliente não encontrado" });
+    const pedido = await clientesDb.registrarPedido({
+      clienteId: id,
+      externalId: null,
+      origem: "manual",
+      dataPedido: dataPedido ? new Date(dataPedido) : new Date(),
+      valor: Number(valor),
+      itens: descricao ? [{ nome: descricao }] : [],
+      cupom: null,
+      payload: { manual: true },
+    });
+    await customerScoring.recalcularCliente(id);
+    const atualizado = await clientesDb.buscarClienteId(id);
+    res.json({ sucesso: true, pedido, cliente: atualizado });
   } catch (e) { res.status(500).json({ erro: e.message }); }
 });
 

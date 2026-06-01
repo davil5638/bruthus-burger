@@ -579,7 +579,7 @@ async function gerarRelatorioCompleto(dias = 90) {
     try {
       const { data: insData } = await axios.get(`${GRAPH_API}/${camp.id}/insights`, {
         params: {
-          fields: 'impressions,clicks,ctr,cpc,cpm,spend,reach,frequency,actions,cost_per_action_type,unique_clicks,unique_ctr',
+          fields: 'impressions,clicks,ctr,cpc,cpm,spend,reach,frequency,actions,action_values,cost_per_action_type,unique_clicks,unique_ctr',
           time_range: JSON.stringify({ since: formatDate(dataInicio), until: formatDate(dataFim) }),
           access_token: ACCESS_TOKEN,
         }
@@ -587,6 +587,7 @@ async function gerarRelatorioCompleto(dias = 90) {
 
       const ins = insData.data?.[0] || {};
       const actions = ins.actions || [];
+      const actionValues  = ins.action_values || [];
       const costPerAction = ins.cost_per_action_type || [];
 
       const linkClicks      = actions.find(a => a.action_type === 'link_click')?.value || '0';
@@ -596,6 +597,8 @@ async function gerarRelatorioCompleto(dias = 90) {
       const pixelCheckouts  = actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_initiate_checkout')?.value || '0';
       const pixelVisualizacoes = actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_view_content')?.value || '0';
       const custoPorCompra  = costPerAction.find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || null;
+      // Receita real rastreada pelo Pixel (purchase value)
+      const pixelReceita    = actionValues.find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || null;
 
       dados.push({
         id: camp.id,
@@ -620,6 +623,7 @@ async function gerarRelatorioCompleto(dias = 90) {
         pixelCheckouts: parseInt(pixelCheckouts),
         pixelVisualizacoes: parseInt(pixelVisualizacoes),
         custoPorCompra: custoPorCompra ? parseFloat(custoPorCompra) : null,
+        pixelReceita: pixelReceita ? parseFloat(pixelReceita) : null,
       });
     } catch (e) {
       console.warn(`⚠️ Erro insights campanha ${camp.id}:`, e.message);

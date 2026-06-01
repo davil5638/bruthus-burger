@@ -118,7 +118,6 @@ function AvaliacaoMetrica({ metrica, valor }) {
   )
 }
 
-// ── Modal de Relatório Final ──
 function RelatorioFinalModal({ camp, onClose }) {
   const printRef = useRef(null)
   const avaliacao = avaliarCampanha(camp)
@@ -170,7 +169,7 @@ function RelatorioFinalModal({ camp, onClose }) {
       ['Avaliação', avaliacao.nota.replace(/[🟢🟡🔴]/g, '').trim()],
     ]
     const csv = linhas.map(l => l.join(';')).join('\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -182,7 +181,6 @@ function RelatorioFinalModal({ camp, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-[#1e1e1e] sticky top-0 bg-[#0f0f0f] z-10">
           <div>
             <p className="text-xs text-[#f97316] font-semibold uppercase tracking-wider mb-0.5">📄 Relatório Final</p>
@@ -191,16 +189,12 @@ function RelatorioFinalModal({ camp, onClose }) {
           <button onClick={onClose} className="text-[#555] hover:text-white text-xl leading-none">×</button>
         </div>
 
-        {/* Conteúdo imprimível */}
         <div className="p-5 space-y-5" ref={printRef}>
-
-          {/* Info básica — versão print */}
           <div style={{ display: 'none' }}>
             <h1>Relatório Final — {camp.nome}</h1>
             <p>Bruthus Burger | Gerado em {new Date().toLocaleString('pt-BR')}</p>
           </div>
 
-          {/* Status + período */}
           <div className="flex flex-wrap items-center gap-3">
             {statusBadge(camp.status)}
             <span className="text-xs text-[#666]">Criada em {dataCriada}</span>
@@ -209,7 +203,6 @@ function RelatorioFinalModal({ camp, onClose }) {
             )}
           </div>
 
-          {/* Avaliação geral */}
           <div className={`p-4 rounded-xl border ${
             avaliacao.nota.includes('Boa') ? 'bg-green-500/10 border-green-500/20' :
             avaliacao.nota.includes('Regular') ? 'bg-yellow-500/10 border-yellow-500/20' :
@@ -220,22 +213,20 @@ function RelatorioFinalModal({ camp, onClose }) {
             <p className="text-xs text-[#aaa] mt-1">{avaliacao.resumo}</p>
           </div>
 
-          {/* Métricas principais */}
           <div>
             <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-2">Resultados da campanha</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <MetricaItem label="Total gasto"      valor={fmtBRL(camp.gasto)}              glossKey="gasto" destaque />
-              <MetricaItem label="Pessoas alcançadas" valor={fmtNum(camp.alcance)}           glossKey="alcance" />
-              <MetricaItem label="Cliques no link"  valor={fmtNum(camp.linkCliques)}         glossKey="linkCliques" destaque />
-              <MetricaItem label="Impressões"        valor={fmtNum(camp.impressoes)}          glossKey="impressoes" />
-              <MetricaItem label="% que clicou"      valor={`${fmt(camp.ctr)}%`}             glossKey="ctr" destaque />
-              <MetricaItem label="Custo/clique"      valor={camp.cpc > 0 ? fmtBRL(camp.cpc) : '—'} glossKey="cpc" destaque />
-              <MetricaItem label="Frequência"        valor={`${fmt(camp.frequencia)}x`}      glossKey="frequencia" />
-              <MetricaItem label="Custo/1000 exib."  valor={fmtBRL(camp.cpm)}                glossKey="cpm" />
+              <MetricaItem label="Total gasto"        valor={fmtBRL(camp.gasto)}                    glossKey="gasto" destaque />
+              <MetricaItem label="Pessoas alcançadas" valor={fmtNum(camp.alcance)}                   glossKey="alcance" />
+              <MetricaItem label="Cliques no link"    valor={fmtNum(camp.linkCliques)}               glossKey="linkCliques" destaque />
+              <MetricaItem label="Impressões"         valor={fmtNum(camp.impressoes)}                glossKey="impressoes" />
+              <MetricaItem label="% que clicou"       valor={`${fmt(camp.ctr)}%`}                   glossKey="ctr" destaque />
+              <MetricaItem label="Custo/clique"       valor={camp.cpc > 0 ? fmtBRL(camp.cpc) : '—'} glossKey="cpc" destaque />
+              <MetricaItem label="Frequência"         valor={`${fmt(camp.frequencia)}x`}             glossKey="frequencia" />
+              <MetricaItem label="Custo/1000 exib."   valor={fmtBRL(camp.cpm)}                       glossKey="cpm" />
             </div>
           </div>
 
-          {/* Avaliação detalhada */}
           {camp.gasto > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-2">Análise detalhada</p>
@@ -247,7 +238,6 @@ function RelatorioFinalModal({ camp, onClose }) {
             </div>
           )}
 
-          {/* Custo por resultado */}
           {camp.gasto > 0 && camp.linkCliques > 0 && (
             <div className="p-4 rounded-xl bg-[#111] border border-[#1e1e1e]">
               <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-3">Resumo de custo</p>
@@ -264,13 +254,11 @@ function RelatorioFinalModal({ camp, onClose }) {
             </div>
           )}
 
-          {/* Rodapé no print */}
           <p className="text-[10px] text-[#444]">
             Relatório gerado em {new Date().toLocaleString('pt-BR')} · Bruthus Burger
           </p>
         </div>
 
-        {/* Ações */}
         <div className="flex gap-2 p-4 border-t border-[#1e1e1e]">
           <button onClick={exportarCSV} className="flex-1 py-2.5 rounded-xl border border-[#333] text-[#888] hover:text-white hover:border-[#555] text-xs font-semibold transition-all">
             📊 Exportar CSV
@@ -287,7 +275,6 @@ function RelatorioFinalModal({ camp, onClose }) {
 function CampanhaCard({ camp }) {
   const [aberta, setAberta]               = useState(false)
   const [verRelatorioFinal, setVerRelatorioFinal] = useState(false)
-  const encerrada = camp.status !== 'ACTIVE'
 
   if (camp.erro || !camp.impressoes) {
     return (
@@ -360,14 +347,14 @@ function CampanhaCard({ camp }) {
             <div>
               <p className="text-[10px] font-semibold text-[#666] uppercase tracking-wider mb-2">Todas as métricas</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <MetricaItem label="Exibições"       valor={fmtNum(camp.impressoes)}              glossKey="impressoes" />
-                <MetricaItem label="Pessoas"          valor={fmtNum(camp.alcance)}                 glossKey="alcance" />
-                <MetricaItem label="Cliques totais"   valor={fmtNum(camp.cliques)}                 glossKey="cliques" />
-                <MetricaItem label="Cliques no link"  valor={fmtNum(camp.linkCliques)}              glossKey="linkCliques" destaque />
-                <MetricaItem label="% que clicou"     valor={`${fmt(camp.ctr)}%`}                  glossKey="ctr" destaque />
-                <MetricaItem label="Custo/clique"     valor={camp.cpc > 0 ? fmtBRL(camp.cpc) : '—'} glossKey="cpc" destaque />
-                <MetricaItem label="Frequência"       valor={`${fmt(camp.frequencia)}x`}            glossKey="frequencia" />
-                <MetricaItem label="Custo/1000 exib." valor={fmtBRL(camp.cpm)}                      glossKey="cpm" />
+                <MetricaItem label="Exibições"       valor={fmtNum(camp.impressoes)}               glossKey="impressoes" />
+                <MetricaItem label="Pessoas"         valor={fmtNum(camp.alcance)}                  glossKey="alcance" />
+                <MetricaItem label="Cliques totais"  valor={fmtNum(camp.cliques)}                  glossKey="cliques" />
+                <MetricaItem label="Cliques no link" valor={fmtNum(camp.linkCliques)}               glossKey="linkCliques" destaque />
+                <MetricaItem label="% que clicou"    valor={`${fmt(camp.ctr)}%`}                   glossKey="ctr" destaque />
+                <MetricaItem label="Custo/clique"    valor={camp.cpc > 0 ? fmtBRL(camp.cpc) : '—'} glossKey="cpc" destaque />
+                <MetricaItem label="Frequência"      valor={`${fmt(camp.frequencia)}x`}             glossKey="frequencia" />
+                <MetricaItem label="Custo/1000 exib." valor={fmtBRL(camp.cpm)}                     glossKey="cpm" />
               </div>
             </div>
 
@@ -541,165 +528,185 @@ function SummaryCard({ label, explicacao, value, sub, cor = '#f97316' }) {
   )
 }
 
-function SecaoROI({ gastoAds, financeiro, periodo }) {
+function SecaoROI({ resumo, periodo }) {
   const [ticketMedio, setTicketMedio] = useState('')
+  const [verEstimativa, setVerEstimativa] = useState(false)
 
-  if (!financeiro) return null
+  if (!resumo) return null
 
-  const faturamento = financeiro.faturamento || 0
-  const gastoTotal  = financeiro.gastos || 0
-  const lucro       = faturamento - gastoTotal
-  const margem      = faturamento > 0 ? ((lucro / faturamento) * 100).toFixed(1) : '0.0'
+  const gastoAds        = parseFloat(resumo.totalGasto)   || 0
+  const cliques         = resumo.totalCliques || 0
+  const alcance         = resumo.totalAlcance || 0
+  const cpcMedio        = parseFloat(resumo.cpcMedio)     || 0
+  const custoPorAlcance = alcance > 0 ? gastoAds / alcance : 0
 
-  // ROI dos ads = (faturamento atribuível - gasto ads) / gasto ads
-  // Como não temos tracking de conversão, usamos o faturamento total do período
-  const roiAds = gastoAds > 0 ? (((faturamento - gastoAds) / gastoAds) * 100).toFixed(1) : null
+  // Dados reais do Pixel
+  const temPixel        = resumo.totalPixelReceita != null
+  const pixelReceita    = temPixel ? parseFloat(resumo.totalPixelReceita) : 0
+  const pixelCompras    = resumo.totalPixelCompras || 0
+  const pixelCheckouts  = resumo.totalPixelCheckouts || 0
+  const custoPorCompra  = resumo.custoPorCompra ? parseFloat(resumo.custoPorCompra) : null
+  const roas            = resumo.roas
+  const lucroAds        = resumo.lucroAds
 
-  // Estimativa baseada em ticket médio
-  const ticket = parseFloat(ticketMedio) || 0
-  const cliquesTotal = financeiro._totalCliques || 0
-  const totalCompras = financeiro._totalCompras || 0
-  const ticketMedioReal = totalCompras > 0 && faturamento > 0 ? faturamento / totalCompras : 0
-  const roiEstimado = gastoAds > 0 && faturamento > 0
-    ? (((faturamento - gastoAds) / gastoAds) * 100).toFixed(1)
-    : null
+  // Estimativa manual
+  const ticket     = parseFloat(ticketMedio) || 0
 
   return (
     <div className="mb-6 space-y-4">
       <p className="text-xs font-semibold text-[#888] uppercase tracking-wider">
-        Resultado Financeiro do Período — últimos {periodo} dias
+        Resultado dos Anúncios — últimos {periodo} dias
       </p>
 
       {/* Cards principais */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-4">
-          <p className="text-[10px] text-[#555] mb-1">Faturamento total</p>
-          <p className="text-xl font-black text-green-400">{fmtBRL(faturamento)}</p>
-          <p className="text-[10px] text-[#444] mt-1">últimos {periodo} dias</p>
-        </div>
-        <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4">
-          <p className="text-[10px] text-[#555] mb-1">Nº de compras</p>
-          <p className="text-xl font-black text-purple-400">{totalCompras}</p>
-          <p className="text-[10px] text-[#444] mt-1">
-            {ticketMedioReal > 0 ? `ticket médio: ${fmtBRL(ticketMedioReal)}` : 'lançamentos de receita'}
-          </p>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-          <p className="text-[10px] text-[#555] mb-1">Total de gastos</p>
-          <p className="text-xl font-black text-red-400">{fmtBRL(gastoTotal)}</p>
-          <p className="text-[10px] text-[#444] mt-1">incluindo ads: {fmtBRL(gastoAds)}</p>
+          <p className="text-[10px] text-[#555] mb-1">Investido em ads</p>
+          <p className="text-xl font-black text-red-400">{fmtBRL(gastoAds)}</p>
+          <p className="text-[10px] text-[#444] mt-1">gasto real no Meta</p>
         </div>
-        <div className={`rounded-xl border p-4 ${lucro >= 0 ? 'border-blue-500/20 bg-blue-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
-          <p className="text-[10px] text-[#555] mb-1">Lucro líquido</p>
-          <p className={`text-xl font-black ${lucro >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
-            {lucro >= 0 ? '+' : ''}{fmtBRL(lucro)}
-          </p>
-          <p className={`text-[10px] mt-1 ${parseFloat(margem) >= 30 ? 'text-green-400' : parseFloat(margem) >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
-            margem: {margem}%
-          </p>
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+          <p className="text-[10px] text-[#555] mb-1">Cliques no cardápio</p>
+          <p className="text-xl font-black text-blue-400">{fmtNum(cliques)}</p>
+          <p className="text-[10px] text-[#444] mt-1">visitas geradas</p>
         </div>
-        <div className={`rounded-xl border p-4 ${
-          roiAds === null ? 'border-[#1e1e1e] bg-[#111]'
-          : parseFloat(roiAds) >= 100 ? 'border-green-500/30 bg-green-500/5'
-          : parseFloat(roiAds) >= 0 ? 'border-yellow-500/30 bg-yellow-500/5'
-          : 'border-red-500/30 bg-red-500/5'
-        }`}>
-          <p className="text-[10px] text-[#555] mb-1 flex items-center gap-1">
-            ROI dos Ads
-            <Tooltip texto="Retorno sobre investimento em anúncios. Calculado como (Faturamento total - Gasto em ads) / Gasto em ads × 100. Como não há tracking de conversão direto, usa o faturamento total do período." />
+        <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-4">
+          <p className="text-[10px] text-[#555] mb-1">Custo por clique</p>
+          <p className={`text-xl font-black ${cpcMedio <= 1.5 ? 'text-green-400' : cpcMedio <= 3 ? 'text-yellow-400' : 'text-red-400'}`}>
+            {cpcMedio > 0 ? fmtBRL(cpcMedio) : '—'}
           </p>
-          {roiAds !== null ? (
-            <>
-              <p className={`text-xl font-black ${parseFloat(roiAds) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {parseFloat(roiAds) >= 0 ? '+' : ''}{roiAds}%
-              </p>
-              <p className="text-[10px] text-[#444] mt-1">
-                {parseFloat(roiAds) >= 200 ? '🚀 Excelente!' : parseFloat(roiAds) >= 100 ? '✅ Bom!' : parseFloat(roiAds) >= 0 ? '⚠️ Aceitável' : '❌ Prejuízo'}
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-[#444]">Sem gasto em ads</p>
-          )}
+          <p className="text-[10px] text-[#444] mt-1">{cpcMedio > 0 ? (cpcMedio <= 1.5 ? '✅ ótimo' : cpcMedio <= 3 ? '⚠️ aceitável' : '❌ caro') : ''}</p>
+        </div>
+        <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-4">
+          <p className="text-[10px] text-[#555] mb-1">Custo/pessoa alcançada</p>
+          <p className="text-xl font-black text-white">{custoPorAlcance > 0 ? fmtBRL(custoPorAlcance) : '—'}</p>
+          <p className="text-[10px] text-[#444] mt-1">{fmtNum(alcance)} pessoas</p>
         </div>
       </div>
 
-      {/* Barra de decomposição do gasto */}
-      {gastoAds > 0 && gastoTotal > 0 && (
-        <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-4">
-          <p className="text-xs font-bold text-white mb-3">💸 Decomposição dos Gastos</p>
-          <div className="space-y-2">
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-[11px] text-[#888]">Ads (Meta Ads)</span>
-                <span className="text-[11px] font-bold text-[#f97316]">{fmtBRL(gastoAds)} · {gastoTotal > 0 ? ((gastoAds / gastoTotal) * 100).toFixed(0) : 0}%</span>
-              </div>
-              <div className="h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
-                <div className="h-full bg-[#f97316]/70 rounded-full" style={{ width: `${gastoTotal > 0 ? Math.min((gastoAds / gastoTotal) * 100, 100) : 0}%` }} />
-              </div>
+      {/* Dados reais do Pixel */}
+      {temPixel ? (
+        <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-4 space-y-3">
+          <p className="text-xs font-bold text-green-400 flex items-center gap-2">
+            📡 Resultados reais — Meta Pixel
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-lg bg-[#0a0a0a] border border-[#1a1a1a] p-3 text-center">
+              <p className="text-[10px] text-[#555] mb-1">Compras rastreadas</p>
+              <p className="text-2xl font-black text-white">{fmtNum(pixelCompras)}</p>
+              <p className="text-[10px] text-[#444] mt-0.5">{fmtNum(pixelCheckouts)} checkouts</p>
             </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-[11px] text-[#888]">Outros gastos</span>
-                <span className="text-[11px] font-bold text-red-400">{fmtBRL(Math.max(gastoTotal - gastoAds, 0))} · {gastoTotal > 0 ? (((gastoTotal - gastoAds) / gastoTotal) * 100).toFixed(0) : 0}%</span>
-              </div>
-              <div className="h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
-                <div className="h-full bg-red-500/60 rounded-full" style={{ width: `${gastoTotal > 0 ? Math.min(((gastoTotal - gastoAds) / gastoTotal) * 100, 100) : 0}%` }} />
-              </div>
+            <div className="rounded-lg bg-[#0a0a0a] border border-[#1a1a1a] p-3 text-center">
+              <p className="text-[10px] text-[#555] mb-1">Receita via Pixel</p>
+              <p className="text-2xl font-black text-green-400">{fmtBRL(pixelReceita)}</p>
+              <p className="text-[10px] text-[#444] mt-0.5">reportado pelo Meta</p>
+            </div>
+            <div className={`rounded-lg border p-3 text-center ${lucroAds != null && lucroAds >= 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+              <p className="text-[10px] text-[#555] mb-1">Lucro dos anúncios</p>
+              <p className={`text-2xl font-black ${lucroAds != null && lucroAds >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {lucroAds != null ? fmtBRL(lucroAds) : '—'}
+              </p>
+              <p className="text-[10px] text-[#444] mt-0.5">receita − gasto</p>
+            </div>
+            <div className={`rounded-lg border p-3 text-center ${roas != null && roas >= 1 ? 'bg-blue-500/10 border-blue-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+              <p className="text-[10px] text-[#555] mb-1">ROAS</p>
+              <p className={`text-2xl font-black ${roas != null && roas >= 1 ? 'text-blue-400' : 'text-red-400'}`}>
+                {roas != null ? `${roas}x` : '—'}
+              </p>
+              <p className="text-[10px] text-[#444] mt-0.5">
+                {roas != null ? (roas >= 3 ? '✅ excelente' : roas >= 1 ? '⚠️ positivo' : '❌ prejuízo') : ''}
+              </p>
             </div>
           </div>
-          <p className="text-[10px] text-[#444] mt-3">
-            Para cada R$1,00 investido em ads → {gastoAds > 0 ? fmtBRL(faturamento / gastoAds) : '—'} de faturamento gerado
+          {custoPorCompra != null && (
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#1a1a1a]">
+              <span className="text-sm">🛒</span>
+              <div>
+                <span className="text-xs text-[#666]">Custo por compra: </span>
+                <span className="text-sm font-bold text-white">{fmtBRL(custoPorCompra)}</span>
+              </div>
+              <div className="ml-auto">
+                <span className="text-[10px] text-[#555]">
+                  {custoPorCompra <= 10 ? '✅ muito bom' : custoPorCompra <= 20 ? '⚠️ aceitável' : '❌ caro por compra'}
+                </span>
+              </div>
+            </div>
+          )}
+          {pixelCompras === 0 && (
+            <p className="text-[11px] text-[#555]">
+              O Pixel está instalado mas não registrou compras no período. Verifique se o evento <strong>Purchase</strong> está disparando no OlaClick.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-4 py-3 flex items-start gap-2">
+          <span className="text-sm shrink-0">⚠️</span>
+          <p className="text-[11px] text-[#888] leading-relaxed">
+            Pixel não retornou dados de receita neste período. Se o evento Purchase estiver configurado no cardápio, os dados aparecerão aqui automaticamente.
           </p>
         </div>
       )}
 
-      {/* Simulador de ROI por ticket médio */}
-      <div className="rounded-xl border border-[#f97316]/20 bg-[#f97316]/5 p-4">
-        <p className="text-xs font-bold text-white mb-1">🧮 Simulador de ROI por Ticket Médio</p>
-        <p className="text-[11px] text-[#666] mb-3">
-          Quanto cada clique gerado pelos ads vale para você? Informe o ticket médio do seu pedido.
-        </p>
-        <div className="flex items-center gap-3 mb-3">
-          <label className="text-xs text-[#666] shrink-0">Ticket médio (R$):</label>
-          <input
-            type="number"
-            value={ticketMedio}
-            onChange={e => setTicketMedio(e.target.value)}
-            placeholder="Ex: 45"
-            className="w-28 bg-[#111] border border-[#f97316]/30 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#f97316]"
-          />
-        </div>
-        {ticket > 0 && cliquesTotal > 0 && (
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { conv: 0.03, label: '3% conversão' },
-              { conv: 0.05, label: '5% conversão' },
-              { conv: 0.10, label: '10% conversão' },
-            ].map(({ conv, label }) => {
-              const pedidos = Math.round(cliquesTotal * conv)
-              const receita = pedidos * ticket
-              const roi = gastoAds > 0 ? (((receita - gastoAds) / gastoAds) * 100).toFixed(0) : null
-              const positivo = roi !== null && parseFloat(roi) >= 0
-              return (
-                <div key={label} className={`p-3 rounded-lg border text-center ${positivo ? 'border-green-500/20 bg-green-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
-                  <p className="text-[10px] text-[#555] mb-1">{label}</p>
-                  <p className="text-[11px] text-white font-semibold">{pedidos} pedidos</p>
-                  <p className="text-[11px] text-green-400">{fmtBRL(receita)}</p>
-                  {roi !== null && (
-                    <p className={`text-[10px] font-bold mt-1 ${positivo ? 'text-green-400' : 'text-red-400'}`}>
-                      ROI {positivo ? '+' : ''}{roi}%
-                    </p>
-                  )}
-                </div>
-              )
-            })}
+      {/* Estimativa manual (sempre disponível como complemento) */}
+      <div className="rounded-xl border border-[#1e1e1e] bg-[#0f0f0f] overflow-hidden">
+        <button
+          onClick={() => setVerEstimativa(!verEstimativa)}
+          className="w-full flex items-center justify-between px-4 py-3 text-xs text-[#555] hover:text-[#888] transition-colors"
+        >
+          <span>🧮 Estimativa manual por ticket médio</span>
+          <span>{verEstimativa ? '▲' : '▼'}</span>
+        </button>
+        {verEstimativa && (
+          <div className="px-4 pb-4 space-y-3 border-t border-[#1a1a1a]">
+            <p className="text-[11px] text-[#555] mt-3">
+              Informe o ticket médio — estimamos quantos dos {fmtNum(cliques)} cliques viraram compra.
+            </p>
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-[#666] shrink-0">Ticket médio (R$):</label>
+              <input
+                type="number"
+                value={ticketMedio}
+                onChange={e => setTicketMedio(e.target.value)}
+                placeholder="Ex: 45"
+                className="w-28 bg-[#111] border border-[#333] rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#f97316]"
+              />
+            </div>
+            {ticket > 0 && cliques > 0 ? (
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { conv: 0.03, label: '3%',  desc: 'conservador' },
+                  { conv: 0.05, label: '5%',  desc: 'realista'    },
+                  { conv: 0.10, label: '10%', desc: 'otimista'    },
+                ].map(({ conv, label, desc }) => {
+                  const pedidos  = Math.round(cliques * conv)
+                  const receita  = pedidos * ticket
+                  const lucro    = receita - gastoAds
+                  const roi      = gastoAds > 0 ? (((receita - gastoAds) / gastoAds) * 100).toFixed(0) : null
+                  const positivo = roi !== null && parseFloat(roi) >= 0
+                  return (
+                    <div key={label} className={`p-3 rounded-lg border text-center ${positivo ? 'border-green-500/20 bg-green-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
+                      <p className="text-[10px] font-bold text-white mb-0.5">{label} conversão</p>
+                      <p className="text-[9px] text-[#444] mb-2">{desc}</p>
+                      <p className="text-[11px] text-white font-semibold">{pedidos} pedidos</p>
+                      <p className="text-[11px] text-green-400">{fmtBRL(receita)}</p>
+                      <p className={`text-[11px] font-semibold ${positivo ? 'text-blue-400' : 'text-red-400'}`}>
+                        {positivo ? '+' : ''}{fmtBRL(lucro)} lucro
+                      </p>
+                      {roi !== null && (
+                        <p className={`text-xs font-black mt-1 ${positivo ? 'text-green-400' : 'text-red-400'}`}>
+                          ROI {positivo ? '+' : ''}{roi}%
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-[11px] text-[#444]">
+                {ticket === 0 ? 'Digite o ticket médio para ver a estimativa.' : 'Sem cliques registrados no período.'}
+              </p>
+            )}
           </div>
-        )}
-        {ticket > 0 && cliquesTotal === 0 && (
-          <p className="text-[11px] text-[#555]">Sem cliques registrados no período para calcular.</p>
-        )}
-        {ticket === 0 && (
-          <p className="text-[11px] text-[#444]">Digite o ticket médio para ver a estimativa de ROI por taxa de conversão.</p>
         )}
       </div>
     </div>
@@ -708,7 +715,6 @@ function SecaoROI({ gastoAds, financeiro, periodo }) {
 
 export default function RelatorioPage() {
   const [dados, setDados]           = useState(null)
-  const [financeiro, setFinanceiro] = useState(null)
   const [loading, setLoading]       = useState(true)
   const [periodo, setPeriodo]       = useState(30)
   const [toast, setToast]           = useState(null)
@@ -718,35 +724,16 @@ export default function RelatorioPage() {
   async function carregar(dias = periodo) {
     setLoading(true)
     setDados(null)
-    setFinanceiro(null)
     try {
-      const [d, fin, entradas] = await Promise.all([
-        api.get(`/ads/relatorio?dias=${dias}`),
-        api.get(`/financeiro/resumo?dias=${dias}`).catch(() => null),
-        api.get('/financeiro').catch(() => null),
-      ])
+      const d = await api.get(`/ads/relatorio?dias=${dias}`)
       setDados(d)
-      if (fin?.resumo) {
-        const totalCliques = d?.resumo?.totalCliques || 0
-        // conta receitas do período
-        let totalCompras = 0
-        if (entradas?.entradas) {
-          const cutoff = new Date()
-          cutoff.setDate(cutoff.getDate() - (dias - 1))
-          const corte = cutoff.toISOString().slice(0, 10)
-          totalCompras = entradas.entradas.filter(e => e.tipo === 'receita' && e.data >= corte).length
-        }
-        setFinanceiro({ ...fin.resumo, _totalCliques: totalCliques, _totalCompras: totalCompras })
-      }
     } catch (e) {
       setToast({ message: e.message, type: 'error' })
     } finally { setLoading(false) }
   }
 
-  // Auto-load ao abrir a página
   useEffect(() => { carregar(periodo) }, [])
 
-  // Salvar campanhas encerradas no histórico local
   useEffect(() => {
     if (!dados?.campanhas) return
     const encerradas = dados.campanhas.filter(c => !c.erro && c.status !== 'ACTIVE' && c.gasto > 0)
@@ -765,8 +752,6 @@ export default function RelatorioPage() {
     carregar(dias)
   }
 
-
-
   function exportarCSV() {
     if (!dados) return
     const linhas = [
@@ -781,7 +766,7 @@ export default function RelatorioPage() {
       })
     ]
     const csv = linhas.map(l => l.join(';')).join('\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -802,7 +787,6 @@ export default function RelatorioPage() {
         description="Análise completa dos seus anúncios do Meta Ads — em linguagem simples"
       />
 
-      {/* Seletor de período */}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xs text-[#555]">Período:</span>
         {PERIODOS.map(p => (
@@ -827,7 +811,6 @@ export default function RelatorioPage() {
         </button>
       </div>
 
-      {/* Glossário */}
       <button
         onClick={() => setVerGlossario(!verGlossario)}
         className="w-full mb-5 py-2 rounded-xl border border-[#222] text-[#666] hover:text-[#aaa] text-xs transition-all"
@@ -849,7 +832,6 @@ export default function RelatorioPage() {
         </div>
       )}
 
-      {/* Loading */}
       {loading && (
         <div className="text-center py-16 rounded-xl border border-[#1e1e1e] bg-[#111]">
           <p className="text-3xl mb-3 animate-pulse">📊</p>
@@ -860,7 +842,6 @@ export default function RelatorioPage() {
 
       {!loading && dados && (
         <>
-          {/* Resumo geral */}
           <p className="text-xs font-semibold text-[#888] uppercase tracking-wider mb-3">
             Resumo geral — últimos {periodo} dias
           </p>
@@ -908,19 +889,13 @@ export default function RelatorioPage() {
             />
           </div>
 
-          {/* ROI & Resultado Financeiro */}
-          <SecaoROI
-            gastoAds={r.totalGasto}
-            financeiro={financeiro}
-            periodo={periodo}
-          />
+          <SecaoROI resumo={r} periodo={periodo} />
 
-          {/* Melhor e Pior */}
           {(() => {
             const comDados = dados.campanhas.filter(c => !c.erro && c.gasto > 0)
             if (comDados.length < 2) return null
-            const melhorCTR  = [...comDados].sort((a, b) => b.ctr - a.ctr)[0]
-            const piorCPC    = [...comDados].sort((a, b) => b.cpc - a.cpc)[0]
+            const melhorCTR = [...comDados].sort((a, b) => b.ctr - a.ctr)[0]
+            const piorCPC   = [...comDados].sort((a, b) => b.cpc - a.cpc)[0]
             return (
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4">
@@ -939,12 +914,11 @@ export default function RelatorioPage() {
             )
           })()}
 
-          {/* Benchmark personalizado */}
           {(() => {
             const comDados = dados.campanhas.filter(c => !c.erro && c.gasto > 0 && c.impressoes > 500)
             if (comDados.length < 2) return null
-            const suaCTR = (comDados.reduce((s, c) => s + c.ctr, 0) / comDados.length)
-            const suaCPC = (comDados.reduce((s, c) => s + c.cpc, 0) / comDados.length)
+            const suaCTR = comDados.reduce((s, c) => s + c.ctr, 0) / comDados.length
+            const suaCPC = comDados.reduce((s, c) => s + c.cpc, 0) / comDados.length
             const IDEAL_CTR = 1.5
             const IDEAL_CPC = 1.5
             return (
@@ -952,26 +926,24 @@ export default function RelatorioPage() {
                 <p className="text-xs font-bold text-white mb-3">🎯 Seu Benchmark vs Ideal</p>
                 <div className="space-y-3">
                   {[
-                    { label: 'CTR médio', sua: suaCTR, ideal: IDEAL_CTR, fmt: v => `${v.toFixed(2)}%`, maior: true },
-                    { label: 'CPC médio', sua: suaCPC, ideal: IDEAL_CPC, fmt: v => `R$${v.toFixed(2)}`, maior: false },
+                    { label: 'CTR médio', sua: suaCTR, ideal: IDEAL_CTR, fmtV: v => `${v.toFixed(2)}%`, maior: true },
+                    { label: 'CPC médio', sua: suaCPC, ideal: IDEAL_CPC, fmtV: v => `R$${v.toFixed(2)}`, maior: false },
                   ].map(m => {
                     const melhor = m.maior ? m.sua >= m.ideal : m.sua <= m.ideal
-                    const pct = m.maior
-                      ? Math.min((m.sua / (m.ideal * 1.5)) * 100, 100)
-                      : Math.min((m.ideal / Math.max(m.sua, 0.01)) * 100 * (m.ideal / (m.ideal * 1.5)), 100)
                     return (
                       <div key={m.label}>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs text-[#666]">{m.label}</span>
                           <div className="flex items-center gap-3">
-                            <span className="text-[10px] text-[#555]">Ideal: {m.fmt(m.ideal)}</span>
+                            <span className="text-[10px] text-[#555]">Ideal: {m.fmtV(m.ideal)}</span>
                             <span className={`text-xs font-bold ${melhor ? 'text-green-400' : 'text-yellow-400'}`}>
-                              {melhor ? '✅' : '⚠️'} Sua média: {m.fmt(m.sua)}
+                              {melhor ? '✅' : '⚠️'} Sua média: {m.fmtV(m.sua)}
                             </span>
                           </div>
                         </div>
                         <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${melhor ? 'bg-green-500' : 'bg-yellow-500'}`} style={{ width: `${Math.max(Math.min(m.maior ? (m.sua/m.ideal)*100 : (m.ideal/Math.max(m.sua,0.01))*100, 100), 5)}%` }} />
+                          <div className={`h-full rounded-full ${melhor ? 'bg-green-500' : 'bg-yellow-500'}`}
+                            style={{ width: `${Math.max(Math.min(m.maior ? (m.sua/m.ideal)*100 : (m.ideal/Math.max(m.sua,0.01))*100, 100), 5)}%` }} />
                         </div>
                       </div>
                     )
@@ -984,7 +956,6 @@ export default function RelatorioPage() {
 
           <EstimativaInvestimento campanhas={dados.campanhas} />
 
-          {/* Lista de campanhas */}
           <p className="text-xs font-semibold text-[#888] uppercase tracking-wider mb-3">
             Suas campanhas ({dados.campanhas.length}) — clique para ver detalhes
           </p>
@@ -994,7 +965,6 @@ export default function RelatorioPage() {
 
           <GraficoCampanhas campanhas={dados.campanhas} />
 
-          {/* Análise IA */}
           {dados.analise && (
             <div className="rounded-xl border border-[#f97316]/20 bg-[#f97316]/5 p-5 mb-6">
               <button onClick={() => setVerAnalise(!verAnalise)} className="w-full flex items-center justify-between">
@@ -1009,7 +979,6 @@ export default function RelatorioPage() {
             </div>
           )}
 
-          {/* Ações */}
           <div className="flex gap-3">
             <button onClick={exportarCSV} className="flex-1 py-2.5 rounded-xl border border-[#333] text-[#888] hover:text-white hover:border-[#555] text-sm transition-all">
               📊 Exportar CSV
