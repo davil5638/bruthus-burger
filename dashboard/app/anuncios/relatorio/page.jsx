@@ -558,11 +558,10 @@ function SecaoROI({ gastoAds, financeiro, periodo }) {
   // Estimativa baseada em ticket médio
   const ticket = parseFloat(ticketMedio) || 0
   const cliquesTotal = financeiro._totalCliques || 0
-  const taxaConversaoEstimada = 0.05 // 5% dos cliques viram pedido (estimativa conservadora)
-  const pedidosEstimados = ticket > 0 && cliquesTotal > 0 ? Math.round(cliquesTotal * taxaConversaoEstimada) : 0
-  const receitaEstimada  = pedidosEstimados * ticket
-  const roiEstimado = gastoAds > 0 && receitaEstimada > 0
-    ? (((receitaEstimada - gastoAds) / gastoAds) * 100).toFixed(1)
+  const totalCompras = financeiro._totalCompras || 0
+  const ticketMedioReal = totalCompras > 0 && faturamento > 0 ? faturamento / totalCompras : 0
+  const roiEstimado = gastoAds > 0 && faturamento > 0
+    ? (((faturamento - gastoAds) / gastoAds) * 100).toFixed(1)
     : null
 
   return (
@@ -572,11 +571,18 @@ function SecaoROI({ gastoAds, financeiro, periodo }) {
       </p>
 
       {/* Cards principais */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-4">
           <p className="text-[10px] text-[#555] mb-1">Faturamento total</p>
           <p className="text-xl font-black text-green-400">{fmtBRL(faturamento)}</p>
           <p className="text-[10px] text-[#444] mt-1">últimos {periodo} dias</p>
+        </div>
+        <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4">
+          <p className="text-[10px] text-[#555] mb-1">Nº de compras</p>
+          <p className="text-xl font-black text-purple-400">{totalCompras}</p>
+          <p className="text-[10px] text-[#444] mt-1">
+            {ticketMedioReal > 0 ? `ticket médio: ${fmtBRL(ticketMedioReal)}` : 'lançamentos de receita'}
+          </p>
         </div>
         <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
           <p className="text-[10px] text-[#555] mb-1">Total de gastos</p>
@@ -714,15 +720,23 @@ export default function RelatorioPage() {
     setDados(null)
     setFinanceiro(null)
     try {
-      const [d, fin] = await Promise.all([
+      const [d, fin, entradas] = await Promise.all([
         api.get(`/ads/relatorio?dias=${dias}`),
         api.get(`/financeiro/resumo?dias=${dias}`).catch(() => null),
+        api.get('/financeiro').catch(() => null),
       ])
       setDados(d)
       if (fin?.resumo) {
-        // injeta total de cliques dos ads no resumo financeiro para o simulador
         const totalCliques = d?.resumo?.totalCliques || 0
-        setFinanceiro({ ...fin.resumo, _totalCliques: totalCliques })
+        // conta receitas do período
+        let totalCompras = 0
+        if (entradas?.entradas) {
+          const cutoff = new Date()
+          cutoff.setDate(cutoff.getDate() - (dias - 1))
+          const corte = cutoff.toISOString().slice(0, 10)
+          totalCompras = entradas.entradas.filter(e => e.tipo === 'receita' && e.data >= corte).length
+        }
+        setFinanceiro({ ...fin.resumo, _totalCliques: totalCliques, _totalCompras: totalCompras })
       }
     } catch (e) {
       setToast({ message: e.message, type: 'error' })
