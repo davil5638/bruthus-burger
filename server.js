@@ -1509,6 +1509,19 @@ app.post("/campanhas/cliente/:id", async (req, res) => {
   } catch (e) { res.status(500).json({ erro: e.message }); }
 });
 
+// Gera mensagem personalizada sem enviar (para envio manual via WhatsApp)
+app.get("/campanhas/cliente/:id/mensagem", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const cliente = await clientesDb.buscarClienteId(id);
+    if (!cliente) return res.status(404).json({ erro: "Cliente não encontrado" });
+    const segmento = cliente.segmento || "regular";
+    const incentivo = customerCampaigns.escolherIncentivo(segmento, cliente);
+    const mensagem  = await customerCampaigns.gerarMensagem(segmento, cliente, incentivo);
+    res.json({ sucesso: true, mensagem, incentivo: incentivo.rotulo, cupom: incentivo.cupom, segmento });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
 app.get("/campanhas/historico", async (req, res) => {
   try {
     const { limite = 100 } = req.query;
