@@ -1522,6 +1522,15 @@ app.get("/campanhas/cliente/:id/mensagem", async (req, res) => {
   } catch (e) { res.status(500).json({ erro: e.message }); }
 });
 
+// Mapa de calor de vendas por dia da semana e horário
+app.get("/vendas/mapa-calor", async (req, res) => {
+  try {
+    const dias = Math.min(Number(req.query.dias) || 90, 365);
+    const r = await clientesDb.mapaCalorVendas(dias);
+    res.json({ sucesso: true, ...r });
+  } catch (e) { res.status(500).json({ erro: e.message }); }
+});
+
 app.get("/campanhas/historico", async (req, res) => {
   try {
     const { limite = 100 } = req.query;

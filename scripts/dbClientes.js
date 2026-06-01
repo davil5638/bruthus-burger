@@ -218,6 +218,45 @@ async function metricas() {
   };
 }
 
+async function mapaCalorVendas(dias = 90) {
+  await conectar();
+  const TZ = "America/Fortaleza";
+  const filtro = `data_pedido > NOW() - ($1 || ' days')::INTERVAL`;
+  const [grade, porDia, porHora, tot] = await Promise.all([
+    pool.query(
+      `SELECT EXTRACT(DOW  FROM data_pedido AT TIME ZONE '${TZ}')::INT AS dia_semana,
+              EXTRACT(HOUR FROM data_pedido AT TIME ZONE '${TZ}')::INT AS hora,
+              COUNT(*)::INT AS pedidos,
+              SUM(valor)::NUMERIC(12,2) AS faturamento
+       FROM pedidos WHERE ${filtro}
+       GROUP BY 1, 2 ORDER BY 1, 2`, [dias]),
+    pool.query(
+      `SELECT EXTRACT(DOW FROM data_pedido AT TIME ZONE '${TZ}')::INT AS dia_semana,
+              COUNT(*)::INT AS pedidos,
+              SUM(valor)::NUMERIC(12,2) AS faturamento
+       FROM pedidos WHERE ${filtro}
+       GROUP BY 1 ORDER BY 1`, [dias]),
+    pool.query(
+      `SELECT EXTRACT(HOUR FROM data_pedido AT TIME ZONE '${TZ}')::INT AS hora,
+              COUNT(*)::INT AS pedidos,
+              SUM(valor)::NUMERIC(12,2) AS faturamento
+       FROM pedidos WHERE ${filtro}
+       GROUP BY 1 ORDER BY 1`, [dias]),
+    pool.query(
+      `SELECT COUNT(*)::INT AS pedidos,
+              COALESCE(SUM(valor),0)::NUMERIC(12,2) AS faturamento
+       FROM pedidos WHERE ${filtro}`, [dias]),
+  ]);
+  return {
+    dias,
+    totalPedidos: tot.rows[0]?.pedidos || 0,
+    totalFaturamento: Number(tot.rows[0]?.faturamento || 0),
+    grade: grade.rows.map(r => ({ diaSemana: r.dia_semana, hora: r.hora, pedidos: r.pedidos, faturamento: Number(r.faturamento) })),
+    porDia: porDia.rows.map(r => ({ diaSemana: r.dia_semana, pedidos: r.pedidos, faturamento: Number(r.faturamento) })),
+    porHora: porHora.rows.map(r => ({ hora: r.hora, pedidos: r.pedidos, faturamento: Number(r.faturamento) })),
+  };
+}
+
 async function marcarRecuperacao(clienteId, valor) {
   await conectar();
   await pool.query(
@@ -267,6 +306,7 @@ module.exports = {
   enviosDoCliente,
   contagemPorSegmento,
   metricas,
+  mapaCalorVendas,
   marcarRecuperacao,
   jaEnviouRecentemente,
   registrarEnvio,

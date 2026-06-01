@@ -20,8 +20,9 @@ const navGroups = [
   {
     label: 'Gestão',
     items: [
-      { href: '/financeiro', label: 'Financeiro', icon: '💰' },
-      { href: '/clientes',   label: 'Clientes',   icon: '👥' },
+      { href: '/vendas',     label: 'Mapa de Vendas', icon: '🔥' },
+      { href: '/financeiro', label: 'Financeiro',     icon: '💰' },
+      { href: '/clientes',   label: 'Clientes',       icon: '👥' },
     ]
   },
 ]
