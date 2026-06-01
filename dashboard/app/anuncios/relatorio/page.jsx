@@ -541,8 +541,168 @@ function SummaryCard({ label, explicacao, value, sub, cor = '#f97316' }) {
   )
 }
 
+function SecaoROI({ gastoAds, financeiro, periodo }) {
+  const [ticketMedio, setTicketMedio] = useState('')
+
+  if (!financeiro) return null
+
+  const faturamento = financeiro.faturamento || 0
+  const gastoTotal  = financeiro.gastos || 0
+  const lucro       = faturamento - gastoTotal
+  const margem      = faturamento > 0 ? ((lucro / faturamento) * 100).toFixed(1) : '0.0'
+
+  // ROI dos ads = (faturamento atribuível - gasto ads) / gasto ads
+  // Como não temos tracking de conversão, usamos o faturamento total do período
+  const roiAds = gastoAds > 0 ? (((faturamento - gastoAds) / gastoAds) * 100).toFixed(1) : null
+
+  // Estimativa baseada em ticket médio
+  const ticket = parseFloat(ticketMedio) || 0
+  const cliquesTotal = financeiro._totalCliques || 0
+  const taxaConversaoEstimada = 0.05 // 5% dos cliques viram pedido (estimativa conservadora)
+  const pedidosEstimados = ticket > 0 && cliquesTotal > 0 ? Math.round(cliquesTotal * taxaConversaoEstimada) : 0
+  const receitaEstimada  = pedidosEstimados * ticket
+  const roiEstimado = gastoAds > 0 && receitaEstimada > 0
+    ? (((receitaEstimada - gastoAds) / gastoAds) * 100).toFixed(1)
+    : null
+
+  return (
+    <div className="mb-6 space-y-4">
+      <p className="text-xs font-semibold text-[#888] uppercase tracking-wider">
+        Resultado Financeiro do Período — últimos {periodo} dias
+      </p>
+
+      {/* Cards principais */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-4">
+          <p className="text-[10px] text-[#555] mb-1">Faturamento total</p>
+          <p className="text-xl font-black text-green-400">{fmtBRL(faturamento)}</p>
+          <p className="text-[10px] text-[#444] mt-1">últimos {periodo} dias</p>
+        </div>
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+          <p className="text-[10px] text-[#555] mb-1">Total de gastos</p>
+          <p className="text-xl font-black text-red-400">{fmtBRL(gastoTotal)}</p>
+          <p className="text-[10px] text-[#444] mt-1">incluindo ads: {fmtBRL(gastoAds)}</p>
+        </div>
+        <div className={`rounded-xl border p-4 ${lucro >= 0 ? 'border-blue-500/20 bg-blue-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
+          <p className="text-[10px] text-[#555] mb-1">Lucro líquido</p>
+          <p className={`text-xl font-black ${lucro >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+            {lucro >= 0 ? '+' : ''}{fmtBRL(lucro)}
+          </p>
+          <p className={`text-[10px] mt-1 ${parseFloat(margem) >= 30 ? 'text-green-400' : parseFloat(margem) >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
+            margem: {margem}%
+          </p>
+        </div>
+        <div className={`rounded-xl border p-4 ${
+          roiAds === null ? 'border-[#1e1e1e] bg-[#111]'
+          : parseFloat(roiAds) >= 100 ? 'border-green-500/30 bg-green-500/5'
+          : parseFloat(roiAds) >= 0 ? 'border-yellow-500/30 bg-yellow-500/5'
+          : 'border-red-500/30 bg-red-500/5'
+        }`}>
+          <p className="text-[10px] text-[#555] mb-1 flex items-center gap-1">
+            ROI dos Ads
+            <Tooltip texto="Retorno sobre investimento em anúncios. Calculado como (Faturamento total - Gasto em ads) / Gasto em ads × 100. Como não há tracking de conversão direto, usa o faturamento total do período." />
+          </p>
+          {roiAds !== null ? (
+            <>
+              <p className={`text-xl font-black ${parseFloat(roiAds) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {parseFloat(roiAds) >= 0 ? '+' : ''}{roiAds}%
+              </p>
+              <p className="text-[10px] text-[#444] mt-1">
+                {parseFloat(roiAds) >= 200 ? '🚀 Excelente!' : parseFloat(roiAds) >= 100 ? '✅ Bom!' : parseFloat(roiAds) >= 0 ? '⚠️ Aceitável' : '❌ Prejuízo'}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-[#444]">Sem gasto em ads</p>
+          )}
+        </div>
+      </div>
+
+      {/* Barra de decomposição do gasto */}
+      {gastoAds > 0 && gastoTotal > 0 && (
+        <div className="rounded-xl border border-[#1e1e1e] bg-[#111] p-4">
+          <p className="text-xs font-bold text-white mb-3">💸 Decomposição dos Gastos</p>
+          <div className="space-y-2">
+            <div>
+              <div className="flex justify-between mb-1">
+                <span className="text-[11px] text-[#888]">Ads (Meta Ads)</span>
+                <span className="text-[11px] font-bold text-[#f97316]">{fmtBRL(gastoAds)} · {gastoTotal > 0 ? ((gastoAds / gastoTotal) * 100).toFixed(0) : 0}%</span>
+              </div>
+              <div className="h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
+                <div className="h-full bg-[#f97316]/70 rounded-full" style={{ width: `${gastoTotal > 0 ? Math.min((gastoAds / gastoTotal) * 100, 100) : 0}%` }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between mb-1">
+                <span className="text-[11px] text-[#888]">Outros gastos</span>
+                <span className="text-[11px] font-bold text-red-400">{fmtBRL(Math.max(gastoTotal - gastoAds, 0))} · {gastoTotal > 0 ? (((gastoTotal - gastoAds) / gastoTotal) * 100).toFixed(0) : 0}%</span>
+              </div>
+              <div className="h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
+                <div className="h-full bg-red-500/60 rounded-full" style={{ width: `${gastoTotal > 0 ? Math.min(((gastoTotal - gastoAds) / gastoTotal) * 100, 100) : 0}%` }} />
+              </div>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#444] mt-3">
+            Para cada R$1,00 investido em ads → {gastoAds > 0 ? fmtBRL(faturamento / gastoAds) : '—'} de faturamento gerado
+          </p>
+        </div>
+      )}
+
+      {/* Simulador de ROI por ticket médio */}
+      <div className="rounded-xl border border-[#f97316]/20 bg-[#f97316]/5 p-4">
+        <p className="text-xs font-bold text-white mb-1">🧮 Simulador de ROI por Ticket Médio</p>
+        <p className="text-[11px] text-[#666] mb-3">
+          Quanto cada clique gerado pelos ads vale para você? Informe o ticket médio do seu pedido.
+        </p>
+        <div className="flex items-center gap-3 mb-3">
+          <label className="text-xs text-[#666] shrink-0">Ticket médio (R$):</label>
+          <input
+            type="number"
+            value={ticketMedio}
+            onChange={e => setTicketMedio(e.target.value)}
+            placeholder="Ex: 45"
+            className="w-28 bg-[#111] border border-[#f97316]/30 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#f97316]"
+          />
+        </div>
+        {ticket > 0 && cliquesTotal > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { conv: 0.03, label: '3% conversão' },
+              { conv: 0.05, label: '5% conversão' },
+              { conv: 0.10, label: '10% conversão' },
+            ].map(({ conv, label }) => {
+              const pedidos = Math.round(cliquesTotal * conv)
+              const receita = pedidos * ticket
+              const roi = gastoAds > 0 ? (((receita - gastoAds) / gastoAds) * 100).toFixed(0) : null
+              const positivo = roi !== null && parseFloat(roi) >= 0
+              return (
+                <div key={label} className={`p-3 rounded-lg border text-center ${positivo ? 'border-green-500/20 bg-green-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
+                  <p className="text-[10px] text-[#555] mb-1">{label}</p>
+                  <p className="text-[11px] text-white font-semibold">{pedidos} pedidos</p>
+                  <p className="text-[11px] text-green-400">{fmtBRL(receita)}</p>
+                  {roi !== null && (
+                    <p className={`text-[10px] font-bold mt-1 ${positivo ? 'text-green-400' : 'text-red-400'}`}>
+                      ROI {positivo ? '+' : ''}{roi}%
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {ticket > 0 && cliquesTotal === 0 && (
+          <p className="text-[11px] text-[#555]">Sem cliques registrados no período para calcular.</p>
+        )}
+        {ticket === 0 && (
+          <p className="text-[11px] text-[#444]">Digite o ticket médio para ver a estimativa de ROI por taxa de conversão.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function RelatorioPage() {
   const [dados, setDados]           = useState(null)
+  const [financeiro, setFinanceiro] = useState(null)
   const [loading, setLoading]       = useState(true)
   const [periodo, setPeriodo]       = useState(30)
   const [toast, setToast]           = useState(null)
@@ -552,9 +712,18 @@ export default function RelatorioPage() {
   async function carregar(dias = periodo) {
     setLoading(true)
     setDados(null)
+    setFinanceiro(null)
     try {
-      const d = await api.get(`/ads/relatorio?dias=${dias}`)
+      const [d, fin] = await Promise.all([
+        api.get(`/ads/relatorio?dias=${dias}`),
+        api.get(`/financeiro/resumo?dias=${dias}`).catch(() => null),
+      ])
       setDados(d)
+      if (fin?.resumo) {
+        // injeta total de cliques dos ads no resumo financeiro para o simulador
+        const totalCliques = d?.resumo?.totalCliques || 0
+        setFinanceiro({ ...fin.resumo, _totalCliques: totalCliques })
+      }
     } catch (e) {
       setToast({ message: e.message, type: 'error' })
     } finally { setLoading(false) }
@@ -581,6 +750,8 @@ export default function RelatorioPage() {
     setPeriodo(dias)
     carregar(dias)
   }
+
+
 
   function exportarCSV() {
     if (!dados) return
@@ -722,6 +893,13 @@ export default function RelatorioPage() {
               cor="#a78bfa"
             />
           </div>
+
+          {/* ROI & Resultado Financeiro */}
+          <SecaoROI
+            gastoAds={r.totalGasto}
+            financeiro={financeiro}
+            periodo={periodo}
+          />
 
           {/* Melhor e Pior */}
           {(() => {
