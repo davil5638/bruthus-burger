@@ -110,6 +110,21 @@ function iniciarAgendador() {
   }, tz);
   console.log("  📱 Resumo WhatsApp: Terça às 10h");
 
+  // ── Custos fixos — provisão semanal toda segunda às 08h ──
+  // Bookkeeping: roda mesmo com o agendador de stories pausado.
+  cron.schedule("0 8 * * 1", async () => {
+    console.log("\n💰 Lançando provisão semanal de custos fixos...");
+    try {
+      const { lancarSemana } = require("../scripts/custosFixos");
+      const r = await lancarSemana();
+      if (r.lancado) console.log(`✅ Custos fixos lançados: R$ ${r.valor} em ${r.data}`);
+      else           console.log(`ℹ️  Custos fixos não lançados (${r.motivo}).`);
+    } catch (e) {
+      console.error("❌ Erro ao lançar custos fixos:", e.message);
+    }
+  }, tz);
+  console.log("  💰 Custos fixos:   Segunda às 08h");
+
   // ── Recálculo diário de scores de clientes — 00h30 ──
   cron.schedule("30 0 * * *", async () => {
     console.log("\n🧮 Recalculando scores de clientes (cron diário)...");

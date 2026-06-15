@@ -1183,6 +1183,36 @@ app.get("/financeiro/evolucao", async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// CUSTOS FIXOS — provisão semanal automática
+// ──────────────────────────────────────────────
+app.get("/financeiro/custos-fixos", (req, res) => {
+  const cf = require("./scripts/custosFixos");
+  res.json({
+    sucesso: true,
+    itens: cf.CUSTOS_FIXOS,
+    totalMensal: cf.totalMensal(),
+    valorSemanal: cf.valorSemanal(),
+    categoria: cf.CATEGORIA,
+  });
+});
+
+// Lança a provisão da semana manualmente. Body opcional:
+//   { "dryRun": true }  → só calcula, não grava
+//   { "data": "2026-06-15" } → força a data do lançamento
+app.post("/financeiro/custos-fixos/lancar", async (req, res) => {
+  try {
+    const cf = require("./scripts/custosFixos");
+    const resultado = await cf.lancarSemana({
+      dryRun: !!req.body?.dryRun,
+      data: req.body?.data || null,
+    });
+    res.json({ sucesso: true, ...resultado });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 // RESUMO WHATSAPP — envio manual ou agendado
 // ──────────────────────────────────────────────
 app.post("/financeiro/enviar-resumo-whatsapp", async (req, res) => {
