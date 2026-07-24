@@ -153,7 +153,7 @@ async function configurarWebhook(serverUrl) {
   }
   try {
     const webhookUrl = `${serverUrl}/webhook/telegram`;
-    await axios.post(`${BASE()}/setWebhook`, { url: webhookUrl, drop_pending_updates: true });
+    await axios.post(`${BASE()}/setWebhook`, { url: webhookUrl, drop_pending_updates: false });
     console.log(`✅ Telegram webhook configurado: ${webhookUrl}`);
   } catch (e) {
     console.error("❌ Erro ao configurar webhook Telegram:", e.message);

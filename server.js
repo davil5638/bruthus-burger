@@ -1621,20 +1621,9 @@ app.listen(PORT, () => {
   const SERVER_URL = process.env.RENDER_EXTERNAL_URL || process.env.SERVER_URL || `http://localhost:${PORT}`;
   configurarWebhook(SERVER_URL);
 
-  // Keep-alive: auto-ping a cada 10 minutos para não dormir no Render free tier
-  const SELF_URL = process.env.RENDER_EXTERNAL_URL;
-  if (SELF_URL) {
-    const axios = require("axios");
-    setInterval(async () => {
-      try {
-        await axios.get(`${SELF_URL}/ping`);
-        console.log(`[keep-alive] ping → ok`);
-      } catch (e) {
-        console.warn(`[keep-alive] falhou: ${e.message}`);
-      }
-    }, 10 * 60 * 1000); // 10 minutos
-    console.log(`🔁 Keep-alive ativo → ${SELF_URL}/ping`);
-  }
+  // Auto-ping removido: mantinha o app acordado 24/7 e estourava as 750h/mês
+  // do plano free do Render (causa do 429). O app agora dorme quando ocioso e
+  // acorda sob demanda (webhook do Telegram, dashboard, webhook OlaClick).
 });
 
 module.exports = app;
