@@ -110,20 +110,26 @@ function iniciarAgendador() {
   }, tz);
   console.log("  📱 Resumo WhatsApp: Terça às 10h");
 
-  // ── Custos fixos — provisão semanal toda segunda às 08h ──
-  // Bookkeeping: roda mesmo com o agendador de stories pausado.
-  cron.schedule("0 8 * * 1", async () => {
-    console.log("\n💰 Lançando provisão semanal de custos fixos...");
+  // ── Custos fixos — provisão semanal toda TERÇA às 00h05 ──
+  // A semana reseta na terça (mesmo ciclo do resumo do WhatsApp), então
+  // a provisão entra assim que ela vira. Bookkeeping: roda mesmo com o
+  // agendador de stories pausado.
+  //
+  // Este cron é só o caminho feliz. Se o app estiver dormindo na terça
+  // (free tier do Render), quem garante o lançamento é o recuperar no
+  // boot, em server.js — ele preenche as semanas que ficaram pra trás.
+  cron.schedule("5 0 * * 2", async () => {
+    console.log("\n💰 Semana nova — lançando provisão de custos fixos...");
     try {
-      const { lancarSemana } = require("../scripts/custosFixos");
-      const r = await lancarSemana();
-      if (r.lancado) console.log(`✅ Custos fixos lançados: R$ ${r.valor} em ${r.data}`);
-      else           console.log(`ℹ️  Custos fixos não lançados (${r.motivo}).`);
+      const { recuperarSemanasPendentes } = require("../scripts/custosFixos");
+      const r = await recuperarSemanasPendentes();
+      if (r.lancadas) console.log(`✅ Custos fixos: ${r.lancadas} semana(s), R$ ${r.valorTotal} (até ${r.semanaAtual})`);
+      else            console.log("ℹ️  Custos fixos já em dia.");
     } catch (e) {
       console.error("❌ Erro ao lançar custos fixos:", e.message);
     }
   }, tz);
-  console.log("  💰 Custos fixos:   Segunda às 08h");
+  console.log("  💰 Custos fixos:   Terça às 00h05 (+ recuperação no boot)");
 
   // ── Recálculo diário de scores de clientes — 00h30 ──
   cron.schedule("30 0 * * *", async () => {

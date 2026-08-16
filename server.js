@@ -1196,16 +1196,19 @@ app.get("/financeiro/custos-fixos", (req, res) => {
   });
 });
 
-// Lança a provisão da semana manualmente. Body opcional:
-//   { "dryRun": true }  → só calcula, não grava
-//   { "data": "2026-06-15" } → força a data do lançamento
+// Lança a provisão manualmente. Body opcional:
+//   { "dryRun": true }        → só calcula, não grava
+//   { "data": "2026-08-11" }  → força a semana do lançamento
+//   { "recuperar": true }     → lança TODAS as semanas pendentes, não só a atual
 app.post("/financeiro/custos-fixos/lancar", async (req, res) => {
   try {
     const cf = require("./scripts/custosFixos");
-    const resultado = await cf.lancarSemana({
-      dryRun: !!req.body?.dryRun,
-      data: req.body?.data || null,
-    });
+    const dryRun = !!req.body?.dryRun;
+
+    const resultado = req.body?.recuperar
+      ? await cf.recuperarSemanasPendentes({ dryRun })
+      : await cf.lancarSemana({ dryRun, data: req.body?.data || null });
+
     res.json({ sucesso: true, ...resultado });
   } catch (error) {
     res.status(500).json({ erro: error.message });
@@ -1624,6 +1627,25 @@ app.listen(PORT, () => {
   // Auto-ping removido: mantinha o app acordado 24/7 e estourava as 750h/mês
   // do plano free do Render (causa do 429). O app agora dorme quando ocioso e
   // acorda sob demanda (webhook do Telegram, dashboard, webhook OlaClick).
+
+  // Como o app dorme, o cron de terça 00h05 sozinho não garante nada: se
+  // ninguém acessar naquele minuto, a semana passa em branco (foi o que
+  // aconteceu entre 27/jul e 10/ago de 2026). A garantia real é esta —
+  // a cada boot o sistema confere quais semanas ficaram sem provisão de
+  // custos fixos e lança as pendentes. Não escreve nada se estiver em dia.
+  (async () => {
+    try {
+      const { recuperarSemanasPendentes } = require("./scripts/custosFixos");
+      const r = await recuperarSemanasPendentes();
+      if (r.lancadas) {
+        console.log(`💰 Custos fixos: ${r.lancadas} semana(s) pendente(s) lançada(s) — R$ ${r.valorTotal}`);
+      } else {
+        console.log(`💰 Custos fixos em dia (semana de ${r.semanaAtual}).`);
+      }
+    } catch (e) {
+      console.error("⚠️  Custos fixos — recuperação no boot falhou:", e.message);
+    }
+  })();
 });
 
 module.exports = app;
