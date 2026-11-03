@@ -21,7 +21,10 @@ const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/p
 // ──────────────────────────────────────────────
 const INCENTIVO_PADRAO = {
   id:     "bruthus15",
-  rotulo: "15% OFF no pedido",
+  // "pelo link" nao e enfeite: o cupom so vale no cardapio proprio, nao no
+  // iFood. Sem isso o cliente tenta no app, leva erro e a campanha vira
+  // irritacao. E empurrar para o link e o que a loja quer de qualquer jeito.
+  rotulo: "15% OFF no pedido pelo link",
   cupom:  "BRUTHUS15",
   tom:    "direto",
 };
