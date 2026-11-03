@@ -85,18 +85,26 @@ const CANAIS = [
 
 // Comissão por canal, aplicada sobre `total + reembolso − taxa de serviço`.
 //
-// 24,18% foi DERIVADO do dado real, não chutado: é o que falta para a
-// reconstrução do cabeçalho fechar nos R$ 1.375 que o dono tinha a
-// receber. Bate com a faixa de plano do iFood com entrega própria
-// (23–25%). Se o extrato do iFood disser 24% ou 25% redondo, ajuste aqui
-// — a diferença vem do R$ 1.375 estar arredondado.
+// 20,85% está CALIBRADO contra o extrato real de outubro/2026 do Portal
+// do Parceiro iFood, que fechou o mês em R$ 5.063,34 líquidos
+// (R$ 4.033,70 de repasses + R$ 1.029,64 recebidos direto pela loja).
+// Com esta alíquota o modelo chega nesse mesmo líquido.
 //
-// ⚠️ CONTAGEM DUPLA A CONFIRMAR: o item único de R$ 800/mês em
-// `custosFixos.js` se chama "Taxa iFood + maquineta + 2 MEIs + sistema".
-// Se aquele "Taxa iFood" for a comissão por pedido, ela passa a ser
-// contada aqui E lá. Se for a mensalidade fixa do plano, não há conflito.
-// Enquanto não estiver confirmado, existe risco de inflar a despesa.
-const COMISSOES = { Ifood: 0.2418 };
+// Atenção: 20,85% NÃO é a alíquota que o iFood publica. Ele cobra
+// R$ 1.079,97 sobre um "valor das vendas" de R$ 7.045,98, ou 15,33%,
+// mas essa base é o valor de menu antes dos descontos e sem a entrega.
+// A nossa base é outra (`total + reembolso − taxa de serviço`), então a
+// alíquota tem que ser outra para dar o mesmo resultado. O que importa
+// é o líquido bater com o extrato, e bate.
+//
+// A primeira estimativa foi 24,18%, derivada de UMA semana a partir de um
+// valor que o dono lembrou de cabeça. Errava R$ 212,85 no mês. Se for
+// recalibrar de novo, use sempre o extrato de um mês fechado.
+//
+// Não há contagem dupla com `custosFixos.js`: os R$ 800/mês de lá são
+// gestor de tráfego, 2 MEIs, sistema e o chip da maquineta — nenhuma
+// taxa de iFood.
+const COMISSOES = { Ifood: 0.2085 };
 
 // Taxa da maquineta sobre venda no CARTÃO do canal próprio.
 //

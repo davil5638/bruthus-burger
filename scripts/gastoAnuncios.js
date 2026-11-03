@@ -58,19 +58,19 @@ const TIMEZONE  = "America/Fortaleza";
 const CATEGORIA = "Marketing / Anúncios";
 const MARCA     = "Meta Ads";
 
-// Piso de segurança: 03/11/2026, o dia em que a verba de anúncio passou
-// a sair do caixa da hamburgueria.
+// Piso de segurança: 01/10/2026.
 //
-// Antes disso o dono bancava os anúncios do próprio bolso. O gasto existia
-// (R$ 2.460,37 desde nov/2025, sendo R$ 861,92 só em outubro) mas NÃO era
-// despesa do negócio — o caixa dele nunca diminuiu por causa disso.
-// Chegamos a lançar outubro e desfizemos: inflava a despesa de um mês em
-// que a hamburgueria não pagou nada de anúncio.
+// A verba de anúncio sempre saiu do caixa da hamburgueria, então é despesa
+// do negócio e pode ser lançada retroativamente. Outubro foi trazido a
+// pedido do dono (R$ 861,92), junto com 01 e 02/11 (R$ 54,69) para não
+// deixar buraco antes do automático começar.
 //
-// O honorário do gestor de tráfego é outra coisa e não entra aqui: ele é
-// fixo, sempre foi pago pelo negócio, e já está dentro dos R$ 800/mês de
-// custosFixos.js.
-const DATA_MINIMA = "2026-11-03";
+// O histórico anterior a outubro continua de fora por decisão dele:
+// R$ 1.544 entre nov/2025 e set/2026, que ficam como estão.
+//
+// O honorário do gestor de tráfego é outra coisa e NÃO entra aqui: é fixo,
+// e já está dentro dos R$ 800/mês de custosFixos.js. Aqui é só a verba.
+const DATA_MINIMA = "2026-10-01";
 
 // Diferença abaixo disso é centavo de arredondamento.
 const TOLERANCIA = 0.5;
