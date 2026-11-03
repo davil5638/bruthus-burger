@@ -31,6 +31,43 @@ function rowParaObj(row) {
 }
 
 // ──────────────────────────────────────────────
+// Quanto sobra por canal.
+//
+// Junta a receita de cada categoria com as taxas daquele canal — comissão
+// do iFood, taxa da maquineta — que `conciliacaoOlaClick` lança em
+// "Taxas / Comissões" citando o canal na descrição.
+//
+// É o número que responde se vale empurrar o cliente para o cardápio
+// próprio em vez do marketplace: em outubro/2026, cada real vendido no
+// iFood deixou 77 centavos, contra 99 no canal próprio.
+// ──────────────────────────────────────────────
+function resumirCanais(entradas) {
+  const porCanal = {};
+  const pegar = (canal) => (porCanal[canal] = porCanal[canal] || { canal, receita: 0, taxas: 0 });
+
+  for (const e of entradas) {
+    if (e.tipo === "receita") {
+      pegar(e.categoria).receita += e.valor;
+      continue;
+    }
+    if (e.categoria !== "Taxas / Comissões") continue;
+    const canal = CATEGORIAS_RECEITA.find((c) => (e.descricao || "").includes(c));
+    if (canal) pegar(canal).taxas += e.valor;
+  }
+
+  return Object.values(porCanal)
+    .filter((c) => c.receita > 0)
+    .map((c) => ({
+      canal:    c.canal,
+      receita:  parseFloat(c.receita.toFixed(2)),
+      taxas:    parseFloat(c.taxas.toFixed(2)),
+      liquido:  parseFloat((c.receita - c.taxas).toFixed(2)),
+      retencao: parseFloat((((c.receita - c.taxas) / c.receita) * 100).toFixed(1)),
+    }))
+    .sort((a, b) => b.receita - a.receita);
+}
+
+// ──────────────────────────────────────────────
 // CRUD
 // ──────────────────────────────────────────────
 
@@ -174,6 +211,7 @@ async function calcularResumo(dias = 7) {
     margem,
     totalEntradas: entradas.length,
     grafico: Object.values(porDia).sort((a, b) => a.data.localeCompare(b.data)),
+    porCanal: resumirCanais(entradas),
     topDespesas: Object.entries(catDespesa)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
@@ -293,6 +331,7 @@ async function calcularResumoCustom(dataInicio, dataFim = null) {
     margem,
     totalEntradas: entradas.length,
     grafico: Object.values(porDia).sort((a, b) => a.data.localeCompare(b.data)),
+    porCanal: resumirCanais(entradas),
     topDespesas: Object.entries(catDespesa)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)

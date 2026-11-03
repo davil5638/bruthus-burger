@@ -316,7 +316,13 @@ export default function FinanceiroPage() {
   const pctGast = pctDiff(resumo?.gastos, resumoAnt?.gastos)
   const pctLucro= pctDiff(resumo?.lucro, resumoAnt?.lucro)
   const metaPct  = metaSemanal > 0 ? Math.min((resumo?.faturamento || 0) / metaSemanal * 100, 100) : 0
-  const alertaMargem = resumo && margemMinima > 0 && resumo.margem < margemMinima && resumo.faturamento > 0
+  // Só alerta depois de a semana ter pelo menos 2 dias com venda. A provisão
+  // de custo fixo entra na terça, antes de qualquer receita, então sem esta
+  // trava o alerta disparava TODA semana — e alerta que sempre dispara é
+  // alerta que a pessoa aprende a ignorar.
+  const diasComVenda = (resumo?.grafico || []).filter(d => d.receita > 0).length
+  const alertaMargem = resumo && margemMinima > 0 && resumo.margem < margemMinima
+    && resumo.faturamento > 0 && diasComVenda >= 2
 
   return (
     <div className="max-w-4xl">
@@ -448,6 +454,37 @@ export default function FinanceiroPage() {
           ))}
         </div>
       </div>
+
+      {/* Quanto sobra por canal — receita menos as taxas daquele canal */}
+      {resumo?.porCanal?.length > 1 && (
+        <div className="rounded-2xl overflow-hidden mb-6" style={{ border: '1px solid #181818', background: '#0b0b0b' }}>
+          <div className="px-5 pt-4 pb-3 flex items-center gap-2">
+            <span className="text-sm">🧾</span>
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: '#3a3a3a' }}>
+              Quanto sobra por canal
+            </p>
+          </div>
+          <div className="divide-y divide-[#141414]">
+            {resumo.porCanal.map(c => (
+              <div key={c.canal} className="px-5 py-3.5 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold truncate" style={{ color: '#d4d4d4' }}>{c.canal}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: '#3a3a3a' }}>
+                    {fmt(c.receita)}{c.taxas > 0 ? ` − ${fmt(c.taxas)} de taxa` : ' · sem taxa de canal'}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-lg font-black leading-none" style={{ color: '#34d399' }}>{fmt(c.liquido)}</p>
+                  <p className="text-[10px] font-bold mt-1"
+                    style={{ color: c.retencao >= 95 ? '#34d399' : c.retencao >= 80 ? '#facc15' : '#f87171' }}>
+                    fica {c.retencao}%
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Botões ação */}
       <div className="flex gap-2.5 mb-3">
