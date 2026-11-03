@@ -40,7 +40,11 @@ const PERIODOS = [
 ]
 
 const CAT_RECEITA = ['Vendas no local', 'Delivery', 'Ifood', 'Outros']
-const CAT_DESPESA = ['Ingredientes / Insumos', 'Embalagens', 'Marketing / Anúncios', 'Funcionários', 'Aluguel', 'Gás / Energia', 'Equipamentos', 'Outros']
+// Precisa espelhar CATEGORIAS_DESPESA de scripts/financeiro.js. Se faltar
+// uma categoria aqui, o <select> de EDITAR nao acha a opcao do lancamento,
+// mostra a primeira da lista como selecionada e salvar troca a categoria
+// sem avisar — 'Custos Fixos' virava 'Ingredientes / Insumos'.
+const CAT_DESPESA = ['Ingredientes / Insumos', 'Embalagens', 'Marketing / Anúncios', 'Funcionários', 'Aluguel', 'Gás / Energia', 'Equipamentos', 'Custos Fixos', 'Taxas / Comissões', 'Outros']
 
 function fmt(v)    { return `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}` }
 function fmtData(d){ return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') }

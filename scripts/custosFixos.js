@@ -20,6 +20,16 @@
 // horário do cron, e sim o próprio banco: ao acordar, o sistema olha
 // qual foi a última semana lançada e preenche o buraco.
 // ──────────────────────────────────────────────
+// dotenv ANTES dos requires: `db.js` monta o Pool no load do módulo e lê
+// process.env.DATABASE_URL naquele instante. Se o .env entrar depois, o
+// Pool nasce sem connectionString, o pg cai no localhost e a falha vem
+// como AggregateError [ECONNREFUSED] de mensagem VAZIA — era por isso que
+// rodar este arquivo na mão morria num "❌" pelado. No server.js o
+// problema não aparece porque lá o dotenv é a linha 1.
+if (require.main === module) {
+  require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
+}
+
 const { adicionarEntrada, listarEntradas } = require("./financeiro");
 
 const CATEGORIA = "Custos Fixos";
@@ -27,7 +37,7 @@ const CATEGORIA = "Custos Fixos";
 // A semana começa na TERÇA (2 = terça, no padrão 0=domingo).
 const DIA_INICIO_SEMANA = 2;
 
-// Divisor da provisão: 4 semanas por mês (R$ 420/mês → R$ 105/semana).
+// Divisor da provisão: 4 semanas por mês (R$ 800/mês → R$ 200/semana).
 // Obs: 4 semanas/mês × 12 = 48 semanas, e o ano tem ~52. Na prática
 // isso provisiona um pouco a mais no acumulado do ano — é proposital,
 // serve de folga e mantém o número da semana redondo.
@@ -39,18 +49,30 @@ const SEMANAS_NO_MES = 4;
 const MAX_SEMANAS_RETROATIVAS = 12;
 
 // Custos fixos MENSAIS (sempre em base mensal — nunca semanal).
-// Total hoje: R$ 420/mês → R$ 105/semana.
-// Para detalhar item a item depois, basta quebrar em várias linhas
-// com os valores individuais — a soma é que manda.
+// Total hoje: R$ 800/mês → R$ 200/semana.
+//
+// Aqui entra só o que é FIXO e cobrado todo mês. Custo variável tem
+// lugar próprio e NÃO deve ser repetido aqui:
+//   • comissão do iFood (24,18%)  → conciliacaoOlaClick.js
+//   • taxa da maquineta (3%)      → conciliacaoOlaClick.js
+//   • verba de anúncio            → gastoAnuncios.js
+//
+// Os R$ 20 da maquineta abaixo são o plano de chip da maquininha, não
+// o percentual por venda. E não existe taxa de iFood nesta lista: o
+// nome antigo do item ("Taxa iFood + maquineta + 2 MEIs + sistema")
+// dizia que existia, e não existia — a composição real veio do dono.
 const CUSTOS_FIXOS = [
-  { nome: "Taxa iFood + maquineta + 2 MEIs + sistema", valorMensal: 420 },
+  { nome: "Gestor de tráfego",          valorMensal: 450 },
+  { nome: "2 MEIs",                     valorMensal: 210 },
+  { nome: "Sistema",                    valorMensal: 120 },
+  { nome: "Plano de chip da maquineta", valorMensal: 20  },
 ];
 
 function totalMensal() {
   return CUSTOS_FIXOS.reduce((s, c) => s + c.valorMensal, 0);
 }
 
-// Provisão semanal = total mensal ÷ 4 semanas. Ex: 420 ÷ 4 = R$ 105,00.
+// Provisão semanal = total mensal ÷ 4 semanas. Ex: 800 ÷ 4 = R$ 200,00.
 function valorSemanal() {
   return parseFloat((totalMensal() / SEMANAS_NO_MES).toFixed(2));
 }
@@ -59,9 +81,14 @@ function fmtBR(v) {
   return Number(v || 0).toFixed(2).replace(".", ",");
 }
 
+// A descrição mostra a fatia SEMANAL de cada item, não o valor mensal.
+// É o que aparece no financeiro, e ali o que importa é entender de onde
+// vieram os R$ 200 daquela semana.
 function descricaoLancamento() {
-  const itens = CUSTOS_FIXOS.map((c) => c.nome).join(" + ");
-  return `Provisão semanal de custos fixos (${itens}) — base R$ ${fmtBR(totalMensal())}/mês`;
+  const itens = CUSTOS_FIXOS
+    .map((c) => `${c.nome} R$ ${fmtBR(c.valorMensal / SEMANAS_NO_MES)}`)
+    .join(" + ");
+  return `Provisão semanal de custos fixos: ${itens} (base R$ ${fmtBR(totalMensal())}/mês ÷ ${SEMANAS_NO_MES} semanas)`;
 }
 
 // ──────────────────────────────────────────────

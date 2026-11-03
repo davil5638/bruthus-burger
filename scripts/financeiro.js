@@ -10,7 +10,7 @@ const CATEGORIAS_RECEITA = [
 const CATEGORIAS_DESPESA = [
   "Ingredientes / Insumos", "Embalagens", "Marketing / Anúncios",
   "Funcionários", "Aluguel", "Gás / Energia", "Equipamentos",
-  "Custos Fixos", "Outros",
+  "Custos Fixos", "Taxas / Comissões", "Outros",
 ];
 
 // ──────────────────────────────────────────────

@@ -392,22 +392,13 @@ app.post("/ads", async (req, res) => {
       objetivo: objetivo || "OUTCOME_TRAFFIC",
     });
 
-    // Registra o gasto no sistema financeiro automaticamente
-    if (registrarFinanceiro !== false) {
-      try {
-        const valorDiario = orcamento / 100; // converte centavos para reais
-        await fin.adicionarEntrada({
-          tipo: "despesa",
-          valor: valorDiario,
-          categoria: "Marketing / Anúncios",
-          descricao: `Meta Ads — campanha criada (R$${valorDiario.toFixed(2)}/dia) ID: ${resultado.campanhaId}`,
-        });
-        resultado.registradoFinanceiro = true;
-      } catch (finErr) {
-        console.warn("⚠️ Não registrou no financeiro:", finErr.message);
-        resultado.registradoFinanceiro = false;
-      }
-    }
+    // NÃO lança gasto aqui. Antes, criar uma campanha gravava UMA despesa
+    // no valor do orçamento diário — campanha de R$20/dia rodando 15 dias
+    // gastava R$300 e o financeiro registrava R$20. Quem lança o gasto de
+    // anúncio agora é `scripts/gastoAnuncios.js`, que puxa o valor real da
+    // API da Meta dia a dia. Reativar isto aqui contaria em dobro.
+    resultado.registradoFinanceiro = false;
+    resultado.obsFinanceiro = "gasto lançado diariamente pela API da Meta (scripts/gastoAnuncios.js)";
 
     res.json({ sucesso: true, resultado });
   } catch (error) {
@@ -1216,6 +1207,78 @@ app.post("/financeiro/custos-fixos/lancar", async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// CONCILIAÇÃO OLACLICK — fecha a receita com a fonte
+//
+// O webhook não entrega pedido de marketplace (iFood). Isto compara,
+// dia por dia e canal por canal, o que o OlaClick vendeu com o que o
+// financeiro tem, e lança a diferença. Ver scripts/conciliacaoOlaClick.js
+// ──────────────────────────────────────────────
+app.get("/financeiro/conciliacao", async (req, res) => {
+  try {
+    const conc = require("./scripts/conciliacaoOlaClick");
+    const dias = parseInt(req.query.dias || "7", 10);
+    const r = await conc.conciliarPendentes({ dias, dryRun: true });
+    res.json({ sucesso: true, ...r });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Body opcional:
+//   { "dryRun": true }           → só mostra o que lançaria
+//   { "dias": 7 }                → quantos dias para trás conferir
+//   { "data": "2026-11-03" }     → concilia só esse dia
+//   { "incluirHoje": true }      → inclui o dia corrente (ainda aberto)
+app.post("/financeiro/conciliacao/lancar", async (req, res) => {
+  try {
+    const conc = require("./scripts/conciliacaoOlaClick");
+    const dryRun = !!req.body?.dryRun;
+
+    const resultado = req.body?.data
+      ? await conc.conciliarDia(req.body.data, { dryRun })
+      : await conc.conciliarPendentes({
+          dias: parseInt(req.body?.dias || "3", 10),
+          incluirHoje: !!req.body?.incluirHoje,
+          dryRun,
+        });
+
+    res.json({ sucesso: true, ...resultado });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────
+// GASTO DE ANÚNCIOS — valor real, direto da Meta
+// Ver scripts/gastoAnuncios.js
+// ──────────────────────────────────────────────
+app.get("/financeiro/anuncios", async (req, res) => {
+  try {
+    const ga = require("./scripts/gastoAnuncios");
+    const dias = parseInt(req.query.dias || "7", 10);
+    const r = await ga.lancarPendentes({ dias, dryRun: true });
+    res.json({ sucesso: true, configurado: ga.configurado(), ...r });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Body opcional: { "dryRun": true, "dias": 14, "incluirHoje": true }
+app.post("/financeiro/anuncios/lancar", async (req, res) => {
+  try {
+    const ga = require("./scripts/gastoAnuncios");
+    const r = await ga.lancarPendentes({
+      dias: parseInt(req.body?.dias || "7", 10),
+      incluirHoje: !!req.body?.incluirHoje,
+      dryRun: !!req.body?.dryRun,
+    });
+    res.json({ sucesso: true, ...r });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 // RESUMO WHATSAPP — envio manual ou agendado
 // ──────────────────────────────────────────────
 app.post("/financeiro/enviar-resumo-whatsapp", async (req, res) => {
@@ -1267,21 +1330,41 @@ app.post("/webhook/olaclick", async (req, res) => {
     const combos = pedido?.combos || [];
     const valor  = parseFloat(pedido?.total || 0);
 
-    if (!cust || !combos.length || valor <= 0) {
+    // Antes este if exigia `cust`. Pedido sem cliente — balcão sem
+    // telefone, por exemplo — era descartado aqui e a receita nunca era
+    // lançada. Agora só exige o que define um pedido de verdade: itens e
+    // valor. Cliente é opcional, e a dedup não depende dele.
+    if (!combos.length || valor <= 0) {
       return res.status(200).json({ ok: true, ignorado: "dados incompletos no update" });
+    }
+
+    // Pedido cancelado não vira receita.
+    const statusPedido = String(pedido?.status || "").toUpperCase();
+    if (/CANCEL/.test(statusPedido) || pedido?.cancelation_reason) {
+      return res.status(200).json({ ok: true, ignorado: "pedido cancelado", status: statusPedido });
     }
 
     const orderId    = pedido?.public_id || pedido?.id || `OC-${Date.now()}`;
     const dataPedido = pedido?.created_at ? new Date(pedido.created_at) : new Date();
-    const dataBR     = dataPedido.toISOString().slice(0, 10);
+    // Data no fuso de Fortaleza, não em UTC. Com toISOString() todo
+    // pedido feito depois das 21h local (= 00h UTC) caía no dia seguinte,
+    // e a loja fecha às 23h — ou seja, as duas últimas horas de cada
+    // noite iam para a data errada. Não mudava o total do mês, mas
+    // embaralhava o dia a dia, e faria a conciliação enxergar diferença
+    // onde não existe: ela somaria receita no dia que ficou curto sem
+    // tirar do dia que ficou sobrando, inflando o faturamento.
+    const dataBR     = dataPedido.toLocaleDateString("en-CA", { timeZone: "America/Fortaleza" });
 
-    // Captura cliente + pedido
-    const telRaw   = cust.phone_number || cust.phone || null;
+    // Captura cliente + pedido. `cust` pode ser null agora que o guard
+    // acima não exige cliente — por isso o acesso é opcional. Sem isto
+    // o pedido sem cliente estourava TypeError e caía no catch, ou seja:
+    // continuava sendo descartado, só por outro caminho.
+    const telRaw   = cust?.phone_number || cust?.phone || null;
     const telefone = telRaw
       ? (String(telRaw).startsWith("55") ? String(telRaw) : "55" + String(telRaw))
       : null;
-    const nome  = cust.name  || null;
-    const email = cust.email || null;
+    const nome  = cust?.name  || null;
+    const email = cust?.email || null;
 
     const itens = combos.map(c => ({
       nome:       c.product_name,
@@ -1291,35 +1374,40 @@ app.post("/webhook/olaclick", async (req, res) => {
     }));
     const cupom = pedido?.discounts?.[0]?.code || null;
 
-    // Upsert cliente
+    // Upsert cliente — opcional. Sem telefone não há cliente, e isso
+    // não impede mais o pedido de ser registrado.
     const cliente = telefone
       ? await clientesDb.upsertCliente({ telefone, nome, email })
       : null;
 
-    // Registra pedido — retorna null se já existir (dedup via UNIQUE constraint)
-    // Só registra receita e recalcula na primeira vez que vemos este pedido com dados completos
-    const pedidoSalvo = cliente
-      ? await clientesDb.registrarPedido({
-          clienteId: cliente.id, externalId: String(orderId), origem: "olaclick",
-          dataPedido, valor, itens, cupom, payload,
-        })
-      : null;
+    // Registra o pedido SEMPRE. `pedidos.cliente_id` aceita NULL e a
+    // dedup é o índice UNIQUE(origem, external_id) — é ele, não o
+    // cliente, que garante que a receita entra uma única vez.
+    // Antes isto só rodava com cliente: pedido sem telefone caía num
+    // galho que apenas escrevia no log, e a receita se perdia.
+    const pedidoSalvo = await clientesDb.registrarPedido({
+      clienteId: cliente ? cliente.id : null,
+      externalId: String(orderId), origem: "olaclick",
+      dataPedido, valor, itens, cupom, payload,
+    });
 
     if (pedidoSalvo) {
-      // Primeira vez com dados completos: registra receita e recalcula
+      // Primeira vez que vemos este pedido: lança a receita no canal certo.
+      const { categoriaPorCanal } = require("./scripts/conciliacaoOlaClick");
       await fin.adicionarEntrada({
-        tipo: "receita", valor, categoria: "Delivery",
+        tipo: "receita", valor, categoria: categoriaPorCanal(pedido?.source),
         descricao: `OlaClick — Pedido ${orderId}`, data: dataBR,
       });
-      await customerScoring.recalcularCliente(cliente.id).catch(e =>
-        console.warn("[OlaClick] recalcular falhou:", e.message)
-      );
-      await clientesDb.marcarRecuperacao(cliente.id, valor).catch(() => {});
-      console.log(`✅ [OlaClick] NOVO ${orderId} | ${nome} (${telefone}) | R$ ${valor}`);
-    } else if (!cliente) {
-      // Sem telefone: registra só a receita se ainda não foi (usa orderId como chave)
-      // Verifica se já tem lançamento para este pedido no financeiro
-      console.log(`[OlaClick] ${orderId} sem telefone — receita pode já estar registrada`);
+
+      // Scoring e recuperação só existem para quem tem cliente.
+      if (cliente) {
+        await customerScoring.recalcularCliente(cliente.id).catch(e =>
+          console.warn("[OlaClick] recalcular falhou:", e.message)
+        );
+        await clientesDb.marcarRecuperacao(cliente.id, valor).catch(() => {});
+      }
+
+      console.log(`✅ [OlaClick] NOVO ${orderId} | ${nome || "sem cliente"} (${telefone || "sem telefone"}) | ${pedido?.source || "?"} | R$ ${valor}`);
     } else {
       // Pedido já processado (update duplicado do OlaClick) — ignora
       console.log(`[OlaClick] ${orderId} update duplicado ignorado`);
@@ -1644,6 +1732,46 @@ app.listen(PORT, () => {
       }
     } catch (e) {
       console.error("⚠️  Custos fixos — recuperação no boot falhou:", e.message);
+    }
+  })();
+
+  // Mesma lógica para a receita: o cron diário só dispara se o app
+  // estiver vivo na hora. A cada boot conferimos os últimos dias contra
+  // o OlaClick e lançamos o que faltou (iFood, sobretudo). Não escreve
+  // nada se estiver em dia, e não faz nada sem OLACLICK_API_TOKEN.
+  (async () => {
+    try {
+      const { conciliarPendentes } = require("./scripts/conciliacaoOlaClick");
+      const r = await conciliarPendentes({ dias: 7 });
+      if (r.ignorado) {
+        console.log(`ℹ️  Conciliação OlaClick ignorada: ${r.ignorado}`);
+      } else if (r.lancamentos) {
+        console.log(`🧾 Conciliação OlaClick: ${r.lancamentos} lançamento(s) — receita R$ ${r.receitaLancada}, taxas R$ ${r.taxaLancada} (${r.de} a ${r.ate})`);
+      } else {
+        console.log(`🧾 Receita conciliada com o OlaClick (${r.de} a ${r.ate}).`);
+      }
+      (r.avisos || []).forEach((a) =>
+        console.warn(`⚠️  Conciliação — ${a.categoria}: ${a.aviso || a.erro}`)
+      );
+    } catch (e) {
+      console.error("⚠️  Conciliação OlaClick no boot falhou:", e.message);
+    }
+  })();
+
+  // Gasto de anúncio: mesma ideia, fonte diferente (API da Meta). Puxa o
+  // gasto real dos últimos dias e lança o que faltar. Não faz nada sem
+  // META_ACCESS_TOKEN e AD_ACCOUNT_ID configurados.
+  (async () => {
+    try {
+      const ga = require("./scripts/gastoAnuncios");
+      const r = await ga.lancarPendentes({ dias: 7 });
+      if (r.ignorado)      console.log(`ℹ️  Gasto de anúncios ignorado: ${r.ignorado}`);
+      else if (r.erro)     console.warn(`⚠️  Gasto de anúncios — Meta respondeu: ${r.erro}`);
+      else if (r.lancamentos) console.log(`📣 Gasto de anúncios: ${r.lancamentos} dia(s) — R$ ${r.valorTotal} (${r.de} a ${r.ate})`);
+      else                 console.log(`📣 Gasto de anúncios em dia (${r.de} a ${r.ate}).`);
+      (r.avisos || []).forEach((a) => console.warn(`⚠️  Anúncios ${a.data}: ${a.aviso}`));
+    } catch (e) {
+      console.error("⚠️  Gasto de anúncios no boot falhou:", e.message);
     }
   })();
 });

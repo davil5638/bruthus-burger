@@ -131,6 +131,50 @@ function iniciarAgendador() {
   }, tz);
   console.log("  💰 Custos fixos:   Terça às 00h05 (+ recuperação no boot)");
 
+  // ── Conciliação da receita com o OlaClick — todo dia às 05h00 ──
+  // Roda depois da loja fechar (23h) para pegar o dia inteiro fechado.
+  // Confere os últimos 3 dias, não só ontem: pedido pode ser atualizado
+  // com atraso no OlaClick, e a conciliação lança diferença — então
+  // reconferir dia já conciliado é barato e não duplica nada.
+  //
+  // Como o app dorme no free tier do Render, este cron é só o caminho
+  // feliz; a garantia é a conciliação no boot, em server.js.
+  cron.schedule("0 5 * * *", async () => {
+    console.log("\n🧾 Conciliando receita com o OlaClick...");
+    try {
+      const { conciliarPendentes } = require("../scripts/conciliacaoOlaClick");
+      const r = await conciliarPendentes({ dias: 3 });
+      if (r.ignorado)          console.log(`ℹ️  Ignorada: ${r.ignorado}`);
+      else if (r.lancamentos)  console.log(`✅ Conciliação: ${r.lancamentos} lançamento(s) — receita R$ ${r.receitaLancada}, taxas R$ ${r.taxaLancada} (${r.de} a ${r.ate})`);
+      else                     console.log("ℹ️  Receita já conciliada.");
+      (r.avisos || []).forEach((a) => console.warn(`⚠️  ${a.categoria}: ${a.aviso || a.erro}`));
+    } catch (e) {
+      console.error("❌ Erro na conciliação OlaClick:", e.message);
+    }
+  }, tz);
+  console.log("  🧾 Conciliação:    Todo dia às 05h00 (+ conciliação no boot)");
+
+  // ── Gasto de anúncios — todo dia às 05h10 ──
+  // Dez minutos depois da conciliação, para não disputar a mesma janela.
+  // Olha 7 dias para trás de propósito: a Meta revisa o gasto de um dia
+  // depois (atribuição, impressão inválida), e como lançamos diferença a
+  // correção entra sozinha sem duplicar nada.
+  cron.schedule("10 5 * * *", async () => {
+    console.log("\n📣 Buscando gasto de anúncios na Meta...");
+    try {
+      const ga = require("../scripts/gastoAnuncios");
+      const r = await ga.lancarPendentes({ dias: 7 });
+      if (r.ignorado)          console.log(`ℹ️  Ignorado: ${r.ignorado}`);
+      else if (r.erro)         console.warn(`⚠️  Meta respondeu: ${r.erro}`);
+      else if (r.lancamentos)  console.log(`✅ Anúncios: ${r.lancamentos} dia(s), R$ ${r.valorTotal} (${r.de} a ${r.ate})`);
+      else                     console.log("ℹ️  Gasto de anúncios já em dia.");
+      (r.avisos || []).forEach((a) => console.warn(`⚠️  ${a.data}: ${a.aviso}`));
+    } catch (e) {
+      console.error("❌ Erro no gasto de anúncios:", e.message);
+    }
+  }, tz);
+  console.log("  📣 Anúncios:       Todo dia às 05h10 (+ no boot)");
+
   // ── Recálculo diário de scores de clientes — 00h30 ──
   cron.schedule("30 0 * * *", async () => {
     console.log("\n🧮 Recalculando scores de clientes (cron diário)...");
