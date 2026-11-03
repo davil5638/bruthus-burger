@@ -175,6 +175,24 @@ function iniciarAgendador() {
   }, tz);
   console.log("  📣 Anúncios:       Todo dia às 05h10 (+ no boot)");
 
+  // ── Recuperação de clientes — 11h00, em doses pequenas ──
+  // Cedo o bastante para a pessoa planejar o jantar, tarde o bastante
+  // para não acordar ninguém. O módulo só roda em dia que a loja abre e
+  // não repete o mesmo cliente por 45 dias.
+  cron.schedule("0 11 * * *", async () => {
+    console.log("\n🔔 Campanha diária de recuperação...");
+    try {
+      const { rodarHoje } = require("../scripts/campanhaDiaria");
+      const r = await rodarHoje();
+      if (r.ignorado)        console.log(`ℹ️  Pulado: ${r.ignorado}`);
+      else if (r.automatico) console.log(`✅ ${r.enviados} mensagem(ns) enviada(s)`);
+      else                   console.log(`📲 ${r.fila.length} cliente(s) na lista — enviada pelo Telegram para envio manual`);
+    } catch (e) {
+      console.error("❌ Erro na campanha diária:", e.message);
+    }
+  }, tz);
+  console.log("  🔔 Recuperação:    Todo dia às 11h00 (5 clientes, só em dia de loja aberta)");
+
   // ── Recálculo diário de scores de clientes — 00h30 ──
   cron.schedule("30 0 * * *", async () => {
     console.log("\n🧮 Recalculando scores de clientes (cron diário)...");

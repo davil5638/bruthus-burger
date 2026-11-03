@@ -160,4 +160,6 @@ async function configurarWebhook(serverUrl) {
   }
 }
 
-module.exports = { processarMensagem, configurarWebhook };
+// `enviar` é exportado para a campanha diária poder mandar a lista de
+// clientes do dia quando o WhatsApp ainda não está configurado.
+module.exports = { processarMensagem, configurarWebhook, enviar };

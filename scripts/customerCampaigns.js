@@ -7,46 +7,31 @@ const { enviarTexto } = require("./whatsappEvolution");
 const ORDER_LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 
 // ──────────────────────────────────────────────
-// Catálogo de incentivos por segmento
-// (chave = segmento; cada item: prioridade, texto humano e cupom opcional)
+// Incentivo único: BRUTHUS15, 15% OFF no pedido.
+//
+// Antes havia um cupom diferente por segmento — VOLTA15, SAUDADE25,
+// FAMILIA, BATATAFREE, HOJE12 e outros. Dava para calibrar a oferta por
+// perfil, mas cada cupom é uma regra a cadastrar no OlaClick, uma exceção
+// a lembrar e uma chance de errar na hora de aplicar no balcão. O dono
+// pediu um só, e tem razão: desconto que ninguém consegue aplicar direito
+// não vira venda, vira discussão no caixa.
+//
+// O TOM da mensagem continua mudando por segmento (ver mensagemFallback).
+// É o cupom que é único, não o texto.
 // ──────────────────────────────────────────────
-const INCENTIVOS = {
-  vip: [
-    { id: "novidade",        rotulo: "novidade exclusiva (sem cupom)", cupom: null,         tom: "exclusivo" },
-    { id: "brinde_vip",      rotulo: "brinde exclusivo no próximo pedido", cupom: "VIP_BRUTHUS", tom: "premiar" },
-  ],
-  em_risco: [
-    { id: "cupom_15",        rotulo: "cupom de 15% OFF",               cupom: "VOLTA15",    tom: "saudade_leve" },
-    { id: "frete_gratis",    rotulo: "frete grátis",                   cupom: "FRETE0",     tom: "praticidade" },
-  ],
-  perdido: [
-    { id: "cupom_25",        rotulo: "cupom de 25% OFF",               cupom: "SAUDADE25",  tom: "saudade_forte" },
-    { id: "combo_familia",   rotulo: "combo família em condição única", cupom: "FAMILIA",    tom: "evento" },
-  ],
-  novo: [
-    { id: "ganhe_2pedido",   rotulo: "10% OFF no 2º pedido",           cupom: "BEMVINDO10", tom: "boas_vindas" },
-    { id: "brinde_2pedido",  rotulo: "batata grátis no 2º pedido",     cupom: "BATATAFREE", tom: "boas_vindas" },
-  ],
-  impulsivo: [
-    { id: "flash_hoje",      rotulo: "promo relâmpago válida só hoje", cupom: "HOJE12",     tom: "urgencia" },
-    { id: "combo_noite",     rotulo: "combo da madrugada",             cupom: "NOITE15",    tom: "noturno" },
-  ],
-  sensivel_desconto: [
-    { id: "cupom_direto",    rotulo: "cupom de 20% OFF",               cupom: "DESCONTO20", tom: "direto" },
-    { id: "leve_3_pague_2",  rotulo: "leve 3 pague 2 em smash",        cupom: "SMASH3X2",   tom: "direto" },
-  ],
-  regular: [
-    { id: "nada",            rotulo: "lembrete gentil (sem desconto)", cupom: null,         tom: "lembrete" },
-  ],
+const INCENTIVO_PADRAO = {
+  id:     "bruthus15",
+  rotulo: "15% OFF no pedido",
+  cupom:  "BRUTHUS15",
+  tom:    "direto",
 };
 
-function escolherIncentivo(segmento, cliente) {
-  const opcoes = INCENTIVOS[segmento] || INCENTIVOS.regular;
-  // heurística: se ticket alto, evita o cupom mais agressivo
-  if (segmento === "perdido" && Number(cliente.ticket_medio) > 80) return opcoes[1] || opcoes[0];
-  if (segmento === "em_risco" && Number(cliente.ticket_medio) > 70) return opcoes[1] || opcoes[0];
-  // alterna pelo id do cliente para distribuir os incentivos
-  return opcoes[cliente.id % opcoes.length];
+// Mantido como objeto para quem importa `INCENTIVOS`, mas agora todos os
+// segmentos apontam para o mesmo incentivo.
+const INCENTIVOS = { padrao: [INCENTIVO_PADRAO] };
+
+function escolherIncentivo() {
+  return INCENTIVO_PADRAO;
 }
 
 // ──────────────────────────────────────────────
@@ -182,11 +167,12 @@ async function dispararSegmento(segmento, { limite = 50, dryRun = false, janelaA
     } catch (e) {
       status = "falhou"; erro = e.message;
     }
-    const envio = await registrarEnvio({
+    // Mesma regra: simulação não escreve histórico.
+    const envio = dryRun ? null : await registrarEnvio({
       clienteId: c.id, segmento, template: segmento + "_" + incentivo.id,
       incentivo: incentivo.id, cupom: incentivo.cupom, mensagem, status, erro,
     });
-    resultados.push({ clienteId: c.id, nome: c.nome, telefone: c.telefone, status, envioId: envio.id, erro });
+    resultados.push({ clienteId: c.id, nome: c.nome, telefone: c.telefone, status, envioId: envio ? envio.id : null, erro });
   }
 
   const ok = resultados.filter(r => r.status === "enviado").length;
@@ -194,7 +180,15 @@ async function dispararSegmento(segmento, { limite = 50, dryRun = false, janelaA
   return { segmento, total: resultados.length, enviados: ok, falhas: resultados.length - ok, dryRun, resultados };
 }
 
-async function dispararParaCliente(clienteId, { dryRun = false } = {}) {
+// opções:
+//   dryRun       → não envia
+//   registrar    → false não grava nada em campanhas_envios
+//   rotuloStatus → sobrescreve o status gravado (ex: "lista_manual")
+//
+// Antes, dryRun pulava o envio mas gravava assim mesmo, com status
+// "enviado". Mentia no histórico e, pior, bloqueava o cliente pela janela
+// anti-spam por causa de um teste que nunca saiu.
+async function dispararParaCliente(clienteId, { dryRun = false, registrar = true, rotuloStatus = null } = {}) {
   const cliente = await buscarClienteId(clienteId);
   if (!cliente) throw new Error("Cliente não encontrado");
   const segmento = cliente.segmento || "regular";
@@ -205,15 +199,20 @@ async function dispararParaCliente(clienteId, { dryRun = false } = {}) {
   try {
     if (!dryRun) await enviarTexto(cliente.telefone, mensagem);
   } catch (e) { status = "falhou"; erro = e.message; }
-  const envio = await registrarEnvio({
-    clienteId, segmento, template: segmento + "_" + incentivo.id,
-    incentivo: incentivo.id, cupom: incentivo.cupom, mensagem, status, erro,
-  });
-  return { envio, mensagem, incentivo: incentivo.rotulo, status };
+  if (rotuloStatus) status = rotuloStatus;
+
+  const envio = registrar
+    ? await registrarEnvio({
+        clienteId, segmento, template: segmento + "_" + incentivo.id,
+        incentivo: incentivo.id, cupom: incentivo.cupom, mensagem, status, erro,
+      })
+    : null;
+  return { envio, mensagem, incentivo: incentivo.rotulo, status, registrado: Boolean(envio) };
 }
 
 module.exports = {
   INCENTIVOS,
+  INCENTIVO_PADRAO,
   escolherIncentivo,
   gerarMensagem,
   mensagemFallback,

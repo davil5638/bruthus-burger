@@ -1279,6 +1279,39 @@ app.post("/financeiro/anuncios/lancar", async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// CAMPANHA DIÁRIA — recuperação em doses pequenas
+// Ver scripts/campanhaDiaria.js
+// ──────────────────────────────────────────────
+app.get("/campanhas/diaria", async (req, res) => {
+  try {
+    const cd = require("./scripts/campanhaDiaria");
+    const r = await cd.rodarHoje({
+      qtd: parseInt(req.query.qtd || cd.POR_DIA, 10),
+      dryRun: true,
+      ignorarDia: req.query.forcar === "1",
+    });
+    res.json({ sucesso: true, ...r });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// Body: { "qtd": 5, "dryRun": true, "forcar": true }
+app.post("/campanhas/diaria/rodar", async (req, res) => {
+  try {
+    const cd = require("./scripts/campanhaDiaria");
+    const r = await cd.rodarHoje({
+      qtd: parseInt(req.body?.qtd || cd.POR_DIA, 10),
+      dryRun: !!req.body?.dryRun,
+      ignorarDia: !!req.body?.forcar,
+    });
+    res.json({ sucesso: true, ...r });
+  } catch (error) {
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 // RESUMO WHATSAPP — envio manual ou agendado
 // ──────────────────────────────────────────────
 app.post("/financeiro/enviar-resumo-whatsapp", async (req, res) => {
