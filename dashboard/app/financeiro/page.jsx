@@ -475,8 +475,11 @@ export default function FinanceiroPage() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-lg font-black leading-none" style={{ color: '#34d399' }}>{fmt(c.liquido)}</p>
+                  {/* 95%+ verde. Marketplace fica na faixa dos 75-80%: caro, mas
+                      normal — amarelo comunica custo, vermelho sugeriria defeito.
+                      Só abaixo de 70% vira alerta de verdade. */}
                   <p className="text-[10px] font-bold mt-1"
-                    style={{ color: c.retencao >= 95 ? '#34d399' : c.retencao >= 80 ? '#facc15' : '#f87171' }}>
+                    style={{ color: c.retencao >= 95 ? '#34d399' : c.retencao >= 70 ? '#facc15' : '#f87171' }}>
                     fica {c.retencao}%
                   </p>
                 </div>
