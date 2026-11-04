@@ -50,7 +50,7 @@ function parsearMensagem(texto) {
 }
 
 async function enviar(chatId, texto) {
-  if (!TOKEN) return;
+  if (!TOKEN) throw new Error("TELEGRAM_BOT_TOKEN não configurado");
   await axios.post(`${BASE()}/sendMessage`, {
     chat_id:    chatId,
     text:       texto,

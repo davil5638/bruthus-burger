@@ -61,6 +61,25 @@ const SEGMENTOS = ["em_risco", "perdido"];
 // cliente. A base tem vários ("teste", "ana", "aline" com números falsos).
 const MIN_DIGITOS = 12;
 
+// O Telegram usa parse_mode Markdown, e underscore solto abre itálico que
+// nunca fecha — a API recusa a mensagem INTEIRA com 400. "em_risco" tem um,
+// e com 5 clientes na lista são 5 underscores. Rótulo legível resolve o
+// problema e ainda fica melhor de ler.
+const ROTULO_SEGMENTO = {
+  em_risco: "em risco",
+  perdido:  "sumiu faz tempo",
+  novo:     "cliente novo",
+  vip:      "VIP",
+  regular:  "regular",
+  impulsivo: "compra por impulso",
+};
+
+// Escapa o que o Markdown do Telegram interpreta. Nome de cliente pode ter
+// qualquer coisa, e um "_" no meio quebra a mensagem toda.
+function escaparMarkdown(txt) {
+  return String(txt || "").replace(/([_*`\[\]])/g, "\\$1");
+}
+
 const TZ = "America/Fortaleza";
 
 function hojeFortaleza() {
@@ -179,8 +198,9 @@ async function rodarHoje({ qtd = POR_DIA, dryRun = false, ignorarDia = false } =
   }
 
   // Sem WhatsApp configurado, a lista vai para o Telegram para envio manual.
+  let telegramStatus = null;
   if (!automatico && !dryRun) {
-    await avisarNoTelegram(resultados, hoje);
+    telegramStatus = await avisarNoTelegram(resultados, hoje);
   }
 
   return {
@@ -188,13 +208,17 @@ async function rodarHoje({ qtd = POR_DIA, dryRun = false, ignorarDia = false } =
     automatico,
     dryRun,
     enviados: automatico && !dryRun ? resultados.filter((r) => r.status === "enviado").length : 0,
+    telegram: telegramStatus,
     fila: resultados,
   };
 }
 
+// Devolve o que aconteceu em vez de falhar calado. Sem isso, "não chegou
+// nada" vira adivinhação: pode ser chat id ausente, token ausente ou a API
+// recusando a formatação — e os três somem no mesmo catch mudo.
 async function avisarNoTelegram(resultados, data) {
   const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!chatId) return;
+  if (!chatId) return { ok: false, motivo: "TELEGRAM_CHAT_ID não configurado" };
 
   const linhas = [
     `🔔 *${resultados.length} cliente(s) para chamar hoje*`,
@@ -208,15 +232,19 @@ async function avisarNoTelegram(resultados, data) {
   ];
   resultados.forEach((r, i) => {
     if (r.erro) { linhas.push(`${i + 1}. ${r.nome} — erro: ${r.erro}`); return; }
-    linhas.push(`${i + 1}. *${r.nome}* (${r.segmento})`);
+    const rotulo = ROTULO_SEGMENTO[r.segmento] || r.segmento.replace(/_/g, " ");
+    linhas.push(`${i + 1}. *${escaparMarkdown(r.nome)}* — ${rotulo}`);
     linhas.push(r.link);
     linhas.push("");
   });
 
   try {
     await telegram.enviar(chatId, linhas.concat(rodape).join("\n"));
+    return { ok: true };
   } catch (e) {
-    console.warn("[CampanhaDiaria] não consegui avisar no Telegram:", e.message);
+    const detalhe = e.response?.data?.description || e.message;
+    console.warn("[CampanhaDiaria] não consegui avisar no Telegram:", detalhe);
+    return { ok: false, motivo: detalhe };
   }
 }
 
