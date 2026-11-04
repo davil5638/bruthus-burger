@@ -32,7 +32,13 @@ async function enviarTexto(telefone, mensagem, { delay = DELAY_MS } = {}) {
   const body = {
     number: numero,
     text:   mensagem,
-    options: { delay: 1200, presence: "composing", linkPreview: true },
+    // Na v2 estes campos sao de TOPO. O formato antigo `options: { ... }`
+    // e da v1: o schema da v2.3.0 so conhece number, text, linkPreview,
+    // delay, quoted, everyOne e mentioned. Como ele nao proibe campo
+    // extra, "options" era aceito e descartado em silencio — a pausa de
+    // digitacao nunca acontecia. "presence" nao existe mais no schema.
+    delay: 1200,
+    linkPreview: true,
   };
 
   let ultimoErro = null;
@@ -67,4 +73,19 @@ async function statusInstancia() {
   }
 }
 
-module.exports = { enviarTexto, statusInstancia, normalizarNumero, configurado, DRY_RUN };
+// `configurado()` so diz que as variaveis existem — e isso NAO basta.
+// Com o chip despareado a API responde normalmente, mas o estado vem
+// "connecting" e cada envio fica pendurado ate estourar o timeout, sem
+// erro util. Quem escolhe entre envio automatico e lista manual precisa
+// olhar o estado real da conexao, senao falha calado.
+async function conectado() {
+  if (!configurado()) return false;
+  try {
+    const s = await statusInstancia();
+    return s?.instance?.state === "open";
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { enviarTexto, statusInstancia, conectado, normalizarNumero, configurado, DRY_RUN };

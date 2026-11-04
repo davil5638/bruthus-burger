@@ -160,7 +160,10 @@ async function rodarHoje({ qtd = POR_DIA, dryRun = false, ignorarDia = false } =
     return { data: hoje, ignorado: "ninguem_elegivel", enviados: 0, fila: [] };
   }
 
-  const automatico = whats.configurado();
+  // Estado real, nao so "tem variavel". Se o chip caiu, a lista volta
+  // para o Telegram e os mesmos clientes continuam na fila ate serem
+  // contatados de verdade.
+  const automatico = await whats.conectado();
   const resultados = [];
 
   for (const cliente of fila) {

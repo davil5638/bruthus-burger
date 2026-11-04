@@ -1,0 +1,7 @@
+# O Caddy pede e renova o certificado do Let's Encrypt sozinho. Para isso
+# funcionar, as portas 80 e 443 precisam estar abertas na Security List do
+# Oracle e o domínio precisa apontar para o IP desta máquina — os dois já
+# estão assim desde o projeto anterior.
+{$DOMINIO} {
+	reverse_proxy evolution:8080
+}

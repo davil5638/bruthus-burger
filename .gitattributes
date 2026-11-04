@@ -1,0 +1,4 @@
+# Os arquivos de infra/evolution rodam no Linux, dentro da VM do Oracle.
+# O Git no Windows converte para CRLF por padrao, e Caddyfile ou .env com
+# fim de linha do Windows quebra la. Aqui e LF sempre.
+infra/evolution/** text eol=lf

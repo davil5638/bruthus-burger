@@ -1,40 +1,59 @@
 # ──────────────────────────────────────────────
 # Evolution API — ponte entre o sistema e o WhatsApp
 #
-# Roda numa VPS, NÃO no Render. No plano free do Render o serviço dorme
-# quando fica ocioso, e quando dorme a sessão do WhatsApp cai — seria
-# reconectar QR todo dia. O disco de lá também é descartado a cada
-# restart, e é nele que a sessão vive.
-#
-# Requisitos: VPS com 1 GB de RAM (2 GB folgado), Docker e Docker Compose.
+# Roda na VM do Oracle (ARM, Ubuntu 24.04), NÃO no Render. No plano free
+# do Render o serviço dorme quando fica ocioso, e quando dorme a sessão do
+# WhatsApp cai — seria reconectar QR todo dia. O disco de lá também é
+# descartado a cada restart, e é nele que a sessão vive.
 #
 # ATENÇÃO À IMAGEM: a partir da v2.3.0 o projeto mudou de
 # `atendai/evolution-api` para `evoapicloud/evolution-api`. A maioria dos
 # tutoriais na internet ainda aponta para o nome antigo e trava numa
-# versão velha. Confirme a tag atual em doc.evolution-api.com antes de
-# subir — os nomes das variáveis também mudam entre versões menores.
+# versão velha. Esta imagem tem build arm64, que é o necessário na
+# Ampere A1 do Oracle — a maioria das imagens de WhatsApp não tem.
+#
+# POR QUE O CADDY:
+# A Evolution NÃO fica exposta na internet. Só o Caddy escuta 80/443, e
+# ele resolve o certificado HTTPS sozinho com o Let's Encrypt. Sem isso a
+# apikey viajaria em texto puro entre o Render e esta máquina.
 #
 # Como usar:
-#   1. copie .env.exemplo para .env e preencha
-#   2. docker compose up -d
-#   3. docker compose logs -f evolution   (confirme que subiu)
-#   4. crie a instância e pareie o QR (ver README.md)
+#   docker compose up -d
+#   docker compose logs -f evolution
 # ──────────────────────────────────────────────
 
 services:
-  evolution:
-    image: evoapicloud/evolution-api:latest
-    container_name: evolution
-    restart: always
+  caddy:
+    image: caddy:2
+    container_name: evolution-caddy
+    restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - evolution
+
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.0
+    container_name: evolution
+    restart: unless-stopped
+    # Só o localhost da própria VM alcança a 8080 direto. Quem vem de fora
+    # passa obrigatoriamente pelo Caddy, com HTTPS.
+    ports:
+      - "127.0.0.1:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      # Endereço público. Precisa bater com o domínio/IP que você vai usar,
-      # senão o QR code e os webhooks apontam para o lugar errado.
-      SERVER_URL: ${SERVER_URL}
+      # Endereço público. Precisa bater com o domínio real, senão o QR
+      # code e os webhooks apontam para o lugar errado.
+      SERVER_URL: https://${DOMINIO}
 
       # A chave que o seu sistema manda no header `apikey`. É esta que vai
       # em EVOLUTION_API_KEY no Render.
@@ -50,7 +69,7 @@ services:
       CACHE_REDIS_ENABLED: "false"
       CACHE_LOCAL_ENABLED: "true"
 
-      # Sem isso o container enche o disco da VPS com log em poucas semanas.
+      # Sem isso o container enche o disco da VM com log em poucas semanas.
       LOG_LEVEL: ERROR
       LOG_BAILEYS: error
     volumes:
@@ -59,7 +78,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: evolution-postgres
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: evolution
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -75,3 +94,5 @@ services:
 volumes:
   evolution_instances:
   evolution_pgdata:
+  caddy_data:
+  caddy_config:
