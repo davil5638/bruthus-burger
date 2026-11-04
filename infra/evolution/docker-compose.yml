@@ -75,6 +75,35 @@ services:
     volumes:
       - evolution_instances:/evolution/instances
 
+  # ── Atendente: o bot de WhatsApp ──
+  # Sem `ports`: ninguém da internet alcança. Só a Evolution chama, pela
+  # rede interna do Docker, em http://bot:3000. Um bot de atendimento
+  # exposto é convite para alguém disparar mensagem no nome da loja.
+  #
+  # Começa em OBSERVAÇÃO: entende tudo e grava, não responde ninguém.
+  # Para soltar, BOT_RESPONDER=1 no .env e `docker compose up -d`.
+  bot:
+    image: node:20-alpine
+    container_name: atendente
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install --omit=dev --no-audit --no-fund --loglevel=error && node index.js"
+    environment:
+      PORTA: 3000
+      RESPONDER: ${BOT_RESPONDER:-0}
+      EVOLUTION_API_URL: http://evolution:8080
+      EVOLUTION_API_KEY: ${AUTHENTICATION_API_KEY}
+      EVOLUTION_INSTANCE: bruthus
+      OLACLICK_API_TOKEN: ${OLACLICK_API_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DIARIO: /dados/observacao.jsonl
+      TZ: America/Fortaleza
+    volumes:
+      - /home/ubuntu/bot:/app
+      - bot_dados:/dados
+    depends_on:
+      - evolution
+
   postgres:
     image: postgres:16-alpine
     container_name: evolution-postgres
@@ -96,3 +125,4 @@ volumes:
   evolution_pgdata:
   caddy_data:
   caddy_config:
+  bot_dados:
