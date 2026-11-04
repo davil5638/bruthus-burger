@@ -76,6 +76,14 @@ Objetivo: lembrar do restaurante sem ser invasivo.`,
 //
 // `i` é o rótulo curto do incentivo ("15% OFF"). Cada frase diz "pelo
 // link" por conta própria, porque o cupom não vale no iFood.
+// Toda mensagem abre dizendo de onde é.
+//
+// Sem isso, quem sumiu há meses recebe uma mensagem de número desconhecido
+// oferecendo desconto — exatamente o perfil que vira denúncia de spam, que
+// é o que mais derruba número no WhatsApp. E o número aqui é o da operação,
+// o mesmo que recebe pedido: uma denúncia custa a linha da loja.
+const LOJA = "Bruthus Burger";
+
 const VARIACOES = {
   vip: [
     (n, i, c) => `${n}, você é um dos nossos clientes mais especiais 🍔
@@ -85,27 +93,28 @@ Guardamos ${i} pro seu próximo pedido pelo link.${c}`,
     (n, i, c) => `Oi ${n}! Separamos ${i} pra quem é de casa — é só pedir pelo link.${c}`,
   ],
   em_risco: [
-    (n, i, c) => `${n}, faz um tempinho que a gente não te vê por aqui 🙏
-Separamos ${i} pro seu próximo pedido pelo link.${c}`,
-    (n, i, c) => `Oi ${n}, tudo bem? Notamos que você sumiu um pouco.
-Tem ${i} te esperando — é só pedir pelo link.${c}`,
-    (n, i, c) => `${n}, que tal matar a saudade do nosso hambúrguer? 🍔
-Deixamos ${i} no seu nome, pedindo pelo link.${c}`,
-    (n, i, c) => `${n}, a chapa continua quente por aqui 🔥
-${i} no seu pedido pelo link.${c}`,
-    (n, i, c) => `Oi ${n}! Faz um tempo que você não pede com a gente.
-Se quiser voltar hoje, ${i} pelo link.${c}`,
+    (n, i, c) => `Oi ${n}, aqui é da ${LOJA} 🍔
+Faz um tempinho que a gente não te vê por aqui. Separamos ${i} pro seu próximo pedido pelo link.${c}`,
+    (n, i, c) => `${n}, aqui é a ${LOJA}!
+Notamos que você sumiu um pouco. Tem ${i} te esperando — é só pedir pelo link.${c}`,
+    (n, i, c) => `Oi ${n}! Aqui é da ${LOJA} 🍔
+Que tal matar a saudade? Deixamos ${i} no seu nome, pedindo pelo link.${c}`,
+    (n, i, c) => `${n}, é a ${LOJA} aqui 🔥
+A chapa continua quente. ${i} no seu pedido pelo link.${c}`,
+    (n, i, c) => `Oi ${n}, aqui é da ${LOJA}.
+Faz um tempo que você não pede com a gente. Se quiser voltar hoje, ${i} pelo link.${c}`,
   ],
   perdido: [
-    (n, i, c) => `${n}, sentimos saudade! 🍔
-Pra te receber de volta, ${i} no pedido pelo link.${c}`,
-    (n, i, c) => `${n}, quanto tempo! A Bruthus continua firme aqui.
-Se quiser dar uma chance pra gente de novo, ${i} pelo link.${c}`,
-    (n, i, c) => `Oi ${n}, tudo certo? Faz bastante tempo que você não aparece 🙏
-Separamos ${i} pro reencontro, pedindo pelo link.${c}`,
-    (n, i, c) => `${n}, a gente lembra de você por aqui.
-Se bater vontade hoje, tem ${i} no seu nome pelo link.${c}`,
-    (n, i, c) => `${n}, bora matar a saudade? 🔥 Tem ${i} te esperando no link.${c}`,
+    (n, i, c) => `Oi ${n}, aqui é da ${LOJA} 🍔
+Sentimos saudade! Pra te receber de volta, ${i} no pedido pelo link.${c}`,
+    (n, i, c) => `${n}, aqui é a ${LOJA}. Quanto tempo!
+A gente continua firme. Se quiser dar uma chance pra gente de novo, ${i} pelo link.${c}`,
+    (n, i, c) => `Oi ${n}, aqui é da ${LOJA} 🙏
+Faz bastante tempo que você não aparece. Separamos ${i} pro reencontro, pedindo pelo link.${c}`,
+    (n, i, c) => `${n}, é a ${LOJA} aqui.
+A gente lembra de você. Se bater vontade hoje, tem ${i} no seu nome pelo link.${c}`,
+    (n, i, c) => `Oi ${n}! Aqui é da ${LOJA} 🔥
+Bora matar a saudade? Tem ${i} te esperando no link.${c}`,
   ],
   novo: [
     (n, i, c) => `${n}, bem-vindo ao Bruthus! 🔥
@@ -146,18 +155,106 @@ function proximaVariacao(segmento, opcoes) {
   return opcoes[i];
 }
 
+// Quando o cadastro não tem um nome aproveitável. São poucos — 7 dos 348
+// da fila — mas sem isso sairia "85994363912, faz um tempinho que a gente
+// não te vê por aqui" ou ", que tal matar a saudade?", com o nome vazio.
+const VARIACOES_SEM_NOME = {
+  em_risco: [
+    (i, c) => `Oi! Faz um tempinho que a gente não te vê por aqui 🙏\nSeparamos ${i} pro seu próximo pedido pelo link.${c}`,
+    (i, c) => `Oi, tudo bem? A chapa continua quente por aqui 🔥\nTem ${i} te esperando — é só pedir pelo link.${c}`,
+  ],
+  perdido: [
+    (i, c) => `Oi! Faz bastante tempo que você não pede com a gente 🙏\nPra te receber de volta, ${i} no pedido pelo link.${c}`,
+    (i, c) => `Oi, tudo certo? A Bruthus continua firme aqui 🍔\nSe bater vontade hoje, ${i} pelo link.${c}`,
+  ],
+};
+
+// Nome de cadastro de loja é bagunçado: vem telefone no campo do nome,
+// vem "teste", vem ponto final, vem tudo em maiúscula. Devolve um primeiro
+// nome apresentável, ou null quando não dá para usar nenhum.
+const NOMES_LIXO = new Set(["teste", "test", "cliente", "consumidor", "nao", "sem", "nome", "asd", "xxx"]);
+
+function primeiroNomeUtilizavel(bruto) {
+  const p = String(bruto || "").trim().split(/\s+/)[0] || "";
+  const limpo = p.replace(/[^\p{L}'-]/gu, "");           // tira dígitos e pontuação
+  if (limpo.length < 3) return null;                      // "js", "kr", "."
+  if (NOMES_LIXO.has(limpo.toLowerCase())) return null;
+  // FRANCISCO vira Francisco: caixa alta no WhatsApp parece grito.
+  if (limpo === limpo.toUpperCase()) {
+    return limpo.charAt(0) + limpo.slice(1).toLowerCase();
+  }
+  return limpo;
+}
+
 function mensagemFallback(segmento, cliente, incentivo) {
-  const nome = cliente.nome?.split(" ")[0] || "amigo";
+  const nome = primeiroNomeUtilizavel(cliente.nome);
   const cupomTxt = incentivo.cupom ? `
 Cupom: *${incentivo.cupom}*` : "";
   const rotulo = incentivo.rotuloCurto || incentivo.rotulo;
+  // Sem nome aproveitável, usa a versão que não começa chamando ninguém.
+  if (!nome) {
+    const semNome = VARIACOES_SEM_NOME[segmento] || VARIACOES_SEM_NOME.perdido;
+    const esc = proximaVariacao("sem_nome_" + segmento, semNome);
+    return `${esc(rotulo, cupomTxt)}
+${ORDER_LINK}`;
+  }
+
   const opcoes = VARIACOES[segmento] || VARIACOES.regular;
   const escolhida = proximaVariacao(segmento, opcoes);
   return `${escolhida(nome, rotulo, cupomTxt)}
 ${ORDER_LINK}`;
 }
 
+// Limpa o que o modelo devolve, ANTES de enviar.
+//
+// Existia uma função parecida em campanhaDiaria, mas ela rodava depois do
+// disparo: limpava só a cópia que aparecia na lista do Telegram, enquanto
+// o cliente recebia o texto cru. Aqui é na origem, então vale para o que
+// é enviado, para o que fica gravado e para o que é exibido.
+//
+// O que já saiu errado em produção:
+//   "aproveite! 🍔  \n https://..."   → a barra-n literal, escrita na cara
+//   "Use o cupom *CUPOM* BRUTHUS15"   → a palavra CUPOM duplicada
+//   "**15% OFF**"                     → negrito de Markdown, não de WhatsApp
+function limparTexto(txt, incentivo) {
+  let s = String(txt || "");
+  // A sequência de dois caracteres \ + n, que o modelo às vezes escreve
+  // em vez de quebrar a linha de verdade.
+  s = s.replace(/\\r\\n|\\n/g, "\n");
+  // Markdown usa **negrito**; o WhatsApp usa *negrito*.
+  s = s.replace(/\*\*([^*]+)\*\*/g, "*$1*");
+  // Link em markdown mostraria os colchetes para o cliente.
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, "$2");
+  // "cupom *CUPOM* BRUTHUS15" e variantes — sobra do próprio prompt.
+  if (incentivo?.cupom) {
+    const c = incentivo.cupom;
+    s = s.replace(new RegExp("\\*?CUPOM\\*?\\s+(\\*?)" + c, "gi"), "*" + c + "*");
+    s = s.replace(new RegExp("\\*" + c + "\\*\\*", "g"), "*" + c + "*");
+  }
+  // Espaço antes de quebra de linha, e três ou mais quebras seguidas.
+  s = s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+  return s.trim();
+}
+
+// A campanha usa TEXTO FIXO por padrão.
+//
+// Antes, toda mensagem era escrita na hora pela OpenAI. O dono não sabia
+// disso e descobriu lendo o que saía em produção: "Use o cupom *CUPOM*
+// BRUTHUS15", uma barra-n literal no meio da frase. Texto livre gerado a
+// cada envio não dá para revisar antes — e aqui ele sai do número que
+// recebe pedido, para cliente de verdade.
+//
+// O mesmo raciocínio que levou a um cupom único para todos vale aqui:
+// previsível vale mais que personalizado. As variações em VARIACOES já
+// dão diferença suficiente entre as mensagens de um mesmo lote.
+//
+// Para voltar a usar a IA: CAMPANHA_USAR_IA=1 no ambiente. A chave da
+// OpenAI continua servindo stories, legendas e promoções normalmente —
+// este interruptor é só da campanha.
+const USAR_IA = process.env.CAMPANHA_USAR_IA === "1";
+
 async function gerarMensagem(segmento, cliente, incentivo) {
+  if (!USAR_IA) return mensagemFallback(segmento, cliente, incentivo);
   if (!process.env.OPENAI_API_KEY) return mensagemFallback(segmento, cliente, incentivo);
   try {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -182,7 +279,10 @@ Regras:
 - Mensagem de WhatsApp curta (3 a 5 linhas).
 - Sem assinatura formal, sem "atenciosamente".
 - Não cite "campanha", "marketing" ou "automação".
-- Se houver cupom, exiba em negrito (*CUPOM*).
+- Se houver cupom, escreva o código dele entre asteriscos, assim: *${incentivo.cupom || "CODIGO"}*. Não escreva a palavra "CUPOM" em negrito.
+- Use quebras de linha de verdade. NUNCA escreva a sequência \\n dentro do texto.
+- Negrito do WhatsApp é *um* asterisco de cada lado, nunca dois.
+- Escreva o link puro, sem colchetes e sem parênteses.
 - Inclua o link de pedido no final.
 - Português do Brasil, regional (Fortaleza).
 - NUNCA invente desconto diferente do informado.
@@ -195,7 +295,7 @@ Devolva SOMENTE o texto da mensagem.`;
       max_tokens: 220,
       temperature: 0.8,
     });
-    const txt = res.choices[0]?.message?.content?.trim();
+    const txt = limparTexto(res.choices[0]?.message?.content, incentivo);
     return txt || mensagemFallback(segmento, cliente, incentivo);
   } catch (e) {
     console.warn("⚠️ OpenAI falhou, usando fallback:", e.message);

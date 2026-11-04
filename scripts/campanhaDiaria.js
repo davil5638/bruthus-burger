@@ -35,7 +35,12 @@ if (require.main === module) {
 const campanhas = require("./customerCampaigns");
 const whats     = require("./whatsappEvolution");
 const telegram  = require("./telegramBot");
+const olaclick  = require("./olaclickApi");
 const { listarClientes, jaEnviouRecentemente, limparPendentes, diaPausado } = require("./dbClientes");
+
+// Qualquer canal serve como prova de que a loja abriu — um pedido no iFood
+// significa cozinha ligada tanto quanto um pelo cardápio próprio.
+const SOURCES_LOJA = ["inbound", "outbound", "chatbot", "ifood", "rappi", "uber_eats"];
 
 // Quantos clientes por dia. Começa pequeno de propósito: é melhor
 // descobrir que a mensagem não funciona com 5 pessoas do que com 100.
@@ -50,7 +55,10 @@ const JANELA_DIAS = 30;
 // Só manda em dia que a loja abre. Chamar alguém para vir hoje quando a
 // loja está fechada é pior que não chamar. 0=domingo.
 // Hoje: quinta a domingo. A partir de 11/11 a quarta entra — basta somar 3.
-const DIAS_DE_ENVIO = [4, 5, 6, 0];
+// Quarta a domingo. A quarta entra a partir de 11/11, mas já pode ficar
+// ligada aqui: a checagem de pedido abaixo cala a campanha em qualquer dia
+// sem movimento, então uma quarta fechada não dispara nada.
+const DIAS_DE_ENVIO = [3, 4, 5, 6, 0];
 
 // Segmentos elegíveis, na ordem em que são esvaziados. "perdido" primeiro
 // porque é o maior grupo e o que tem mais a ganhar; "em_risco" depois,
@@ -161,6 +169,33 @@ async function rodarHoje({ qtd = POR_DIA, dryRun = false, ignorarDia = false } =
   const pausa = await diaPausado(hoje);
   if (pausa.pausado) {
     return { data: hoje, ignorado: "dia_pausado", motivo: pausa.motivo, enviados: 0, fila: [] };
+  }
+
+  // Loja aberta? Pergunta indireta, mas honesta: se já entrou pedido hoje,
+  // a loja está aberta. Não existe jeito direto — o get_store_status do
+  // OlaClick só enxerga iFood e Rappi, e devolve UNKNOWN para todos.
+  //
+  // Medido em 30 dias de operação: o primeiro pedido cai por volta das
+  // 18h30, e em apenas 1 desses dias (3%) não havia pedido nenhum às 19h.
+  // Quando erra, erra para o lado seguro — não envia, e os clientes ficam
+  // na fila para o próximo dia.
+  //
+  // Se o OlaClick não responder, segue em frente em vez de emudecer a
+  // campanha por tempo indeterminado. A API fora do ar não é motivo para
+  // ninguém mais ser chamado; o /fechado continua valendo nesse caso.
+  let pedidosHoje = null;
+  if (!ignorarDia && olaclick.configurado()) {
+    try {
+      const resumo = await olaclick.buscarResumo({
+        dataInicio: hoje, dataFim: hoje, sources: SOURCES_LOJA,
+      });
+      pedidosHoje = resumo.pedidos;
+      if (!pedidosHoje) {
+        return { data: hoje, ignorado: "loja_sem_movimento", enviados: 0, fila: [] };
+      }
+    } catch (e) {
+      console.warn("[CampanhaDiaria] não consegui conferir se a loja abriu:", e.message);
+    }
   }
 
   // A lista de ontem que não foi enviada é descartada. Como a fila é
