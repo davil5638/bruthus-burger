@@ -187,11 +187,53 @@ async function buscarPedido(id) {
   return data?.data || data;
 }
 
+// ──────────────────────────────────────────────
+// Perfil da loja: horário de funcionamento por dia e se está aberta AGORA.
+//
+// `currently_open` é o que o painel mostra como "Cardápio digital: Fechado".
+// Ele fica falso tanto fora do horário quanto quando o dono aperta pausar
+// por alta demanda — quem separa os dois casos é o relógio contra
+// `business_hours`, e isso é feito em quem chama (ver infra/bot/loja.js).
+// ──────────────────────────────────────────────
+async function buscarEmpresa() {
+  exigirToken();
+  const { data } = await getComRetry(`${BASE}/company`, {
+    headers: headers(),
+    timeout: 15000,
+  });
+  return data?.data || data;
+}
+
+// ──────────────────────────────────────────────
+// Catálogo com o campo `visible`.
+//
+// É assim que o dono tira um item do ar: marca como INVISÍVEL, não como
+// esgotado. Quando acaba a massa, todas as pizzas ficam invisíveis de uma
+// vez. Vem paginado de 20 em 20, então percorre tudo.
+// ──────────────────────────────────────────────
+async function listarProdutos({ maxPaginas = 10 } = {}) {
+  exigirToken();
+  const todos = [];
+  for (let pagina = 1; pagina <= maxPaginas; pagina++) {
+    const { data } = await getComRetry(`${BASE}/menu/products`, {
+      headers: headers(),
+      timeout: 15000,
+      params: { page: pagina, per_page: 100 },
+    });
+    const lote = data?.data || [];
+    todos.push(...lote);
+    if (!data?.pagination?.has_more) break;
+  }
+  return todos;
+}
+
 module.exports = {
   configurado,
   buscarResumo,
   listarPedidos,
   buscarPedido,
+  buscarEmpresa,
+  listarProdutos,
   SOURCES_VALIDOS,
   TIMEZONE,
 };
