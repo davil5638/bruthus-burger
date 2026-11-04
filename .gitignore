@@ -5,3 +5,6 @@ generated/
 *.log
 dashboard/.next/
 dashboard/node_modules/
+
+# credenciais da VPS do Evolution
+infra/evolution/.env
