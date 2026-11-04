@@ -157,7 +157,9 @@ async function decidir(texto, msg) {
   const codigo = codigoDoPedido(texto);
   if (codigo) {
     try {
-      const pedido = await olaclick.buscarPedido(codigo);
+      // Pelo código público, não pelo UUID: `/orders/{BR-x}` devolve 422.
+      const pedido = await olaclick.buscarPedidoPorCodigo(codigo);
+      if (!pedido) return { intencao: "pedido_pelo_botao", pedido: codigo, erro: "não achei esse pedido" };
       const forma = pedido?.payments?.[0]?.payment_method?.code || null;
       return {
         intencao: "pedido_pelo_botao",
@@ -171,23 +173,27 @@ async function decidir(texto, msg) {
     }
   }
 
-  // 2. Loja pausada ou fechada responde antes de qualquer outra coisa:
-  //    não adianta falar de cardápio para quem não pode pedir agora.
-  if (estado && estado.situacao !== "aberta") {
-    return {
-      intencao: estado.situacao === "pausada" ? "loja_pausada" : "loja_fechada",
-      acao: estado.situacao === "pausada"
-        ? "avisa que a produção está cheia e que volta a aceitar em breve"
-        : `avisa que abre ${estado.proximaAbertura?.dia} às ${estado.proximaAbertura?.hora}`,
-    };
-  }
+  // Como avisar que não dá para pedir agora. NÃO é resposta sozinha: no
+  // primeiro teste isto atropelava tudo, e quem perguntasse "quanto custa
+  // o combo do melt?" às 15h recebia só "abrimos quinta", sem o preço.
+  // Pergunta se responde; o aviso vai junto, não no lugar.
+  const avisoFechado = !estado || estado.situacao === "aberta" ? null
+    : estado.situacao === "pausada"
+      ? "a produção está cheia agora; volta a aceitar em breve"
+      : `fechado agora; abre ${estado.proximaAbertura?.dia} às ${estado.proximaAbertura?.hora}`;
 
   const n = cardapio.normalizar(texto);
   if (!n) return { intencao: msg?.temImagem ? "print_pendente" : "sem_texto" };
 
   // 3. Só um cumprimento. 135 conversas abriram assim.
   if (/^(oi+|ola|alo|opa|bo[am]\s+(dia|tarde|noite)|e\s*ai)[\s!,.]*$/.test(n)) {
-    return { intencao: "saudacao", acao: "manda as boas-vindas com o link do cardápio" };
+    return {
+      intencao: "saudacao",
+      loja: avisoFechado || undefined,
+      acao: avisoFechado
+        ? `manda a mensagem de ausência: ${avisoFechado}`
+        : "manda as boas-vindas com o link do cardápio",
+    };
   }
 
   // 4. Pediu alguma coisa do cardápio.
@@ -201,11 +207,16 @@ async function decidir(texto, msg) {
       preco: achado.item.preco,
       confianca: achado.confianca,
       esgotado,
+      loja: avisoFechado || undefined,
+      // Responde o preço de qualquer jeito. Quem pergunta de tarde pede
+      // de noite; devolver só "estamos fechados" joga a venda fora.
       acao: esgotado
-        ? "avisa que esse acabou hoje e oferece os que restam"
-        : achado.confianca === "baixa"
-          ? "pergunta qual dos parecidos, em vez de chutar"
-          : "confirma o item e pergunta ponto da carne, maionese, endereço e pagamento",
+        ? "diz o preço e avisa que esse acabou hoje, oferecendo os que restam"
+        : avisoFechado
+          ? `diz o preço e avisa: ${avisoFechado}`
+          : achado.confianca === "baixa"
+            ? "pergunta qual dos parecidos, em vez de chutar"
+            : "confirma o item e pergunta ponto da carne, maionese, endereço e pagamento",
       alternativas: achado.confianca === "baixa" ? achado.alternativas.map((a) => a.nome) : undefined,
     };
   }
@@ -214,9 +225,17 @@ async function decidir(texto, msg) {
   const bairro = cardapio.taxaBairro(texto);
   if (bairro) return { intencao: "endereco", bairro: bairro.bairro, taxa: bairro.taxa };
 
-  if (/\b(pix|cartao|dinheiro|debito|credito|troco)\b/.test(n)) return { intencao: "pagamento" };
+  if (/\b(pix|cartao|dinheiro|debito|credito|troco)\b/.test(n)) {
+    return { intencao: "pagamento", loja: avisoFechado || undefined };
+  }
   if (/\b(aberto|abriu|funcionando|horario|entrega|taxa|demora|quanto tempo|pizza)\b/.test(n)) {
-    return { intencao: "duvida", acao: "responde com o que sabe da loja e do cardápio" };
+    return {
+      intencao: "duvida",
+      loja: avisoFechado || undefined,
+      acao: avisoFechado
+        ? `responde a dúvida e avisa: ${avisoFechado}`
+        : "responde com o que sabe da loja e do cardápio",
+    };
   }
   return { intencao: "nao_entendi", acao: "não responde; deixa para o dono" };
 }

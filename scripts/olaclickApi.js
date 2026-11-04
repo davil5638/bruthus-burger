@@ -188,6 +188,41 @@ async function buscarPedido(id) {
 }
 
 // ──────────────────────────────────────────────
+// Busca pelo código público (BR-xxxxxxx), que é o que o cliente manda no
+// WhatsApp quando chega pelo botão do OlaClick — 7 de cada 10 pedidos.
+//
+// `/orders/{id}` só aceita o UUID: passar o BR- devolve 422. E `/orders`
+// exige os filtros de data, senão também é 422 — não dá para consultar
+// "o pedido BR-x" sem dizer de quando ele é. Por isso varre os últimos
+// dias e depois busca o detalhe pelo UUID, que é onde vêm os pagamentos.
+// ──────────────────────────────────────────────
+async function buscarPedidoPorCodigo(publicId, { diasAtras = 2 } = {}) {
+  exigirToken();
+  const hoje = new Date();
+  const ymd = (d) => d.toISOString().slice(0, 10);
+  const inicio = new Date(hoje.getTime() - diasAtras * 86400000);
+
+  const { data } = await getComRetry(`${BASE}/orders`, {
+    headers: headers(),
+    timeout: 20000,
+    params: {
+      "filter[start_date]": ymd(inicio),
+      "filter[end_date]":   ymd(hoje),
+      "filter[sources]":    SOURCES_VALIDOS.join(","),
+      "filter[timezone]":   TIMEZONE,
+      "filter[public_id]":  publicId,
+      per_page: 5,
+    },
+  });
+
+  const achado = (data?.data || [])[0];
+  if (!achado) return null;
+  // O detalhe traz payments[], que a listagem não traz — e é dele que sai
+  // o ramo pix / cartão / dinheiro.
+  return buscarPedido(achado.id);
+}
+
+// ──────────────────────────────────────────────
 // Perfil da loja: horário de funcionamento por dia e se está aberta AGORA.
 //
 // `currently_open` é o que o painel mostra como "Cardápio digital: Fechado".
@@ -232,6 +267,7 @@ module.exports = {
   buscarResumo,
   listarPedidos,
   buscarPedido,
+  buscarPedidoPorCodigo,
   buscarEmpresa,
   listarProdutos,
   SOURCES_VALIDOS,
