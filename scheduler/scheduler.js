@@ -175,11 +175,12 @@ function iniciarAgendador() {
   }, tz);
   console.log("  📣 Anúncios:       Todo dia às 05h10 (+ no boot)");
 
-  // ── Recuperação de clientes — 11h00, em doses pequenas ──
-  // Cedo o bastante para a pessoa planejar o jantar, tarde o bastante
-  // para não acordar ninguém. O módulo só roda em dia que a loja abre e
-  // não repete o mesmo cliente por 45 dias.
-  cron.schedule("0 11 * * *", async () => {
+  // ── Recuperação de clientes — 19h00, em doses pequenas ──
+  // A loja abre 18h30 e fecha 23h. Às 19h a cozinha já está rodando, é
+  // a hora em que a pessoa decide a janta, e ainda sobram 4 horas para
+  // ela pedir. Mandar antes da abertura era chamar para uma loja fechada.
+  // Só roda em dia que a loja abre e não repete o mesmo cliente por 30 dias.
+  cron.schedule("0 19 * * *", async () => {
     console.log("\n🔔 Campanha diária de recuperação...");
     try {
       const { rodarHoje } = require("../scripts/campanhaDiaria");
@@ -191,7 +192,7 @@ function iniciarAgendador() {
       console.error("❌ Erro na campanha diária:", e.message);
     }
   }, tz);
-  console.log("  🔔 Recuperação:    Todo dia às 11h00 (5 clientes, só em dia de loja aberta)");
+  console.log("  🔔 Recuperação:    Todo dia às 19h00 (5 clientes, só em dia de loja aberta)");
 
   // ── Recálculo diário de scores de clientes — 00h30 ──
   cron.schedule("30 0 * * *", async () => {

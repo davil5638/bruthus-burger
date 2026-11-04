@@ -25,6 +25,10 @@ const INCENTIVO_PADRAO = {
   // iFood. Sem isso o cliente tenta no app, leva erro e a campanha vira
   // irritacao. E empurrar para o link e o que a loja quer de qualquer jeito.
   rotulo: "15% OFF no pedido pelo link",
+  // Versao curta para encaixar no meio de uma frase. O rotulo inteiro
+  // trunca o texto ("Deixamos 15% OFF no pedido pelo link separado no seu
+  // nome"), entao as variacoes usam esta e dizem "pelo link" por conta.
+  rotuloCurto: "15% OFF",
   cupom:  "BRUTHUS15",
   tom:    "direto",
 };
@@ -64,19 +68,93 @@ Tom: simples e amigo. No máximo 2 emojis.
 Objetivo: lembrar do restaurante sem ser invasivo.`,
 };
 
+// Varia o texto de propósito. Cinco mensagens idênticas saindo do mesmo
+// número em poucos minutos é o padrão que o WhatsApp usa para flagrar
+// disparo em massa — e aqui o número é o da operação, o que recebe
+// pedido. Cada cliente do lote recebe um texto diferente mesmo sem a
+// OpenAI configurada (que é o caso hoje).
+//
+// `i` é o rótulo curto do incentivo ("15% OFF"). Cada frase diz "pelo
+// link" por conta própria, porque o cupom não vale no iFood.
+const VARIACOES = {
+  vip: [
+    (n, i, c) => `${n}, você é um dos nossos clientes mais especiais 🍔
+Novidade saindo do forno, e você sabe primeiro: ${i} pedindo pelo link.${c}`,
+    (n, i, c) => `${n}, cliente de casa merece tratamento de casa 🙌
+Guardamos ${i} pro seu próximo pedido pelo link.${c}`,
+    (n, i, c) => `Oi ${n}! Separamos ${i} pra quem é de casa — é só pedir pelo link.${c}`,
+  ],
+  em_risco: [
+    (n, i, c) => `${n}, faz um tempinho que a gente não te vê por aqui 🙏
+Separamos ${i} pro seu próximo pedido pelo link.${c}`,
+    (n, i, c) => `Oi ${n}, tudo bem? Notamos que você sumiu um pouco.
+Tem ${i} te esperando — é só pedir pelo link.${c}`,
+    (n, i, c) => `${n}, que tal matar a saudade do nosso hambúrguer? 🍔
+Deixamos ${i} no seu nome, pedindo pelo link.${c}`,
+    (n, i, c) => `${n}, a chapa continua quente por aqui 🔥
+${i} no seu pedido pelo link.${c}`,
+    (n, i, c) => `Oi ${n}! Faz um tempo que você não pede com a gente.
+Se quiser voltar hoje, ${i} pelo link.${c}`,
+  ],
+  perdido: [
+    (n, i, c) => `${n}, sentimos saudade! 🍔
+Pra te receber de volta, ${i} no pedido pelo link.${c}`,
+    (n, i, c) => `${n}, quanto tempo! A Bruthus continua firme aqui.
+Se quiser dar uma chance pra gente de novo, ${i} pelo link.${c}`,
+    (n, i, c) => `Oi ${n}, tudo certo? Faz bastante tempo que você não aparece 🙏
+Separamos ${i} pro reencontro, pedindo pelo link.${c}`,
+    (n, i, c) => `${n}, a gente lembra de você por aqui.
+Se bater vontade hoje, tem ${i} no seu nome pelo link.${c}`,
+    (n, i, c) => `${n}, bora matar a saudade? 🔥 Tem ${i} te esperando no link.${c}`,
+  ],
+  novo: [
+    (n, i, c) => `${n}, bem-vindo ao Bruthus! 🔥
+Pra um 2º pedido inesquecível, ${i} pelo link.${c}`,
+    (n, i, c) => `Oi ${n}! Que bom ter você com a gente 🍔
+Pro próximo pedido, ${i} pelo link.${c}`,
+    (n, i, c) => `${n}, gostou do primeiro? O segundo vai com ${i}, pedindo pelo link.${c}`,
+  ],
+  impulsivo: [
+    (n, i, c) => `${n}, hoje rola ${i} no pedido pelo link 🔥${c}`,
+    (n, i, c) => `${n}, bateu a fome? Tem ${i} liberado agora pelo link.${c}`,
+    (n, i, c) => `Fala ${n}! Chapa quente e ${i} te esperando no link 🍔${c}`,
+  ],
+  sensivel_desconto: [
+    (n, i, c) => `${n}, ${i} liberado pro seu pedido pelo link.${c}`,
+    (n, i, c) => `${n}, seu desconto está de pé: ${i} pelo link.${c}`,
+    (n, i, c) => `Oi ${n}, ${i} no seu nome, pedindo pelo link.${c}`,
+  ],
+  regular: [
+    (n, i, c) => `${n}, passando pra lembrar que tem hambúrguer artesanal te esperando 🍔${c}`,
+    (n, i, c) => `Oi ${n}! A chapa tá quente hoje 🔥${c}`,
+    (n, i, c) => `${n}, bateu vontade de um hambúrguer de verdade? 🍔${c}`,
+  ],
+};
+
+// Rodízio, não sorteio. Sorteando, um lote de 5 repetia texto — saíram
+// duas mensagens iguais em 5 no primeiro teste, que é justamente o que a
+// variação existe para evitar. O ponteiro começa num ponto aleatório para
+// os lotes não abrirem sempre com a mesma frase, e avança a cada envio.
+const ponteiroVariacao = {};
+
+function proximaVariacao(segmento, opcoes) {
+  if (ponteiroVariacao[segmento] === undefined) {
+    ponteiroVariacao[segmento] = Math.floor(Math.random() * opcoes.length);
+  }
+  const i = ponteiroVariacao[segmento] % opcoes.length;
+  ponteiroVariacao[segmento] = (i + 1) % opcoes.length;
+  return opcoes[i];
+}
+
 function mensagemFallback(segmento, cliente, incentivo) {
   const nome = cliente.nome?.split(" ")[0] || "amigo";
-  const cupomTxt = incentivo.cupom ? `\nCupom: *${incentivo.cupom}*` : "";
-  const base = {
-    vip:               `${nome}, você é um dos nossos clientes mais especiais 🍔\nQueremos te avisar em primeira mão: novidade saindo! ${incentivo.rotulo}.${cupomTxt}\n${ORDER_LINK}`,
-    em_risco:          `${nome}, faz um tempinho que a gente não te vê por aqui 🙏\nSeparamos ${incentivo.rotulo} pra você.${cupomTxt}\n${ORDER_LINK}`,
-    perdido:           `${nome}, sentimos saudade! 🍔 Pra te receber de volta, liberamos ${incentivo.rotulo}.${cupomTxt}\n${ORDER_LINK}`,
-    novo:              `${nome}, bem-vindo ao Bruthus! 🔥 Pra um 2º pedido inesquecível, garantimos ${incentivo.rotulo}.${cupomTxt}\n${ORDER_LINK}`,
-    impulsivo:         `${nome}, hoje rola ${incentivo.rotulo} 🔥 só por algumas horas!${cupomTxt}\nPedir agora: ${ORDER_LINK}`,
-    sensivel_desconto: `${nome}, ${incentivo.rotulo} liberado pra você.${cupomTxt}\n${ORDER_LINK}`,
-    regular:           `${nome}, passando aqui pra lembrar que tem hambúrguer artesanal te esperando 🍔\n${ORDER_LINK}`,
-  };
-  return base[segmento] || base.regular;
+  const cupomTxt = incentivo.cupom ? `
+Cupom: *${incentivo.cupom}*` : "";
+  const rotulo = incentivo.rotuloCurto || incentivo.rotulo;
+  const opcoes = VARIACOES[segmento] || VARIACOES.regular;
+  const escolhida = proximaVariacao(segmento, opcoes);
+  return `${escolhida(nome, rotulo, cupomTxt)}
+${ORDER_LINK}`;
 }
 
 async function gerarMensagem(segmento, cliente, incentivo) {

@@ -4,7 +4,26 @@ const BASE_URL  = process.env.EVOLUTION_API_URL;
 const API_KEY   = process.env.EVOLUTION_API_KEY;
 const INSTANCE  = process.env.EVOLUTION_INSTANCE;
 const DRY_RUN   = process.env.EVOLUTION_DRY_RUN === "1" || !BASE_URL || !API_KEY || !INSTANCE;
-const DELAY_MS  = Number(process.env.EVOLUTION_DELAY_MS || 4000);
+// Pausa entre um envio e o proximo.
+//
+// Era fixa em 4 segundos: cinco mensagens em vinte segundos, sempre no
+// mesmo ritmo. Cadencia regular e um dos sinais que o WhatsApp usa para
+// identificar disparo automatico, e aqui o numero e o da operacao — o
+// mesmo que recebe pedido. Agora e sorteada entre 1 e 4 minutos, entao
+// um lote de 5 leva uns 10 minutos. Para quem opera nao muda nada.
+//
+// EVOLUTION_DELAY_MS continua funcionando como escape: se estiver
+// definida, volta a ser fixa (util em teste, com valor baixo).
+const DELAY_FIXO   = process.env.EVOLUTION_DELAY_MS ? Number(process.env.EVOLUTION_DELAY_MS) : null;
+const DELAY_MIN_MS = Number(process.env.EVOLUTION_DELAY_MIN_MS || 60000);
+const DELAY_MAX_MS = Number(process.env.EVOLUTION_DELAY_MAX_MS || 240000);
+
+function pausaEntreEnvios() {
+  if (DELAY_FIXO !== null && !Number.isNaN(DELAY_FIXO)) return DELAY_FIXO;
+  const min = Math.min(DELAY_MIN_MS, DELAY_MAX_MS);
+  const max = Math.max(DELAY_MIN_MS, DELAY_MAX_MS);
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
 
 function configurado() {
   return Boolean(BASE_URL && API_KEY && INSTANCE);
@@ -18,7 +37,7 @@ function normalizarNumero(telefone) {
   return digitos.startsWith("55") ? digitos : "55" + digitos;
 }
 
-async function enviarTexto(telefone, mensagem, { delay = DELAY_MS } = {}) {
+async function enviarTexto(telefone, mensagem, { delay } = {}) {
   const numero = normalizarNumero(telefone);
   if (!numero) throw new Error("Telefone inválido");
   if (!mensagem || !mensagem.trim()) throw new Error("Mensagem vazia");
@@ -48,7 +67,9 @@ async function enviarTexto(telefone, mensagem, { delay = DELAY_MS } = {}) {
         headers: { apikey: API_KEY, "Content-Type": "application/json" },
         timeout: 15000,
       });
-      if (delay) await sleep(delay);
+      // Espera DEPOIS de enviar, antes do proximo da fila.
+      const espera = delay ?? pausaEntreEnvios();
+      if (espera > 0) await sleep(espera);
       return { ok: true, response: data, numero };
     } catch (e) {
       ultimoErro = e.response?.data?.message || e.response?.data || e.message;

@@ -58,6 +58,35 @@ async function enviar(chatId, texto) {
   });
 }
 
+// Datas sempre no fuso de Fortaleza. O Render roda em UTC: depois das 21h
+// locais um `new Date()` sem fuso já virou o dia seguinte, e um /fechado
+// mandado à noite marcaria amanhã em vez de hoje. Foi exatamente esse bug
+// que fez o webhook lançar 32% dos pedidos no dia errado.
+const TZ_BR = "America/Fortaleza";
+
+function hojeBR() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: TZ_BR });
+}
+
+// Aceita vazio (hoje), DD/MM e DD/MM/AAAA. Devolve YYYY-MM-DD, ou null se
+// não entendeu — melhor recusar e perguntar do que pausar o dia errado.
+function interpretarData(arg) {
+  if (!arg) return hojeBR();
+  const m = String(arg).match(new RegExp("^([0-9]{1,2})/([0-9]{1,2})(?:/([0-9]{2,4}))?$"));
+  if (!m) return null;
+  const dia = Number(m[1]);
+  const mes = Number(m[2]);
+  if (dia < 1 || dia > 31 || mes < 1 || mes > 12) return null;
+  let ano = m[3] ? Number(m[3]) : Number(hojeBR().slice(0, 4));
+  if (ano < 100) ano += 2000;
+  return ano + "-" + String(mes).padStart(2, "0") + "-" + String(dia).padStart(2, "0");
+}
+
+function formatarBR(iso) {
+  const p = String(iso).slice(0, 10).split("-");
+  return p[2] + "/" + p[1] + "/" + p[0];
+}
+
 async function processarMensagem(msg) {
   const chatId = String(msg.chat.id);
   const texto  = (msg.text || "").trim();
@@ -86,6 +115,8 @@ async function processarMensagem(msg) {
       "",
       "/resumo → Gastos dos últimos 7 dias",
       "/enviei → Confirma que você mandou a lista de clientes do dia",
+      "/fechado → Hoje não abre (ou `/fechado 11/11`)",
+      "/abrir → Desfaz o /fechado",
     ].join("\n"));
     return;
   }
@@ -117,6 +148,54 @@ async function processarMensagem(msg) {
         : "ℹ️ Não havia lista pendente. Nada a confirmar.");
     } catch (e) {
       await enviar(chatId, `❌ Erro ao confirmar: ${e.message}`);
+    }
+    return;
+  }
+
+  // ── /fechado — hoje (ou a data informada) a loja não abre ──
+  // O OlaClick não sabe dizer isso: `get_store_status` só enxerga iFood,
+  // Rappi e 99Food, e devolve UNKNOWN para todos. Quem sabe é o dono.
+  // Fica no banco porque o Render reinicia o processo a qualquer momento
+  // e uma flag em memória sumiria junto.
+  if (texto === "/fechado" || texto.startsWith("/fechado ")) {
+    try {
+      const { pausarDia, listarPausasFuturas } = require("./dbClientes");
+      const arg = texto.slice("/fechado".length).trim();
+      const data = interpretarData(arg);
+      if (!data) {
+        await enviar(chatId, "❌ Não entendi a data.\nUse */fechado* para hoje, ou */fechado 11/11*.");
+        return;
+      }
+      await pausarDia(data, arg ? null : "avisado no dia");
+      const futuras = await listarPausasFuturas();
+      const lista = futuras.map((f) => formatarBR(f.data)).join(", ");
+      await enviar(chatId,
+        `🚫 *${formatarBR(data)} marcado como fechado*\n` +
+        "Nenhuma mensagem de recuperação sai nesse dia.\n\n" +
+        `Dias fechados: ${lista}\n` +
+        "_Para desfazer, mande */abrir*_");
+    } catch (e) {
+      await enviar(chatId, `❌ Erro ao marcar como fechado: ${e.message}`);
+    }
+    return;
+  }
+
+  // ── /abrir — desfaz o /fechado ──
+  if (texto === "/abrir" || texto.startsWith("/abrir ")) {
+    try {
+      const { despausarDia } = require("./dbClientes");
+      const arg = texto.slice("/abrir".length).trim();
+      const data = interpretarData(arg);
+      if (!data) {
+        await enviar(chatId, "❌ Não entendi a data.\nUse */abrir* para hoje, ou */abrir 11/11*.");
+        return;
+      }
+      const tinha = await despausarDia(data);
+      await enviar(chatId, tinha
+        ? `✅ *${formatarBR(data)} liberado*\nA campanha volta a enviar nesse dia.`
+        : `ℹ️ ${formatarBR(data)} não estava marcado como fechado.`);
+    } catch (e) {
+      await enviar(chatId, `❌ Erro: ${e.message}`);
     }
     return;
   }

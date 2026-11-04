@@ -15,7 +15,7 @@ gratuito. Custo mensal: **R$ 0**.
 | Máquina | VM.Standard.A1.Flex — Ampere **ARM**, 1 OCPU, 5,8 GB RAM, 45 GB |
 | Sistema | Ubuntu 24.04 LTS |
 | IP | 163.176.241.81 |
-| Endereço | https://licitafacilpreview.duckdns.org |
+| Endereço | https://bruthusburger.duckdns.org |
 | Pasta | `/home/ubuntu/evolution` |
 
 ```bash
@@ -65,7 +65,7 @@ grep AUTHENTICATION_API_KEY /home/ubuntu/evolution/.env
 
 ### Parear o chip
 
-Abra <https://licitafacilpreview.duckdns.org/manager>, entre com a chave
+Abra <https://bruthusburger.duckdns.org/manager>, entre com a chave
 acima e leia o QR code em **WhatsApp → Aparelhos conectados**.
 
 **Use um chip separado, nunca o número que recebe pedido.** Se esse número
@@ -76,7 +76,7 @@ online, mas o chip precisa continuar existindo.
 Conferir o estado:
 
 ```bash
-curl -s https://licitafacilpreview.duckdns.org/instance/connectionState/bruthus \
+curl -s https://bruthusburger.duckdns.org/instance/connectionState/bruthus \
   -H "apikey: SUA_CHAVE"
 ```
 
@@ -87,7 +87,7 @@ curl -s https://licitafacilpreview.duckdns.org/instance/connectionState/bruthus 
 No Render, serviço `bruthus-burger`, em Environment:
 
 ```
-EVOLUTION_API_URL   = https://licitafacilpreview.duckdns.org
+EVOLUTION_API_URL   = https://bruthusburger.duckdns.org
 EVOLUTION_API_KEY   = a mesma AUTHENTICATION_API_KEY
 EVOLUTION_INSTANCE  = bruthus
 ```

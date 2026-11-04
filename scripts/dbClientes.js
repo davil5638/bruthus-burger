@@ -67,6 +67,16 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_campanhas_cliente ON campanhas_envios(cliente_id);
   CREATE INDEX IF NOT EXISTS idx_campanhas_status  ON campanhas_envios(status);
   CREATE INDEX IF NOT EXISTS idx_campanhas_enviado ON campanhas_envios(enviado_em DESC);
+
+  -- Dias em que a loja nao abre. O OlaClick nao sabe dizer isso: o
+  -- get_store_status so enxerga iFood/Rappi e devolve UNKNOWN. Quem sabe
+  -- e o dono, e ele avisa pelo Telegram. Precisa viver no banco porque o
+  -- Render reinicia o processo a qualquer momento e flag em memoria some.
+  CREATE TABLE IF NOT EXISTS campanha_pausas (
+    data       DATE PRIMARY KEY,
+    motivo     TEXT,
+    criado_em  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
 `;
 
 async function conectar() {
@@ -276,6 +286,39 @@ async function marcarRecuperacao(clienteId, valor) {
 // Status "pendente" é lista gerada mas ainda NÃO enviada — o dono recebeu
 // os links no Telegram e ainda não confirmou. Não conta como contato, para
 // o cliente continuar aparecendo na lista de amanhã até a mensagem sair.
+// Marca um dia como fechado. Idempotente: avisar duas vezes nao quebra.
+async function pausarDia(data, motivo = null) {
+  await conectar();
+  await pool.query(
+    `INSERT INTO campanha_pausas (data, motivo) VALUES ($1, $2)
+     ON CONFLICT (data) DO UPDATE SET motivo = EXCLUDED.motivo`,
+    [data, motivo]
+  );
+  return data;
+}
+
+async function despausarDia(data) {
+  await conectar();
+  const { rowCount } = await pool.query(`DELETE FROM campanha_pausas WHERE data = $1`, [data]);
+  return rowCount > 0;
+}
+
+async function diaPausado(data) {
+  await conectar();
+  const { rows } = await pool.query(`SELECT motivo FROM campanha_pausas WHERE data = $1`, [data]);
+  return rows.length ? { pausado: true, motivo: rows[0].motivo } : { pausado: false };
+}
+
+// So do dia de hoje para frente — pausa velha nao interessa.
+async function listarPausasFuturas() {
+  await conectar();
+  const { rows } = await pool.query(
+    `SELECT TO_CHAR(data, 'YYYY-MM-DD') AS data, motivo FROM campanha_pausas
+     WHERE data >= CURRENT_DATE ORDER BY data`
+  );
+  return rows;
+}
+
 async function jaEnviouRecentemente(clienteId, dias = 7) {
   await conectar();
   const { rows } = await pool.query(
@@ -334,6 +377,10 @@ module.exports = {
   mapaCalorVendas,
   marcarRecuperacao,
   jaEnviouRecentemente,
+  pausarDia,
+  despausarDia,
+  diaPausado,
+  listarPausasFuturas,
   limparPendentes,
   confirmarPendentes,
   registrarEnvio,

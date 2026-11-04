@@ -35,7 +35,7 @@ if (require.main === module) {
 const campanhas = require("./customerCampaigns");
 const whats     = require("./whatsappEvolution");
 const telegram  = require("./telegramBot");
-const { listarClientes, jaEnviouRecentemente, limparPendentes } = require("./dbClientes");
+const { listarClientes, jaEnviouRecentemente, limparPendentes, diaPausado } = require("./dbClientes");
 
 // Quantos clientes por dia. Começa pequeno de propósito: é melhor
 // descobrir que a mensagem não funciona com 5 pessoas do que com 100.
@@ -148,6 +148,19 @@ async function rodarHoje({ qtd = POR_DIA, dryRun = false, ignorarDia = false } =
 
   if (!ignorarDia && !DIAS_DE_ENVIO.includes(diaDaSemana())) {
     return { data: hoje, ignorado: "loja_fechada_hoje", enviados: 0, fila: [] };
+  }
+
+  // Fechamento avulso — feriado, falta de insumo, o que for. O dono avisa
+  // pelo Telegram com /fechado. Chamar cliente para uma loja fechada é
+  // pior do que não chamar: queima o contato e a janela de 30 dias.
+  //
+  // Esta checagem NÃO respeita `ignorarDia`, de propósito. `--forcar`
+  // existe para driblar a regra de dia da semana em teste; a pausa é uma
+  // afirmação explícita de alguém que sabe que hoje não abre, e nenhum
+  // disparo — nem manual — deve passar por cima dela.
+  const pausa = await diaPausado(hoje);
+  if (pausa.pausado) {
+    return { data: hoje, ignorado: "dia_pausado", motivo: pausa.motivo, enviados: 0, fila: [] };
   }
 
   // A lista de ontem que não foi enviada é descartada. Como a fila é
