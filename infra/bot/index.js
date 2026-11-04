@@ -33,6 +33,7 @@ const path    = require("path");
 const cardapio = require("./scripts/cardapio");
 const loja     = require("./scripts/loja");
 const olaclick = require("./scripts/olaclickApi");
+const respostas = require("./respostas");
 
 const PORTA        = Number(process.env.PORTA || 3000);
 const RESPONDER    = process.env.RESPONDER === "1";
@@ -161,12 +162,18 @@ async function decidir(texto, msg) {
       const pedido = await olaclick.buscarPedidoPorCodigo(codigo);
       if (!pedido) return { intencao: "pedido_pelo_botao", pedido: codigo, erro: "não achei esse pedido" };
       const forma = pedido?.payments?.[0]?.payment_method?.code || null;
+      // Pix pede a chave e o comprovante; cartão e dinheiro só agradecem.
+      const mensagem = forma === "pix"
+        ? respostas.pix()
+        : forma ? respostas.agradecimento() : null;
+
       return {
         intencao: "pedido_pelo_botao",
         pedido: codigo,
         total: pedido?.total,
         pagamento: forma,
         acao: forma ? RAMO_PAGAMENTO[forma] : "forma de pagamento ainda não definida",
+        mensagem,
       };
     } catch (e) {
       return { intencao: "pedido_pelo_botao", pedido: codigo, erro: e.message };
@@ -193,6 +200,9 @@ async function decidir(texto, msg) {
       acao: avisoFechado
         ? `manda a mensagem de ausência: ${avisoFechado}`
         : "manda as boas-vindas com o link do cardápio",
+      mensagem: estado?.situacao === "pausada" ? respostas.pausado()
+        : avisoFechado ? respostas.ausencia(estado?.proximaAbertura)
+        : respostas.boasVindas(),
     };
   }
 
@@ -218,6 +228,13 @@ async function decidir(texto, msg) {
             ? "pergunta qual dos parecidos, em vez de chutar"
             : "confirma o item e pergunta ponto da carne, maionese, endereço e pagamento",
       alternativas: achado.confianca === "baixa" ? achado.alternativas.map((a) => a.nome) : undefined,
+      mensagem: esgotado
+        ? (estado?.indisponiveis?.massaAcabou && /pizza|margherita|calabres|pepperoni|manzo/i.test(achado.item.nome)
+            ? respostas.massaAcabou()
+            : respostas.esgotado(achado.item.nome, cardapio.CARDAPIO.itens.filter((i) => i.cat === achado.item.cat).map((i) => i.nome)))
+        : achado.confianca === "baixa"
+          ? respostas.qualDeles(achado.alternativas.map((a) => a.nome))
+          : undefined,
     };
   }
 

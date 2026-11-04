@@ -96,6 +96,10 @@ services:
       EVOLUTION_INSTANCE: bruthus
       OLACLICK_API_TOKEN: ${OLACLICK_API_TOKEN}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # A chave do Pix vive só aqui, no .env da VM — nunca no git.
+      PIX_CHAVE: ${PIX_CHAVE}
+      PIX_NOME: ${PIX_NOME}
+      ORDER_LINK: ${ORDER_LINK}
       DIARIO: /dados/observacao.jsonl
       TZ: America/Fortaleza
     volumes:

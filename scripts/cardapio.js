@@ -39,6 +39,41 @@ function palavras(txt) {
   return normalizar(txt).split(" ").filter((p) => p && !VAZIAS.has(p));
 }
 
+// Distância de edição: quantas letras mudam de uma palavra para a outra.
+//
+// Existe por um caso concreto: o cardápio diz "Calabrese", grafia
+// italiana, e o cliente escreve "calabresa", do jeito que se fala. Uma
+// letra no fim, e sem isto o bot não achava a pizza mais pedida da casa.
+// O mesmo vale para "margherita"/"marguerita" e "pepperoni"/"peperoni".
+function distancia(a, b) {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 2) return 99;          // longe demais, nem calcula
+  let anterior = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const atual = [i];
+    for (let j = 1; j <= n; j++) {
+      atual[j] = Math.min(
+        anterior[j] + 1,
+        atual[j - 1] + 1,
+        anterior[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    anterior = atual;
+  }
+  return anterior[n];
+}
+
+// Duas palavras são "a mesma coisa" para um cliente digitando no celular?
+// A tolerância cresce com o tamanho: em palavra curta uma letra muda o
+// sentido ("mel" e "mil"), em palavra longa é só erro de digitação.
+function mesmaPalavra(a, b) {
+  if (a === b) return true;
+  if (a.startsWith(b) || b.startsWith(a)) return Math.min(a.length, b.length) >= 4;
+  const limite = Math.min(a.length, b.length) >= 7 ? 2 : 1;
+  return Math.min(a.length, b.length) >= 5 && distancia(a, b) <= limite;
+}
+
 // Quanto o texto do cliente se parece com o nome do item. Conta quantas
 // palavras do item aparecem na frase, e vice-versa.
 function pontuar(consulta, item) {
@@ -48,8 +83,9 @@ function pontuar(consulta, item) {
 
   let acertos = 0;
   for (const p of pi) {
-    // Casa palavra inteira ou começo dela: "classic" acha "classico".
-    if (pc.some((q) => q === p || q.startsWith(p) || p.startsWith(q))) acertos++;
+    // Casa palavra inteira, começo dela, ou quase ela: "classic" acha
+    // "classico", e "calabresa" acha "calabrese".
+    if (pc.some((q) => mesmaPalavra(q, p))) acertos++;
   }
   if (!acertos) return 0;
 
