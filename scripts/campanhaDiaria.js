@@ -35,7 +35,7 @@ if (require.main === module) {
 const campanhas = require("./customerCampaigns");
 const whats     = require("./whatsappEvolution");
 const telegram  = require("./telegramBot");
-const { listarClientes, jaEnviouRecentemente } = require("./dbClientes");
+const { listarClientes, jaEnviouRecentemente, limparPendentes } = require("./dbClientes");
 
 // Quantos clientes por dia. Começa pequeno de propósito: é melhor
 // descobrir que a mensagem não funciona com 5 pessoas do que com 100.
@@ -131,6 +131,11 @@ async function rodarHoje({ qtd = POR_DIA, dryRun = false, ignorarDia = false } =
     return { data: hoje, ignorado: "loja_fechada_hoje", enviados: 0, fila: [] };
   }
 
+  // A lista de ontem que não foi enviada é descartada. Como a fila é
+  // montada por prioridade, as mesmas pessoas reaparecem — é isso que faz
+  // o cliente ficar na fila até a mensagem sair de verdade.
+  if (!dryRun) await limparPendentes();
+
   const fila = await filaDoDia(qtd);
   if (!fila.length) {
     return { data: hoje, ignorado: "ninguem_elegivel", enviados: 0, fila: [] };
@@ -154,7 +159,7 @@ async function rodarHoje({ qtd = POR_DIA, dryRun = false, ignorarDia = false } =
         ? { dryRun: true, registrar: false }
         : automatico
           ? { dryRun: false }
-          : { dryRun: true, rotuloStatus: "lista_manual" };
+          : { dryRun: true, rotuloStatus: "pendente" };
       r = await campanhas.dispararParaCliente(cliente.id, opcoes);
     } catch (e) {
       resultados.push({ nome: cliente.nome, erro: e.message });
@@ -196,6 +201,11 @@ async function avisarNoTelegram(resultados, data) {
     `_${data} — toque no link, confira e envie_`,
     "",
   ];
+  const rodape = [
+    "─────────────",
+    "Quando terminar, responda */enviei*",
+    "_Sem isso, os mesmos clientes voltam amanhã._",
+  ];
   resultados.forEach((r, i) => {
     if (r.erro) { linhas.push(`${i + 1}. ${r.nome} — erro: ${r.erro}`); return; }
     linhas.push(`${i + 1}. *${r.nome}* (${r.segmento})`);
@@ -204,7 +214,7 @@ async function avisarNoTelegram(resultados, data) {
   });
 
   try {
-    await telegram.enviar(chatId, linhas.join("\n"));
+    await telegram.enviar(chatId, linhas.concat(rodape).join("\n"));
   } catch (e) {
     console.warn("[CampanhaDiaria] não consegui avisar no Telegram:", e.message);
   }

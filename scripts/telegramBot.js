@@ -85,6 +85,7 @@ async function processarMensagem(msg) {
       "ingrediente, embalagem, marketing, funcionario, aluguel, gas, equipamento",
       "",
       "/resumo → Gastos dos últimos 7 dias",
+      "/enviei → Confirma que você mandou a lista de clientes do dia",
     ].join("\n"));
     return;
   }
@@ -102,6 +103,20 @@ async function processarMensagem(msg) {
       ].join("\n"));
     } catch (e) {
       await enviar(chatId, `❌ Erro ao buscar resumo: ${e.message}`);
+    }
+    return;
+  }
+
+  // ── /enviei — confirma que a lista de recuperação foi enviada ──
+  if (texto === "/enviei" || texto === "/enviado") {
+    try {
+      const { confirmarPendentes } = require("./dbClientes");
+      const n = await confirmarPendentes();
+      await enviar(chatId, n
+        ? `✅ *${n} cliente(s) marcado(s) como contatado(s)*\nEles não voltam na lista por 30 dias.`
+        : "ℹ️ Não havia lista pendente. Nada a confirmar.");
+    } catch (e) {
+      await enviar(chatId, `❌ Erro ao confirmar: ${e.message}`);
     }
     return;
   }

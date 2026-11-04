@@ -273,15 +273,40 @@ async function marcarRecuperacao(clienteId, valor) {
   );
 }
 
+// Status "pendente" é lista gerada mas ainda NÃO enviada — o dono recebeu
+// os links no Telegram e ainda não confirmou. Não conta como contato, para
+// o cliente continuar aparecendo na lista de amanhã até a mensagem sair.
 async function jaEnviouRecentemente(clienteId, dias = 7) {
   await conectar();
   const { rows } = await pool.query(
     `SELECT 1 FROM campanhas_envios
-     WHERE cliente_id = $1 AND enviado_em > NOW() - ($2 || ' days')::INTERVAL
+     WHERE cliente_id = $1
+       AND status <> 'pendente'
+       AND enviado_em > NOW() - ($2 || ' days')::INTERVAL
      LIMIT 1`,
     [clienteId, dias]
   );
   return rows.length > 0;
+}
+
+// Apaga a lista de ontem que não foi enviada. Chamado antes de montar a
+// lista do dia, para a tabela não encher de pendente repetido — as mesmas
+// pessoas voltam na fila de qualquer jeito, por ordem de prioridade.
+async function limparPendentes() {
+  await conectar();
+  const { rowCount } = await pool.query(`DELETE FROM campanhas_envios WHERE status = 'pendente'`);
+  return rowCount;
+}
+
+// O dono confirmou que enviou. Agora sim vale como contato, e esses
+// clientes saem da fila pela janela anti-spam.
+async function confirmarPendentes() {
+  await conectar();
+  const { rows } = await pool.query(
+    `UPDATE campanhas_envios SET status = 'enviado', enviado_em = NOW()
+     WHERE status = 'pendente' RETURNING cliente_id`
+  );
+  return rows.length;
 }
 
 async function registrarEnvio({ clienteId, segmento, template, incentivo, cupom, mensagem, status = "enviado", erro }) {
@@ -309,5 +334,7 @@ module.exports = {
   mapaCalorVendas,
   marcarRecuperacao,
   jaEnviouRecentemente,
+  limparPendentes,
+  confirmarPendentes,
   registrarEnvio,
 };
