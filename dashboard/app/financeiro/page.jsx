@@ -6,6 +6,19 @@ import PageHeader from '../../components/PageHeader'
 import { Toast } from '../../components/Toast'
 
 // ── Ciclo Ter→Seg ──────────────────────────────
+// Data no fuso de quem está olhando, não em UTC.
+//
+// `toISOString()` converte para UTC antes de cortar. Em Fortaleza, a partir
+// das 21h já é o dia seguinte em UTC — então todo fim de noite a tela
+// pulava para a semana seguinte, que está vazia, e o financeiro parecia
+// zerado justo na hora em que o dono fecha o caixa e vai conferir.
+// É o mesmo erro que o webhook do OlaClick tinha no backend.
+function ymdLocal(d) {
+  const mes = String(d.getMonth() + 1).padStart(2, '0')
+  const dia = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mes}-${dia}`
+}
+
 function getRangoSemana(offset = 0) {
   const hoje = new Date()
   const dia = hoje.getDay()
@@ -15,8 +28,8 @@ function getRangoSemana(offset = 0) {
   const seg = new Date(terca)
   seg.setDate(terca.getDate() + 6)
   return {
-    dataInicio: terca.toISOString().slice(0, 10),
-    dataFim:    seg.toISOString().slice(0, 10),
+    dataInicio: ymdLocal(terca),
+    dataFim:    ymdLocal(seg),
   }
 }
 
@@ -58,6 +71,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
 export default function FinanceiroPage() {
   const [periodo, setPeriodo]           = useState('semana')
   const [semanaOffset, setSemanaOffset] = useState(0)
+  // O servidor da Vercel roda em UTC e o navegador no fuso de quem abre.
+  // Renderizar a faixa da semana nos dois lados dava hydration mismatch
+  // (React #418/#423/#425 no console). Ela só aparece depois de montar.
+  const [montado, setMontado] = useState(false)
   const [resumo, setResumo]             = useState(null)
   const [resumoAnt, setResumoAnt]       = useState(null)
   const [entradas, setEntradas]         = useState([])
@@ -106,6 +123,7 @@ export default function FinanceiroPage() {
 
   // ── Load configs localStorage ──
   useEffect(() => {
+    setMontado(true)
     setMetaSemanal(parseFloat(localStorage.getItem('metaSemanal') || '0'))
     setMargemMinima(parseFloat(localStorage.getItem('margemMinima') || '30'))
   }, [])
@@ -384,7 +402,7 @@ export default function FinanceiroPage() {
             <p className="text-xs font-semibold text-white">
               {semanaOffset === 0 ? 'Semana atual' : semanaOffset === -1 ? 'Semana passada' : `${Math.abs(semanaOffset)} semanas atrás`}
             </p>
-            <p className="text-[11px] text-[#f97316]">{fmtRango(getRangoSemana(semanaOffset))}</p>
+            <p className="text-[11px] text-[#f97316]">{montado ? fmtRango(getRangoSemana(semanaOffset)) : '—'}</p>
           </div>
           <button onClick={() => setSemanaOffset(o => Math.min(0, o + 1))} disabled={semanaOffset === 0}
             className="text-[#888] hover:text-white transition-colors px-2 py-1 text-xl disabled:opacity-20">›</button>
