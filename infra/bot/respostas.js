@@ -72,16 +72,24 @@ function ausencia(abertura, funcionamento) {
       : `Abrimos ${abertura.dia} às ${abertura.hora} ⏰`);
   }
 
-  // O agendado precisa dizer QUANDO chega, senão o cliente agenda achando
-  // que sai às 18:30 e cobra às 18:40. O entregador chega às 19h, e o
-  // pedido sai assim que ele chega — é o combinado da casa.
-  linhas.push(
-    "",
-    "Caso queira, já pode deixar seu pedido agendado pelo link 👇",
-    `🔗 ${LINK}`,
-    "",
-    "_O entregador chega às 19h, e os pedidos agendados saem assim que ele chegar_ 🛵"
-  );
+  // Convite para agendar SÓ quando a loja ainda abre hoje.
+  //
+  // Regra do dono: em dia que ele não abre, a resposta é só o horário de
+  // funcionamento — nada de agendar. Faz sentido: agendar numa terça para
+  // quarta deixa o pedido pendurado um dia inteiro, e a loja carrega uma
+  // promessa que ninguém está lá para cumprir.
+  if (abertura?.hoje) {
+    linhas.push(
+      "",
+      "Caso queira, já pode deixar seu pedido agendado pelo link 👇",
+      `🔗 ${LINK}`,
+      "",
+      // Sem isto o cliente agenda achando que sai às 18h30 e cobra às
+      // 18h40. O entregador chega às 19h, e o pedido sai quando ele chega.
+      "_O entregador chega às 19h, e os pedidos agendados saem assim que ele chegar_ 🛵"
+    );
+  }
+
   return linhas.join("\n");
 }
 
