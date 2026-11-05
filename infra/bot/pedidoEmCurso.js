@@ -172,6 +172,21 @@ function perguntar(falta, p, conta) {
   return null;
 }
 
+// O resumo que o cliente lê ANTES do pedido existir.
+//
+// É a trava mais importante do fluxo: se o bot entendeu o item errado, é
+// aqui que a pessoa vê e corrige — antes de virar comida na chapa.
+function resumoParaCliente(p, conta) {
+  const linhas = ["Confere pra mim? 🙌", ""];
+  conta.linhas.forEach((l) => linhas.push(`${l.qtd}x ${l.nome} — ${br(l.subtotal)}`));
+  linhas.push(`Entrega (${p.bairro.bairro}) — ${br(conta.entrega)}`);
+  linhas.push("", `*Total: ${br(conta.total)}*`);
+  linhas.push(`${PAGAMENTO_PT[p.pagamento] || p.pagamento}${p.troco ? ` — troco para ${br(p.troco)}` : ""}`);
+  linhas.push("", `📍 ${p.endereco}`);
+  linhas.push("", "Tá certo? Responde *sim* que eu já mando pra cozinha 🔥");
+  return linhas.join("\n");
+}
+
 // Confirmação final, depois que tudo está completo.
 function confirmarParaCliente(p, conta) {
   const linhas = conta.linhas.map((l) => `${l.qtd}x ${l.nome} — ${br(l.subtotal)}`);
@@ -199,7 +214,8 @@ function resumoParaDono(p, conta, nomeCliente) {
 
 module.exports = {
   pegar, abrirOuPegar, guardar, fechar,
-  oQueFalta, somar, resumoParaDono,
+  perguntar, confirmarParaCliente,
+  oQueFalta, somar, resumoParaDono, resumoParaCliente,
   VALIDADE_MS,
   quantosAbertos: () => emCurso.size,
 };

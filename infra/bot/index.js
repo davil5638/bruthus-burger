@@ -30,6 +30,8 @@ const axios   = require("axios");
 const fs      = require("fs");
 const path    = require("path");
 
+const pedidos  = require("./pedidoEmCurso");
+const criarPedido = require("./scripts/criarPedido");
 const cardapio = require("./scripts/cardapio");
 const loja     = require("./scripts/loja");
 const olaclick = require("./scripts/olaclickApi");
@@ -70,6 +72,9 @@ let cacheLoja = { em: 0, dados: null };
 async function estadoDaLoja() {
   if (Date.now() - cacheLoja.em < 60000 && cacheLoja.dados) return cacheLoja.dados;
   const [estado, fora] = await Promise.all([loja.estado(), loja.indisponiveis()]);
+  // Só para ensaiar o fluxo de pedido fora do horário. Nunca fica ligado
+  // em operação: com ela o bot tomaria pedido com a loja fechada.
+  if (process.env.FORCAR_LOJA_ABERTA === "1") estado.situacao = "aberta";
   cacheLoja = { em: Date.now(), dados: { ...estado, indisponiveis: fora } };
   return cacheLoja.dados;
 }
@@ -149,10 +154,205 @@ const RAMO_PAGAMENTO = {
 };
 
 // ──────────────────────────────────────────────
+// TOMAR O PEDIDO
+//
+// É a maior dor do dono: hoje ele lê a conversa, abre o OlaClick e
+// digita tudo. Aqui o bot pergunta o que falta, monta, CONFIRMA COM O
+// CLIENTE e só então cadastra.
+//
+// A confirmação não estava no plano e é a trava mais importante: sem
+// ela, um erro de interpretação vira comida errada sem ninguém ter
+// chance de pegar. O cliente lê os itens e o total antes de existir
+// pedido.
+// ──────────────────────────────────────────────
+const SIM = /^(sim|isso|confirmo?|confirma|pode|ok|blz|beleza|certo|ta bom|ta certo|fechou|perfeito|aham|uhum|s)\b/;
+const NAO = /^(nao|n|errado|muda|trocar|cancela)\b/;
+
+function lerPagamento(n) {
+  if (/\bpix\b/.test(n)) return "pix";
+  if (/\b(cartao|credito|debito|card|maquin)/.test(n)) return "card";
+  if (/\b(dinheiro|especie|cash|vivo)\b/.test(n)) return "cash";
+  return null;
+}
+
+function lerTroco(n) {
+  if (/\b(nao precisa|sem troco|nao vou precisar|trocado|certinho)\b/.test(n)) return 0;
+  const m = n.match(/\b(?:troco\s*(?:p|pra|para)?\s*)?(\d{2,4})\b/);
+  return m ? Number(m[1]) : null;
+}
+
+function lerCoca(n) {
+  if (/\bzero\b|\bdiet\b|\blight\b/.test(n)) return "Coca Lata Zero";
+  if (/\bnormal\b|\btradicional\b|\bcomum\b|\boriginal\b/.test(n)) return "Coca Lata Normal";
+  return null;
+}
+
+// Batata diferente da padrão: só entra se o cliente falar, e muda o preço.
+function lerBatata(n) {
+  if (/\bbatata\b.*\b(media|média)\b|\bmedia\b.*\bbatata\b/.test(n)) {
+    return { nome: "Batata Média", extra: 9 };
+  }
+  if (/\bbatata\b.*(cheddar|bacon)/.test(n)) {
+    return { nome: "Batata com cheddar e bacon", extra: 13 };
+  }
+  return null;
+}
+
+// Traduz o que o cliente escolheu — "Coca Lata Zero", "Batata Média" —
+// nos ids que a API quer. Procura pelo nome dentro de todos os grupos,
+// porque a mesma opção pode aparecer em mais de um.
+function idModificador(nomeOpcao) {
+  if (!nomeOpcao) return null;
+  const alvo = cardapio.normalizar(nomeOpcao);
+  for (const grupo of Object.values(cardapio.CARDAPIO.modificadores || {})) {
+    const op = (grupo.opcoes || []).find((o) => cardapio.normalizar(o.nome) === alvo);
+    if (op) return op.id;
+  }
+  return null;
+}
+
+function idsDasEscolhas(item) {
+  return [idModificador(item.coca), idModificador(item.batataNome)].filter(Boolean);
+}
+
+async function tratarPedidoEmCurso(msg, texto, estado) {
+  const p = pedidos.pegar(msg.conversa);
+  if (!p) return null;
+  const n = cardapio.normalizar(texto);
+
+  // Esperando o "sim"?
+  if (p.aguardandoConfirmacao) {
+    if (NAO.test(n)) {
+      pedidos.fechar(msg.conversa);
+      return {
+        intencao: "pedido_cancelado",
+        escalar: true,
+        acao: "cliente disse que está errado — chama o dono",
+        mensagem: "Sem problema! Deixa eu chamar alguém aqui pra te ajudar 🙏",
+      };
+    }
+    if (!SIM.test(n)) return null;  // não entendi: deixa cair no fluxo normal
+
+    const conta = pedidos.somar(p, cardapio);
+    const r = await criarPedido.criar({
+      cliente: { nome: msg.nome, telefone: p.telefone || msg.conversa },
+      endereco: { texto: p.endereco, area_id: p.bairro.area_id, taxa: p.bairro.taxa },
+      itens: p.itens.map((i) => ({
+        variant_id: i.variant_id,
+        qtd: i.qtd || 1,
+        // As OPÇÕES escolhidas, não os grupos.
+        //
+        // `i.modificadores` vem do cardápio e guarda os IDs dos GRUPOS
+        // (adicionais, qual batata, qual coca) — mandá-los como se
+        // fossem opção faz a API responder "the selected item does not
+        // exist in your menu", que foi o que derrubou o primeiro pedido
+        // tomado pelo bot.
+        modificadores: idsDasEscolhas(i),
+      })),
+      pagamento: p.pagamento,
+      troco: p.troco,
+      observacao: `Pedido tomado pelo WhatsApp${p.troco ? ` — troco para ${p.troco}` : ""}`,
+      idempotencia: p.idempotencia,
+    });
+    pedidos.fechar(msg.conversa);
+
+    if (!r.ok) {
+      return {
+        intencao: "pedido_falhou",
+        escalar: true,
+        acao: "NÃO consegui cadastrar — chama o dono: " + r.erro,
+        mensagem: "Anotei seu pedido! Já te confirmo aqui 🙏",
+      };
+    }
+    return {
+      intencao: "pedido_criado",
+      pedido: r.public_id,
+      total: r.total,
+      acao: "pedido cadastrado no OlaClick",
+      mensagem: pedidos.confirmarParaCliente(p, conta),
+      avisarDono: `✅ *Pedido novo pelo WhatsApp*\n${r.public_id} — ${msg.nome || "cliente"}\nR$ ${Number(r.total).toFixed(2).replace(".", ",")}\nJá está no OlaClick 🔥`,
+    };
+  }
+
+  // Preenche o que o cliente acabou de dizer.
+  const falta = pedidos.oQueFalta(p);
+
+  if (falta.includes("coca")) {
+    const coca = lerCoca(n);
+    if (coca) p.itens.filter((i) => i.cat === "combo" && !i.coca).forEach((i) => { i.coca = coca; });
+  }
+  const batata = lerBatata(n);
+  if (batata) p.itens.filter((i) => i.cat === "combo").forEach((i) => {
+    if (!i.batataNome) { i.batataNome = batata.nome; i.batataExtra = batata.extra; }
+  });
+  if (!p.bairro) {
+    const b = cardapio.taxaBairro(texto);
+    // Só aceita como endereço se reconheceu o bairro: endereço sem bairro
+    // vira taxa zerada e o dono descobre no caixa.
+    if (b) { p.bairro = b; p.endereco = texto.trim().slice(0, 191); }
+  }
+  if (!p.pagamento) {
+    const pg = lerPagamento(n);
+    if (pg) p.pagamento = pg;
+  }
+  if (p.pagamento === "cash" && p.troco === null) {
+    const t = lerTroco(n);
+    if (t !== null) p.troco = t;
+  }
+
+  // Mais algum item na mesma conversa?
+  const maisUm = cardapio.buscarItem(texto);
+  if (maisUm && maisUm.confianca === "alta" && !p.itens.some((i) => i.id === maisUm.item.id)) {
+    p.itens.push({ ...maisUm.item, qtd: 1 });
+  }
+
+  pedidos.guardar(msg.conversa, p);
+  const aindaFalta = pedidos.oQueFalta(p);
+  const conta = pedidos.somar(p, cardapio);
+
+  if (aindaFalta.length) {
+    return {
+      intencao: "tomando_pedido",
+      falta: aindaFalta,
+      acao: "pergunta: " + aindaFalta[0],
+      mensagem: pedidos.perguntar(aindaFalta, p, conta),
+    };
+  }
+
+  if (conta.faltaParaMinimo) {
+    return {
+      intencao: "abaixo_do_minimo",
+      acao: "avisa o pedido mínimo",
+      mensagem: `Nosso pedido mínimo é R$ 15,00 e deu R$ ${conta.produtos.toFixed(2).replace(".", ",")} 🙏\nFaltam R$ ${conta.faltaParaMinimo.toFixed(2).replace(".", ",")} — quer incluir mais alguma coisa?`,
+    };
+  }
+
+  // Tudo preenchido: pede o "sim" antes de criar.
+  p.aguardandoConfirmacao = true;
+  p.idempotencia = p.idempotencia || require("crypto").randomUUID();
+  pedidos.guardar(msg.conversa, p);
+  return {
+    intencao: "confirmando_pedido",
+    acao: "mostra o pedido e espera o cliente confirmar",
+    mensagem: pedidos.resumoParaCliente(p, conta),
+  };
+}
+
+// ──────────────────────────────────────────────
 // O que o bot entendeu e o que faria.
 // ──────────────────────────────────────────────
 async function decidir(texto, msg) {
   const estado = await estadoDaLoja().catch(() => null);
+
+  // Já existe um pedido sendo tomado nesta conversa? Então o que o
+  // cliente acabou de dizer é resposta a uma pergunta minha — endereço,
+  // pagamento, troco ou o "sim". Isso vem ANTES de tudo, senão um
+  // endereço seria lido como mensagem solta e a conversa recomeçaria.
+  const emCurso = await tratarPedidoEmCurso(msg, texto, estado).catch((e) => {
+    console.error("[pedido]", e.message);
+    return { intencao: "pedido_falhou", escalar: true, acao: "erro ao tomar o pedido: " + e.message };
+  });
+  if (emCurso) return emCurso;
 
   // 1. Veio pelo botão: o pedido já existe, é só buscar.
   const codigo = codigoDoPedido(texto);
@@ -307,6 +507,24 @@ async function decidir(texto, msg) {
   if (achado) {
     const fora = estado?.indisponiveis?.nomes || [];
     const esgotado = fora.some((f) => cardapio.normalizar(f) === cardapio.normalizar(achado.item.nome));
+
+    // Loja aberta, item identificado com certeza e disponível: começa a
+    // tomar o pedido. É a dor que o dono quer resolver — hoje ele lê a
+    // conversa e digita tudo no OlaClick na mão.
+    if (!avisoFechado && !esgotado && achado.confianca === "alta") {
+      const p = pedidos.abrirOuPegar(msg.conversa);
+      p.itens.push({ ...achado.item, qtd: 1 });
+      pedidos.guardar(msg.conversa, p);
+      const falta = pedidos.oQueFalta(p);
+      return {
+        intencao: "tomando_pedido",
+        item: achado.item.nome,
+        preco: achado.item.preco,
+        falta,
+        acao: "começou a tomar o pedido; pergunta: " + falta[0],
+        mensagem: pedidos.perguntar(falta, p, pedidos.somar(p, cardapio)),
+      };
+    }
     return {
       intencao: "pedido_escrito",
       item: achado.item.nome,
@@ -396,6 +614,11 @@ const PODE_RESPONDER = new Set([
   "endereco",             // bairro reconhecido, taxa conhecida
   "consulta_de_local",    // o dono mandando o código do pedido
   "nao_entendi_loja_fechada",
+  // O fluxo de pedido: o bot conduz e so cria depois do "sim".
+  "tomando_pedido",
+  "confirmando_pedido",
+  "pedido_criado",
+  "abaixo_do_minimo",
 ]);
 
 // Estes ele entende, mas só responde quando a confiança é alta: item
@@ -571,6 +794,18 @@ app.post("/webhook/evolution", async (req, res) => {
     // coisa resolvida — e foi o que aconteceu no primeiro teste dele, que
     // pareceu falha do bot quando era decisão correta mal comunicada.
     const alerta = responde || leitura.repetida ? null : await alertarDono(msg, leitura);
+
+    // Pedido criado: o dono precisa saber na hora, mesmo sem ter sido
+    // chamado. É venda entrando, não problema — e ele vai querer olhar o
+    // primeiro que o bot fechar sozinho.
+    if (leitura.avisarDono && RESPONDER) {
+      await Promise.all([
+        ALERTA_NUMERO ? axios.post(`${EVO_URL}/message/sendText/${EVO_INSTANCE}`,
+          { number: ALERTA_NUMERO, text: leitura.avisarDono },
+          { headers: { apikey: EVO_KEY, "Content-Type": "application/json" }, timeout: 15000 }).catch(() => {}) : null,
+        avisarTelegram(leitura.avisarDono),
+      ]);
+    }
 
     // E aqui, se estiver solto, o bot fala com o cliente.
     let envio = null;
