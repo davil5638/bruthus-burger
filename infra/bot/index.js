@@ -245,15 +245,37 @@ async function decidir(texto, msg) {
   if (/\b(pix|cartao|dinheiro|debito|credito|troco)\b/.test(n)) {
     return { intencao: "pagamento", loja: avisoFechado || undefined };
   }
-  if (/\b(aberto|abriu|funcionando|horario|entrega|taxa|demora|quanto tempo|pizza)\b/.test(n)) {
+  // "vocês estão recebendo pedidos?" caiu em nao_entendi na primeira noite
+  // de observação — e é das perguntas que o cliente mais faz, justamente a
+  // que o bot tinha como responder. Daí "recebendo pedido", "atendendo",
+  // "tá aberto" entrarem aqui.
+  if (/\b(aberto|abriu|abre|fechado|funcionando|atendendo|recebendo|pedidos?|horario|entrega|taxa|demora|quanto tempo|pizza)\b/.test(n)) {
     return {
       intencao: "duvida",
       loja: avisoFechado || undefined,
       acao: avisoFechado
         ? `responde a dúvida e avisa: ${avisoFechado}`
         : "responde com o que sabe da loja e do cardápio",
+      mensagem: estado?.situacao === "pausada" ? respostas.pausado()
+        : avisoFechado ? respostas.ausencia(estado?.proximaAbertura)
+        : undefined,
     };
   }
+
+  // Não entendi, MAS a loja está fechada ou pausada: quem escreveu merece
+  // saber disso, qualquer que tenha sido a pergunta. Silêncio aqui é o
+  // cliente esperando resposta que não vem.
+  if (avisoFechado) {
+    return {
+      intencao: "nao_entendi_loja_fechada",
+      loja: avisoFechado,
+      acao: "não sei responder, mas aviso que não dá para pedir agora",
+      mensagem: estado?.situacao === "pausada"
+        ? respostas.pausado()
+        : respostas.ausencia(estado?.proximaAbertura),
+    };
+  }
+
   return { intencao: "nao_entendi", acao: "não responde; deixa para o dono" };
 }
 
@@ -272,7 +294,10 @@ app.post("/webhook/evolution", async (req, res) => {
     // Nada pior do que ele digitando e o bot atropelando por cima.
     if (msg.minha) { marcarDonoFalou(msg.conversa); return; }
     if (donoFalouHaPouco(msg.conversa)) {
-      registrar({ conversa: msg.conversa, tipo: msg.tipo, leitura: { intencao: "dono_assumiu" } });
+      // Grava o texto também: sem ele não dá para revisar depois o que o
+      // cliente perguntou nessas conversas, que são justamente as que o
+      // dono achou que precisavam dele.
+      registrar({ conversa: msg.conversa, tipo: msg.tipo, texto: msg.texto || null, leitura: { intencao: "dono_assumiu" } });
       return;
     }
 
@@ -284,6 +309,14 @@ app.post("/webhook/evolution", async (req, res) => {
     }
 
     const leitura = await decidir(texto, msg);
+
+    // Já disse isso aqui há pouco? Então cala — e registra que calou, para
+    // a gente ver depois quantas repetições foram evitadas.
+    if (leitura.mensagem && jaDisseAgora(msg.conversa, leitura.mensagem)) {
+      leitura.repetida = true;
+      leitura.acao = "já disse isso nesta conversa há pouco; não repete";
+      delete leitura.mensagem;
+    }
 
     registrar({
       conversa: msg.conversa,
@@ -302,6 +335,28 @@ app.post("/webhook/evolution", async (req, res) => {
     console.error("[webhook]", e.message);
   }
 });
+
+// Não repetir a mesma mensagem para a mesma conversa.
+//
+// Na primeira noite de observação um cliente mandou "oii" e "boa noite"
+// com um minuto de diferença: o bot teria mandado a mensagem de ausência
+// duas vezes. Gente escreve em rajada, e receber o mesmo texto repetido
+// parece robô quebrado — além de ser exatamente o que o WhatsApp olha
+// para flagrar automação.
+const JA_DISSE = new Map();
+const NAO_REPETIR_MS = 30 * 60 * 1000;
+
+function jaDisseAgora(conversa, mensagem) {
+  if (!mensagem) return false;
+  // Só os primeiros caracteres: as variações mudam o fim do texto, mas
+  // mandar "Segue a chave do Pix" e "Pode pagar por aqui" seguidos é a
+  // mesma repetição aos olhos de quem recebe.
+  const marca = conversa + "|" + mensagem.slice(0, 40);
+  const quando = JA_DISSE.get(marca);
+  if (quando && Date.now() - quando < NAO_REPETIR_MS) return true;
+  JA_DISSE.set(marca, Date.now());
+  return false;
+}
 
 // Quem o dono atendeu nos últimos minutos. Em memória de propósito: se o
 // serviço reiniciar, o pior que acontece é o bot responder uma vez a mais.

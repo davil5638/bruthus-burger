@@ -45,9 +45,16 @@ Trabalhamos com produção limitada diariamente. Se não aparecer no cardápio, 
 😊 Em breve retornaremos com a confirmação!`;
 }
 
-// Fora do horário. `abertura` vem de loja.js: { dia, hora }.
+// Fora do horário. `abertura` vem de loja.js: { dia, hora, hoje }.
+//
+// "Abrimos quinta às 18:30" dito numa quinta de manhã soa como se fosse
+// semana que vem. Quando a abertura é hoje, diz hoje.
 function ausencia(abertura) {
-  const quando = abertura ? `Abrimos ${abertura.dia} às ${abertura.hora}.` : "";
+  const quando = abertura
+    ? (abertura.hoje
+        ? `Abrimos hoje às ${abertura.hora}.`
+        : `Abrimos ${abertura.dia} às ${abertura.hora}.`)
+    : "";
   return `👋 Olá! No momento não podemos atendê-lo 🕐
 
 ${quando}
