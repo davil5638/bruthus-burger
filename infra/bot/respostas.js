@@ -21,6 +21,9 @@ const LOJA = "Bruthus Burger & Pizza";
 const LINK = process.env.ORDER_LINK || "https://bruthus-burger.ola.click/products";
 const PIX_CHAVE = process.env.PIX_CHAVE || "";
 const PIX_NOME  = process.env.PIX_NOME || "";
+// Como ele digita no WhatsApp (26 vezes no histórico), não o endereço
+// formal do cadastro — que inclusive não traz o número 233.
+const ENDERECO  = process.env.ENDERECO_LOJA || "Rua Manoel Messias, 233";
 
 const sortear = (lista) => lista[Math.floor(Math.random() * lista.length)];
 
@@ -81,12 +84,35 @@ function ausencia(abertura, funcionamento) {
 // O bot não sabe o tempo de espera, então não promete prazo: prometer
 // errado é pior do que não prometer.
 // ──────────────────────────────────────────────
+// As palavras são dele, tiradas do histórico: "pra delivery estamos
+// fechado por enquanto, devido a alta demanda" e "por isso pausamos o
+// aplicativo". Eu tinha escrito algo bem mais formal; isto é como a loja
+// realmente fala, e o cliente não estranha.
 function pausado() {
   return sortear([
-    `Oi! No momento estamos com a produção cheia e pausamos os pedidos por um tempinho 🙏\nAssim que liberar, o cardápio volta no link: ${LINK}`,
-    `Oi! Estamos com alta demanda agora e pausamos os pedidos para dar conta da fila 🔥\nDaqui a pouco liberamos de novo: ${LINK}`,
-    `Oi! Pausamos os pedidos por uns minutos porque a cozinha está cheia 🙏\nFica de olho no link que já volta: ${LINK}`,
+    `Oi! Pra delivery estamos fechado por enquanto, devido a alta demanda 🙏\nAssim que liberar o cardápio volta: ${LINK}`,
+    `Oi! Pausamos o aplicativo por um tempinho, tá tudo cheio aqui 🔥\nDaqui a pouco liberamos: ${LINK}`,
+    `Oi! Pausamos os pedidos agora por causa da demanda 🙏\nFica de olho no link que já volta: ${LINK}`,
   ]);
+}
+
+// Depois do horário de fechar, no mesmo dia. "Já encerramos" é dele.
+function jaEncerramos(abertura) {
+  const volta = abertura ? `\nVoltamos ${abertura.dia} às ${abertura.hora} ⏰` : "";
+  return `${sortear(["Boa noite! Já encerramos 🥲", "Oi! Por hoje já encerramos 🥲"])}${volta}\n\nMas já dá pra deixar seu pedido agendado 👇\n🔗 ${LINK}`;
+}
+
+// Endereço da loja. Pedido 26 vezes no histórico, sempre para retirada —
+// e o bot não sabia responder. Ele escreve curto assim mesmo.
+function endereco() {
+  return `${ENDERECO}\n\nQualquer coisa é só chamar 🙌`;
+}
+
+// Tempo de entrega. O cardápio anuncia 45–65 min, mas no WhatsApp ele
+// responde "uns 30 min" e "40min". Vale o que ele diz ao cliente, senão
+// o bot promete mais devagar do que a loja realmente é.
+function tempoEntrega() {
+  return sortear(["uns 40min", "entre 30 e 40min", "uns 40 minutos"]);
 }
 
 // Item fora do ar. O dono esconde item por item, então dá para dizer o
@@ -186,5 +212,6 @@ module.exports = {
   LOJA, LINK,
   boasVindas, ausencia, pausado, esgotado, massaAcabou,
   pix, agradecimento, status, qualDeles,
+  jaEncerramos, endereco, tempoEntrega, ENDERECO,
   temPix: () => Boolean(PIX_CHAVE),
 };

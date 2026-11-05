@@ -189,8 +189,37 @@ async function decidir(texto, msg) {
       ? "a produção está cheia agora; volta a aceitar em breve"
       : `fechado agora; abre ${estado.proximaAbertura?.dia} às ${estado.proximaAbertura?.hora}`;
 
+  // Qual mensagem de "não dá para pedir agora" cabe aqui. São três
+  // situações diferentes e o cliente percebe a diferença.
+  const fechouHoje = estado && estado.situacao === "fechada"
+    && estado.horarioDeHoje?.length && !estado.abreHojeMaisTarde;
+  const textoFechado = () =>
+    estado?.situacao === "pausada" ? respostas.pausado()
+      : fechouHoje ? respostas.jaEncerramos(estado?.proximaAbertura)
+      : respostas.ausencia(estado?.proximaAbertura, estado?.funcionamento);
+
   const n = cardapio.normalizar(texto);
   if (!n) return { intencao: msg?.temImagem ? "print_pendente" : "sem_texto" };
+
+  // Endereço da loja: pedido 26 vezes no histórico, sempre para retirada,
+  // e o bot não sabia responder. Vale antes da checagem de fechado — o
+  // endereço é o mesmo com a loja aberta ou não.
+  if (/\b(endereco|onde (fica|e|voces|vcs)|retirar|buscar|local|localizacao|rua)\b/.test(n)
+      && !cardapio.taxaBairro(texto)) {
+    return { intencao: "endereco_da_loja", acao: "manda o endereço", mensagem: respostas.endereco() };
+  }
+
+  // "quanto tempo?" — responde o que ele responde, não o que o cardápio
+  // anuncia. No WhatsApp ele diz "uns 30 min" e "40min"; a página diz
+  // 45–65. Prometer mais devagar do que a loja é faz ela parecer pior.
+  if (/\b(quanto tempo|quantos? min|demora|demorar|prazo)\b/.test(n)) {
+    return {
+      intencao: "tempo_entrega",
+      loja: avisoFechado || undefined,
+      acao: "responde o tempo de entrega",
+      mensagem: avisoFechado ? textoFechado() : `Entrega em ${respostas.tempoEntrega()} 🛵`,
+    };
+  }
 
   // 3. Só um cumprimento. 135 conversas abriram assim.
   if (/^(oi+|ola|alo|opa|bo[am]\s+(dia|tarde|noite)|e\s*ai)[\s!,.]*$/.test(n)) {
@@ -200,9 +229,7 @@ async function decidir(texto, msg) {
       acao: avisoFechado
         ? `manda a mensagem de ausência: ${avisoFechado}`
         : "manda as boas-vindas com o link do cardápio",
-      mensagem: estado?.situacao === "pausada" ? respostas.pausado()
-        : avisoFechado ? respostas.ausencia(estado?.proximaAbertura, estado?.funcionamento)
-        : respostas.boasVindas(),
+      mensagem: avisoFechado ? textoFechado() : respostas.boasVindas(),
     };
   }
 
@@ -256,9 +283,7 @@ async function decidir(texto, msg) {
       acao: avisoFechado
         ? `responde a dúvida e avisa: ${avisoFechado}`
         : "responde com o que sabe da loja e do cardápio",
-      mensagem: estado?.situacao === "pausada" ? respostas.pausado()
-        : avisoFechado ? respostas.ausencia(estado?.proximaAbertura, estado?.funcionamento)
-        : undefined,
+      mensagem: avisoFechado ? textoFechado() : undefined,
     };
   }
 
@@ -270,9 +295,7 @@ async function decidir(texto, msg) {
       intencao: "nao_entendi_loja_fechada",
       loja: avisoFechado,
       acao: "não sei responder, mas aviso que não dá para pedir agora",
-      mensagem: estado?.situacao === "pausada"
-        ? respostas.pausado()
-        : respostas.ausencia(estado?.proximaAbertura, estado?.funcionamento),
+      mensagem: textoFechado(),
     };
   }
 
