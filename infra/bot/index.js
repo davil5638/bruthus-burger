@@ -330,7 +330,10 @@ async function decidir(texto, msg) {
             : respostas.esgotado(achado.item.nome, cardapio.CARDAPIO.itens.filter((i) => i.cat === achado.item.cat).map((i) => i.nome)))
         : achado.confianca === "baixa"
           ? respostas.qualDeles(achado.alternativas.map((a) => a.nome))
-          : undefined,
+          // Loja fechada: diz o preço e avisa. Não há pedido a tomar.
+          : avisoFechado
+            ? `${achado.item.nome} — *R$ ${achado.item.preco.toFixed(2).replace(".", ",")}* 🍔\n\n${textoFechado()}`
+            : undefined,
     };
   }
 
@@ -372,6 +375,51 @@ async function decidir(texto, msg) {
 }
 
 // ──────────────────────────────────────────────
+// O QUE O BOT PODE RESPONDER SOZINHO.
+//
+// Lista fechada, de propósito. Tudo que não está aqui — inclusive o que
+// ele achou que entendeu mas com confiança baixa — vira pedido de ajuda:
+// não responde nada ao cliente e avisa o dono no WhatsApp dele.
+//
+// A regra é do dono: "qualquer dúvida que o bot tiver, não responda,
+// manda msg pro meu wpp que eu vou lá responder". É o jeito seguro de
+// soltar um bot no número que recebe pedido — o pior que acontece é ele
+// ficar quieto e alguém humano aparecer, nunca uma resposta errada.
+// ──────────────────────────────────────────────
+const PODE_RESPONDER = new Set([
+  "saudacao",             // boas-vindas / ausência / pausado — texto fixo
+  "loja_fechada",
+  "loja_pausada",
+  "duvida",               // só cai aqui quando é sobre horário/loja
+  "tempo_entrega",
+  "endereco_da_loja",
+  "endereco",             // bairro reconhecido, taxa conhecida
+  "consulta_de_local",    // o dono mandando o código do pedido
+  "nao_entendi_loja_fechada",
+]);
+
+// Estes ele entende, mas só responde quando a confiança é alta: item
+// errado vira comida errada na cozinha.
+function podeResponder(leitura) {
+  if (leitura.escalar) return false;
+  if (leitura.erro) return false;
+
+  // Pedido escrito: o bot diz o preço só quando a loja está FECHADA —
+  // aí não há pedido a tomar, é informação e ponto.
+  //
+  // Com a loja aberta, pedido é do dono. Fechar um pedido exige ponto da
+  // carne, maionese, endereço e forma de pagamento, e o bot não conduz
+  // essa conversa ainda. Responder "R$ 42,99" e parar aí deixaria o
+  // cliente achando que pediu quando não pediu — pior que não responder.
+  if (leitura.intencao === "pedido_escrito") {
+    return leitura.confianca === "alta" && Boolean(leitura.loja);
+  }
+
+  if (leitura.intencao === "pedido_pelo_botao") return Boolean(leitura.mensagem);
+  return PODE_RESPONDER.has(leitura.intencao);
+}
+
+// ──────────────────────────────────────────────
 // Avisa o dono quando o bot encosta no limite do que pode responder.
 //
 // Marcar a conversa como "dele" não serve de nada se ele não ficar
@@ -392,17 +440,27 @@ const ALERTAR = process.env.ALERTAR_DONO !== "0" && Boolean(ALERTA_NUMERO);
 const ALERTADO = new Map();
 const ALERTA_JANELA_MS = 20 * 60 * 1000;
 
+const MOTIVO = {
+  cobranca_de_pedido:        "está cobrando o pedido",
+  pedido_ou_endereco_errado: "diz que errou o pedido ou o endereço",
+  print_pendente:            "mandou um print",
+  sem_texto:                 "mandou algo que não é texto",
+  nao_entendi:               "escreveu algo que não entendi",
+  pedido_escrito:            "pediu algo e não tenho certeza do item",
+};
+
 async function alertarDono(msg, leitura) {
   if (!ALERTAR) return null;
   const ultimo = ALERTADO.get(msg.conversa);
   if (ultimo && Date.now() - ultimo < ALERTA_JANELA_MS) return "repetido";
   ALERTADO.set(msg.conversa, Date.now());
 
-  const motivo = leitura.intencao === "cobranca_de_pedido"
-    ? "está cobrando o pedido"
-    : "diz que errou o pedido ou o endereço";
+  const motivo = MOTIVO[leitura.intencao] || "precisa de você";
   const quem = msg.nome ? `*${msg.nome}*` : "Um cliente";
-  const texto = `🔔 ${quem} ${motivo}:\n\n_"${String(msg.texto || "").slice(0, 160)}"_\n\nO bot segurou e não respondeu. Assume aí 🙏`;
+  const dica = leitura.alternativas?.length
+    ? `\n\nPode ser: ${leitura.alternativas.slice(0, 3).join(" / ")}`
+    : "";
+  const texto = `🔔 ${quem} ${motivo}:\n\n_"${String(msg.texto || "").slice(0, 160)}"_${dica}\n\nO bot não respondeu. Assume aí 🙏`;
 
   try {
     await axios.post(
@@ -456,11 +514,33 @@ app.post("/webhook/evolution", async (req, res) => {
       delete leitura.mensagem;
     }
 
-    // O aviso ao dono sai mesmo em observação: é para ele, não para
-    // cliente, e é agora que ele precisa saber o que o bot não resolve.
-    const alerta = leitura.escalar ? await alertarDono(msg, leitura) : null;
+    // Responde ou chama o dono — nunca os dois, nunca nenhum.
+    const responde = podeResponder(leitura) && Boolean(leitura.mensagem);
+    leitura.decisao = responde ? "responde" : "chama_o_dono";
+
+    // O aviso sai mesmo em observação: é para ele, não para cliente, e é
+    // agora que ele precisa ver o que o bot deixaria passar.
+    const alerta = responde ? null : await alertarDono(msg, leitura);
+
+    // E aqui, se estiver solto, o bot fala com o cliente.
+    let envio = null;
+    if (RESPONDER && responde) {
+      try {
+        await axios.post(
+          `${EVO_URL}/message/sendText/${EVO_INSTANCE}`,
+          { number: msg.conversa.replace(/@.*/, ""), text: leitura.mensagem, delay: 1200, linkPreview: false },
+          { headers: { apikey: EVO_KEY, "Content-Type": "application/json" }, timeout: 20000 }
+        );
+        envio = "enviado";
+      } catch (e) {
+        envio = "falhou: " + (e.response?.data?.message || e.message);
+        console.error("[envio]", envio);
+      }
+    }
 
     registrar({
+      decisao: leitura.decisao,
+      envio: envio || undefined,
       alerta: alerta || undefined,
       conversa: msg.conversa,
       nome: msg.nome,
