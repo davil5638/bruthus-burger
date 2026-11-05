@@ -156,6 +156,43 @@ async function decidir(texto, msg) {
 
   // 1. Veio pelo botão: o pedido já existe, é só buscar.
   const codigo = codigoDoPedido(texto);
+
+  // Só o código, nada mais: é o dono (ou o entregador) perguntando onde
+  // fica a entrega, não um cliente chegando.
+  //
+  // Existe por um caso concreto do iFood: o entregador liga dizendo que
+  // não achou o número, e aí começa a corrida atrás do cliente. Mas o
+  // pedido do iFood vem com a coordenada do GPS — 15 de 15 na amostra —,
+  // então o pin sempre esteve ali. O telefone do cliente vem mascarado
+  // pelo iFood ("0800 700 3020 | ..."), então falar com ele não é opção:
+  // o que resolve é o entregador navegar pelo mapa.
+  //
+  // A mensagem do botão do OlaClick também traz um BR-, mas vem com
+  // dezenas de palavras junto; aqui exige-se o código quase sozinho.
+  if (codigo && texto.replace(/\s+/g, " ").trim().length <= codigo.length + 12) {
+    try {
+      const p = await olaclick.buscarPedidoPorCodigo(codigo, { diasAtras: 3 });
+      if (!p) return { intencao: "consulta_de_local", pedido: codigo, erro: "não achei esse pedido" };
+      const a = p.address || {};
+      const linhas = [`📍 *${codigo}*`, a.address || "(sem endereço)"];
+      if (a.reference) linhas.push(`_Ref: ${a.reference}_`);
+      if (a.latitude && a.longitude) {
+        linhas.push("", `https://www.google.com/maps/search/?api=1&query=${a.latitude},${a.longitude}`);
+      } else {
+        linhas.push("", "_Esse pedido não veio com localização._");
+      }
+      return {
+        intencao: "consulta_de_local",
+        pedido: codigo,
+        temCoordenada: Boolean(a.latitude),
+        acao: "responde o endereço e o link do mapa",
+        mensagem: linhas.join("\n"),
+      };
+    } catch (e) {
+      return { intencao: "consulta_de_local", pedido: codigo, erro: e.message };
+    }
+  }
+
   if (codigo) {
     try {
       // Pelo código público, não pelo UUID: `/orders/{BR-x}` devolve 422.
