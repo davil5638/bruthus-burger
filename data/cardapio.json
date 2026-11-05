@@ -365,5 +365,11 @@
     "pausado_por_demanda": "get_company -> currently_open:false DENTRO do horario de business_hours.",
     "fechado_normal": "get_company -> currently_open:false FORA do horario. Usa a mensagem de ausencia.",
     "_regra": "E o relogio contra business_hours que separa pausado de fechado. Sem isso o bot diria que esta fechado quando na verdade esta so pausado, e perderia a venda de quem esperaria."
+  },
+  "pedido_minimo": 15,
+  "tempo_entrega": "45 a 65 min",
+  "_notas_da_loja": {
+    "pedido_minimo": "R$ 15,00, lido na propria pagina do cardapio. Sem isto o bot calcularia o total de um pedido pequeno e mandaria o valor, e o pedido seria recusado depois.",
+    "agendamento": "Com a loja fechada o cardapio mostra \"Fechado\" e \"Pedir para depois\", e avisa: \"Nesse momento so recebemos pedidos agendados\". Entao convidar para agendar e verdade, nao promessa vazia."
   }
 }

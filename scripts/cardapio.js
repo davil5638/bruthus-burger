@@ -165,6 +165,11 @@ function taxaBairro(texto) {
 
 /**
  * Soma o pedido. Nenhuma IA envolvida: entra lista de itens, sai total.
+ *
+ * `faltaParaMinimo` existe porque a loja tem pedido mínimo de R$ 15 (está
+ * escrito na página do cardápio). Sem conferir, o bot somaria uma Coca de
+ * R$ 6,99 com a entrega, mandaria o valor, e o pedido seria recusado
+ * depois — com o cliente já tendo decidido comprar.
  */
 function precificar(itens, bairro = null) {
   const linhas = itens.map(({ item, qtd = 1 }) => ({
@@ -176,12 +181,18 @@ function precificar(itens, bairro = null) {
 
   const produtos = Number(linhas.reduce((s, l) => s + l.subtotal, 0).toFixed(2));
   const entrega = bairro ? bairro.taxa : 0;
+  const minimo = Number(CARDAPIO.pedido_minimo || 0);
+  // O mínimo vale sobre os produtos, não sobre o total com entrega: a
+  // taxa é da entrega, não da compra.
+  const faltaParaMinimo = minimo > produtos ? Number((minimo - produtos).toFixed(2)) : 0;
 
   return {
     linhas,
     produtos,
     entrega,
     total: Number((produtos + entrega).toFixed(2)),
+    minimo,
+    faltaParaMinimo,
   };
 }
 
