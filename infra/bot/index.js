@@ -201,6 +201,25 @@ async function decidir(texto, msg) {
   const n = cardapio.normalizar(texto);
   if (!n) return { intencao: msg?.temImagem ? "print_pendente" : "sem_texto" };
 
+  // "Cadê meu pedido?" — o bot NÃO responde isso sozinho.
+  //
+  // O dono responde com informação que só ele tem: "vou ligar aqui pra
+  // ele", "ele precisou voltar na loja", "pegou uma entrega pra Boa Vista
+  // e atrasou". O bot não sabe onde o entregador está, e o LID impede
+  // ligar esta conversa a um pedido pelo telefone. Inventar "já está a
+  // caminho" quando não está custa o cliente, e a loja leva a culpa.
+  //
+  // Então segura com honestidade e marca para o dono ver. Vale mais que
+  // silêncio: o cliente sabe que foi lido.
+  if (/\b(cade|onde (ta|esta)|ainda nao chegou|nao chegou|atras|demorando|esqueceu|ja saiu|em rota)\b/.test(n)) {
+    return {
+      intencao: "cobranca_de_pedido",
+      escalar: true,
+      acao: "SEGURA e chama o dono — só ele sabe onde está o entregador",
+      mensagem: respostas.vouVerificar(),
+    };
+  }
+
   // Endereço da loja: pedido 26 vezes no histórico, sempre para retirada,
   // e o bot não sabia responder. Vale antes da checagem de fechado — o
   // endereço é o mesmo com a loja aberta ou não.

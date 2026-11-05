@@ -91,8 +91,28 @@ function ausencia(abertura, funcionamento) {
 function pausado() {
   return sortear([
     `Oi! Pra delivery estamos fechado por enquanto, devido a alta demanda 🙏\nAssim que liberar o cardápio volta: ${LINK}`,
-    `Oi! Pausamos o aplicativo por um tempinho, tá tudo cheio aqui 🔥\nDaqui a pouco liberamos: ${LINK}`,
-    `Oi! Pausamos os pedidos agora por causa da demanda 🙏\nFica de olho no link que já volta: ${LINK}`,
+    `Oi! No momento não conseguimos pegar pedido, por conta da alta demanda 🥲\nDaqui a pouco liberamos: ${LINK}`,
+    `Oi! Pausamos o aplicativo por um tempinho, tá tudo cheio aqui 🔥\nFica de olho no link que já volta: ${LINK}`,
+  ]);
+}
+
+// ──────────────────────────────────────────────
+// Quando o bot NÃO deve responder sozinho.
+//
+// "Cadê meu pedido?" é o caso mais claro. Olha como ele responde de
+// verdade: "vou ligar aqui pra ele", "ele precisou voltar na loja", "o
+// entregador pegou uma entrega pra Boa Vista, aí acabou atrasando".
+// Nenhuma dessas o bot tem como saber — e inventar "já está a caminho"
+// quando não está custa o cliente, com a loja levando a culpa.
+//
+// Então ele segura e chama o dono. "te digo já" é dele, do histórico:
+// é exatamente o que uma pessoa faz quando precisa ir verificar.
+// ──────────────────────────────────────────────
+function vouVerificar() {
+  return sortear([
+    "Deixa eu verificar aqui e já te falo 🙏",
+    "Só um instante que eu confiro e te digo já",
+    "Vou dar uma olhada aqui e já te respondo 🙏",
   ]);
 }
 
@@ -117,11 +137,15 @@ function tempoEntrega() {
 
 // Item fora do ar. O dono esconde item por item, então dá para dizer o
 // nome — bem melhor que um "não temos" seco.
+// Ele diz "Acabou a cebola caramelizada 🥲" — nomeia o que faltou e usa
+// o 🥲, não um "indisponível" seco. Aqui o bot só sabe o item, não o
+// ingrediente, então nomeia o item e oferece o que sobrou: a conversa
+// continua sendo venda, não recusa.
 function esgotado(nome, alternativas = []) {
   const sobra = alternativas.length
-    ? `\n\nAinda temos: ${alternativas.slice(0, 4).join(", ")}.`
+    ? `\n\nMas ainda tem: ${alternativas.slice(0, 4).join(", ")}`
     : "";
-  return `Poxa, ${nome} acabou hoje 😕${sobra}\n\nCardápio completo: ${LINK}`;
+  return `Poxa, ${nome} acabou hoje 🥲${sobra}\n\nCardápio: ${LINK}`;
 }
 
 // Quando TODAS as pizzas saem do ar de uma vez, foi a massa que acabou —
@@ -212,6 +236,6 @@ module.exports = {
   LOJA, LINK,
   boasVindas, ausencia, pausado, esgotado, massaAcabou,
   pix, agradecimento, status, qualDeles,
-  jaEncerramos, endereco, tempoEntrega, ENDERECO,
+  jaEncerramos, endereco, tempoEntrega, vouVerificar, ENDERECO,
   temPix: () => Boolean(PIX_CHAVE),
 };
