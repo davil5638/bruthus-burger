@@ -389,17 +389,26 @@
     }
   },
   "pedido_pelo_whatsapp": {
-    "_nota": "Decisao do dono: o bot NAO pergunta ponto nem maionese, porque nao existem. So precisa de endereco e forma de pagamento.",
-    "perguntar": [
+    "_nota": "Regra do dono. O bot pergunta o MINIMO: cliente nao quer questionario, quer comer.",
+    "sempre_perguntar": [
       "endereco",
       "forma de pagamento"
     ],
-    "perguntar_se_combo": [
-      "coca zero ou normal",
-      "qual batata"
+    "se_combo": [
+      "qual coca (zero ou normal)"
     ],
-    "perguntar_se_dinheiro": [
-      "precisa de troco"
-    ]
+    "batata": {
+      "padrao": "batata pequena",
+      "_nota": "NAO perguntar. Quase todo mundo quer a pequena, que ja vem no preco do combo. So muda se o cliente falar sozinho.",
+      "so_muda_se_cliente_pedir": {
+        "batata media": 9,
+        "batata com cheddar e bacon": 13
+      }
+    },
+    "nunca_perguntar": [
+      "ponto da carne",
+      "maionese"
+    ],
+    "_nunca_porque": "Nao existem no cardapio ativo: so ha uma maionese e ninguem escolhe ponto."
   }
 }

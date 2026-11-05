@@ -82,6 +82,11 @@ function mesmaPalavra(a, b) {
 // que nem existe no cardápio, e citou bacon como ADICIONAL — e o bot
 // responderia o preço de outro lanche. "bacon" está em vários itens;
 // "coalho" e "melt" estão em dois e identificam de verdade.
+// Todas as palavras que existem em nome de item. Serve para saber se uma
+// palavra que o cliente disse é do cardápio ("duplo") ou conversa solta
+// ("quero", "viu", "amiga") — só a primeira diz algo sobre qual item é.
+const VOCABULARIO = new Set(CARDAPIO.itens.flatMap((i) => palavras(i.nome)));
+
 const PESO = (() => {
   const freq = {};
   CARDAPIO.itens.forEach((i) => {
@@ -115,7 +120,25 @@ function pontuar(consulta, item) {
   // Proporção do nome que foi mencionada, pesada pela raridade. "melt"
   // sozinho cobre quase todo "Bruthus Melt" porque é raro; "bacon"
   // sozinho cobre pouco de "Cheddar & Bacon" porque está em todo canto.
-  return ganho / total;
+  let nota = ganho / total;
+
+  // E o que o cliente disse e este item NÃO tem?
+  //
+  // Sem isto, "um combo do duplo smash" empatava entre "Smash Bruthus -
+  // Combo" e "Duplo Smash Bruthus - Combo": os dois nomes aparecem
+  // inteiros na frase, então os dois davam nota 1. Só que o cliente disse
+  // "duplo", e o primeiro não é duplo — cobraria R$ 4 a menos e mandaria
+  // o lanche errado.
+  //
+  // Só conta palavra que EXISTE no cardápio: "quero", "pra", "viu" não
+  // dizem nada sobre qual item é.
+  for (const q of pc) {
+    if (!VOCABULARIO.has(q)) continue;
+    if (pi.some((p) => mesmaPalavra(q, p))) continue;
+    nota -= 0.5 * PESO(q);
+  }
+
+  return Math.max(0, nota);
 }
 
 // O cliente pediu combo? "combo", "completo", "com batata e refri".
