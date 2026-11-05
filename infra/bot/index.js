@@ -201,7 +201,7 @@ async function decidir(texto, msg) {
         ? `manda a mensagem de ausência: ${avisoFechado}`
         : "manda as boas-vindas com o link do cardápio",
       mensagem: estado?.situacao === "pausada" ? respostas.pausado()
-        : avisoFechado ? respostas.ausencia(estado?.proximaAbertura)
+        : avisoFechado ? respostas.ausencia(estado?.proximaAbertura, estado?.funcionamento)
         : respostas.boasVindas(),
     };
   }
@@ -257,7 +257,7 @@ async function decidir(texto, msg) {
         ? `responde a dúvida e avisa: ${avisoFechado}`
         : "responde com o que sabe da loja e do cardápio",
       mensagem: estado?.situacao === "pausada" ? respostas.pausado()
-        : avisoFechado ? respostas.ausencia(estado?.proximaAbertura)
+        : avisoFechado ? respostas.ausencia(estado?.proximaAbertura, estado?.funcionamento)
         : undefined,
     };
   }
@@ -272,7 +272,7 @@ async function decidir(texto, msg) {
       acao: "não sei responder, mas aviso que não dá para pedir agora",
       mensagem: estado?.situacao === "pausada"
         ? respostas.pausado()
-        : respostas.ausencia(estado?.proximaAbertura),
+        : respostas.ausencia(estado?.proximaAbertura, estado?.funcionamento),
     };
   }
 

@@ -75,17 +75,55 @@ async function estado() {
     agora: hhmm,
     dia,
     horarioDeHoje: hoje.is_active ? hoje.hours : [],
+    // "de quarta a domingo, das 18:30 às 23:00" — derivado, nunca escrito
+    // à mão, para não envelhecer quando o dono mexer nos dias.
+    funcionamento: diasDeFuncionamento(empresa),
+    // Hoje a loja abre, mas ainda não abriu. Muda a resposta: em vez de
+    // "voltamos quarta", é "abrimos hoje às 18:30, já pode agendar".
+    abreHojeMaisTarde: Boolean(hoje.is_active) && !deveriaEstarAberta
+      && (hoje.hours || []).some((f) => hhmm < f.open),
     proximaAbertura: situacao === "fechada" ? proximaAbertura(empresa, dia, hhmm) : null,
   };
+}
+
+const PT_DIA = {
+  sunday: "domingo", monday: "segunda", tuesday: "terça", wednesday: "quarta",
+  thursday: "quinta", friday: "sexta", saturday: "sábado",
+};
+
+// "de quarta a domingo, das 18:30 às 23:00", montado do horário cadastrado.
+//
+// NÃO escrito à mão de propósito. A mensagem da OlaClick diz "quinta a
+// domingo" em texto fixo e vai ficar errada no dia que a quarta entrar —
+// é esse o erro que isto evita. Mudou no painel, muda aqui sozinho.
+function diasDeFuncionamento(empresa) {
+  // Semana começando na segunda, que é como se fala "de quarta a domingo".
+  const ordem = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  const ativos = ordem.filter((d) => {
+    const x = empresa?.business_hours?.[d];
+    return x?.is_active && x.hours?.length;
+  });
+  if (!ativos.length) return null;
+
+  // Contíguos viram faixa ("de quarta a domingo"); soltos viram lista.
+  const indices = ativos.map((d) => ordem.indexOf(d));
+  const contiguo = indices.every((v, i) => i === 0 || v === indices[i - 1] + 1);
+  const dias = ativos.length === 1
+    ? PT_DIA[ativos[0]]
+    : contiguo
+      ? `de ${PT_DIA[ativos[0]]} a ${PT_DIA[ativos[ativos.length - 1]]}`
+      : ativos.map((d) => PT_DIA[d]).join(", ");
+
+  // O horário costuma ser o mesmo em todos os dias; se não for, mostra o
+  // do primeiro em vez de inventar uma faixa que não existe.
+  const h = empresa.business_hours[ativos[0]].hours[0];
+  return { dias, abre: h.open, fecha: h.close, texto: `${dias}, das ${h.open} às ${h.close}` };
 }
 
 // Quando abre de novo, para a mensagem de fora de horário poder dizer
 // "abrimos quinta às 18:30" em vez de um genérico "estamos fechados".
 function proximaAbertura(empresa, diaAtual, hhmm) {
-  const PT = {
-    sunday: "domingo", monday: "segunda", tuesday: "terça", wednesday: "quarta",
-    thursday: "quinta", friday: "sexta", saturday: "sábado",
-  };
+  const PT = PT_DIA;
   const base = DIAS.indexOf(diaAtual);
   for (let i = 0; i < 8; i++) {
     const dia = DIAS[(base + i) % 7];
@@ -139,4 +177,4 @@ if (require.main === module) {
   })().catch((e) => { console.error("❌", e.message); process.exit(1); });
 }
 
-module.exports = { estado, indisponiveis, agoraEm, dentroDaFaixa };
+module.exports = { estado, indisponiveis, agoraEm, dentroDaFaixa, diasDeFuncionamento };

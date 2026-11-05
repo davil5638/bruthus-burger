@@ -45,24 +45,32 @@ Trabalhamos com produção limitada diariamente. Se não aparecer no cardápio, 
 😊 Em breve retornaremos com a confirmação!`;
 }
 
-// Fora do horário. `abertura` vem de loja.js: { dia, hora, hoje }.
+// Fora do horário. Três situações diferentes, três respostas:
 //
-// "Abrimos quinta às 18:30" dito numa quinta de manhã soa como se fosse
-// semana que vem. Quando a abertura é hoje, diz hoje.
-function ausencia(abertura) {
-  const quando = abertura
-    ? (abertura.hoje
-        ? `Abrimos hoje às ${abertura.hora}.`
-        : `Abrimos ${abertura.dia} às ${abertura.hora}.`)
-    : "";
-  return `👋 Olá! No momento não podemos atendê-lo 🕐
+//   terça (dia que não abre)      → "funcionamos de quarta a domingo"
+//   quinta de manhã, antes de abrir → "abrimos HOJE às 18:30"
+//   quinta depois das 23h          → "abrimos sexta às 18:30"
+//
+// Os dias vêm de `funcionamento`, derivado do horário cadastrado no
+// OlaClick — nunca escritos à mão. A mensagem da OlaClick diz "quinta a
+// domingo" em texto fixo e ficou errada no dia em que a quarta entrou;
+// esta se corrige sozinha.
+//
+// O convite para agendar fica em todas: quem escreve de manhã janta à
+// noite, e o pedido agendado é venda que entraria de qualquer jeito.
+function ausencia(abertura, funcionamento) {
+  const linhas = ["👋 Olá! No momento não podemos atendê-lo 🕐", ""];
 
-${quando}
+  if (funcionamento) linhas.push(`Funcionamos ${funcionamento.texto}.`);
 
-Esperamos vê-lo em breve! 🙌
+  if (abertura) {
+    linhas.push(abertura.hoje
+      ? `Abrimos *hoje às ${abertura.hora}* ⏰`
+      : `Abrimos ${abertura.dia} às ${abertura.hora} ⏰`);
+  }
 
-Caso queira, já pode deixar seu pedido agendado pelo link 👇
-🔗 ${LINK}`;
+  linhas.push("", "Caso queira, já pode deixar seu pedido agendado pelo link 👇", `🔗 ${LINK}`);
+  return linhas.join("\n");
 }
 
 // ──────────────────────────────────────────────
