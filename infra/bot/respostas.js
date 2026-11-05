@@ -134,9 +134,16 @@ function vouVerificar() {
 }
 
 // Depois do horário de fechar, no mesmo dia. "Já encerramos" é dele.
-function jaEncerramos(abertura) {
-  const volta = abertura ? `\nVoltamos ${abertura.dia} às ${abertura.hora} ⏰` : "";
-  return `${sortear(["Boa noite! Já encerramos 🥲", "Oi! Por hoje já encerramos 🥲"])}${volta}\n\nMas já dá pra deixar seu pedido agendado 👇\n🔗 ${LINK}`;
+// Depois das 23h NÃO oferece agendar — decisão do dono.
+//
+// O expediente acabou e o próximo é amanhã; convidar a agendar agora
+// deixaria o pedido pendurado a noite inteira, com ninguém na loja. Diz
+// que encerrou e quando volta, e para por aí.
+function jaEncerramos(abertura, funcionamento) {
+  const linhas = [sortear(["Boa noite! Já encerramos 🥲", "Oi! Por hoje já encerramos 🥲"])];
+  if (funcionamento) linhas.push(`\nFuncionamos ${funcionamento.texto}.`);
+  if (abertura) linhas.push(`Voltamos ${abertura.dia} às ${abertura.hora} ⏰`);
+  return linhas.join("\n");
 }
 
 // Endereço da loja. Pedido 26 vezes no histórico, sempre para retirada —

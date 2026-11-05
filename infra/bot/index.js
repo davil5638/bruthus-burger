@@ -232,7 +232,7 @@ async function decidir(texto, msg) {
     && estado.horarioDeHoje?.length && !estado.abreHojeMaisTarde;
   const textoFechado = () =>
     estado?.situacao === "pausada" ? respostas.pausado()
-      : fechouHoje ? respostas.jaEncerramos(estado?.proximaAbertura)
+      : fechouHoje ? respostas.jaEncerramos(estado?.proximaAbertura, estado?.funcionamento)
       : respostas.ausencia(estado?.proximaAbertura, estado?.funcionamento);
 
   const n = cardapio.normalizar(texto);
@@ -562,13 +562,15 @@ app.post("/webhook/evolution", async (req, res) => {
       delete leitura.mensagem;
     }
 
-    // Responde ou chama o dono — nunca os dois, nunca nenhum.
+    // Responde, cala, ou chama o dono.
     const responde = podeResponder(leitura) && Boolean(leitura.mensagem);
-    leitura.decisao = responde ? "responde" : "chama_o_dono";
+    leitura.decisao = responde ? "responde" : (leitura.repetida ? "calou" : "chama_o_dono");
 
-    // O aviso sai mesmo em observação: é para ele, não para cliente, e é
-    // agora que ele precisa ver o que o bot deixaria passar.
-    const alerta = responde ? null : await alertarDono(msg, leitura);
+    // Repetição silenciada NÃO é pedido de ajuda: o bot sabia a resposta
+    // e escolheu não repetir. Alertar aqui enchia o dono de aviso de
+    // coisa resolvida — e foi o que aconteceu no primeiro teste dele, que
+    // pareceu falha do bot quando era decisão correta mal comunicada.
+    const alerta = responde || leitura.repetida ? null : await alertarDono(msg, leitura);
 
     // E aqui, se estiver solto, o bot fala com o cliente.
     let envio = null;
@@ -622,7 +624,13 @@ app.post("/webhook/evolution", async (req, res) => {
 // parece robô quebrado — além de ser exatamente o que o WhatsApp olha
 // para flagrar automação.
 const JA_DISSE = new Map();
-const NAO_REPETIR_MS = 30 * 60 * 1000;
+// 10 minutos, não 30.
+//
+// A trava existe para a rajada: "oii" e "boa noite" com um minuto entre
+// elas, que foi o caso real da primeira noite. Meia hora silenciava
+// também quem volta a escrever depois — gente diferente, com intenção
+// diferente. Dez minutos cobre a rajada e devolve o resto.
+const NAO_REPETIR_MS = 10 * 60 * 1000;
 
 function jaDisseAgora(conversa, mensagem) {
   if (!mensagem) return false;
