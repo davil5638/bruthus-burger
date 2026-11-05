@@ -318,19 +318,6 @@
     "mel": 4,
     "queijo coalho": 4
   },
-  "escolhas_obrigatorias": {
-    "_nota": "Hamburguer nao pode ser cadastrado sem estas. O bot precisa perguntar antes de criar o pedido.",
-    "ponto da carne": [
-      "mal passada",
-      "ao ponto",
-      "bem passada"
-    ],
-    "maionese": [
-      "maionese verde",
-      "maionese de bacon",
-      "sem maionese"
-    ]
-  },
   "escolhas_de_combo": {
     "_nota": "So nos combos. A batata muda o preco.",
     "coca": [
@@ -372,5 +359,47 @@
     "pedido_minimo": "R$ 15,00, lido na propria pagina do cardapio. Sem isto o bot calcularia o total de um pedido pequeno e mandaria o valor, e o pedido seria recusado depois.",
     "agendamento": "Com a loja fechada o cardapio mostra \"Fechado\" e \"Pedir para depois\", e avisa: \"Nesse momento so recebemos pedidos agendados\". Entao convidar para agendar e verdade, nao promessa vazia."
   },
-  "endereco": "Rua Manoel Messias, 233 — Alto Guaramiranga, Caninde-CE"
+  "endereco": "Rua Manoel Messias, 233 — Alto Guaramiranga, Caninde-CE",
+  "escolhas_por_produto": {
+    "_nota": "Conferido no cardapio ATIVO, lendo modifier_category_ids de cada produto — nao a lista de grupos. Ponto da carne e Escolha a maionese existem no catalogo mas NAO estao ligados a produto nenhum: sao restos. Hamburguer nao exige escolha nenhuma.",
+    "hamburguer": {
+      "obrigatorio": [],
+      "opcional": [
+        "adicionais"
+      ]
+    },
+    "combo": {
+      "obrigatorio": [
+        "coca zero ou normal"
+      ],
+      "opcional": [
+        "adicionais"
+      ],
+      "muda_preco": {
+        "batata pequena": 0,
+        "batata media": 9,
+        "batata com cheddar e bacon": 13
+      }
+    },
+    "pizza_metade": {
+      "obrigatorio": [
+        "sabor 1",
+        "sabor 2"
+      ]
+    }
+  },
+  "pedido_pelo_whatsapp": {
+    "_nota": "Decisao do dono: o bot NAO pergunta ponto nem maionese, porque nao existem. So precisa de endereco e forma de pagamento.",
+    "perguntar": [
+      "endereco",
+      "forma de pagamento"
+    ],
+    "perguntar_se_combo": [
+      "coca zero ou normal",
+      "qual batata"
+    ],
+    "perguntar_se_dinheiro": [
+      "precisa de troco"
+    ]
+  }
 }
