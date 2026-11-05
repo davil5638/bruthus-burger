@@ -409,6 +409,14 @@
       "ponto da carne",
       "maionese"
     ],
-    "_nunca_porque": "Nao existem no cardapio ativo: so ha uma maionese e ninguem escolhe ponto."
+    "_nunca_porque": "Nao existem no cardapio ativo: so ha uma maionese e ninguem escolhe ponto.",
+    "ordem_da_conversa": {
+      "1": "cliente diz o item",
+      "2": "bot confirma o item com o preco dele, e pergunta o que falta (coca se combo, e o endereco)",
+      "3": "com o endereco, ja sabe a taxa: fala o TOTAL e pergunta a forma de pagamento",
+      "_nota": "Como a conversa acontece de verdade, pela observacao do dono: o cliente pergunta quanto ficou LOGO depois de pedir. O bot nao espera ser perguntado — fala o valor assim que souber.",
+      "4_se_dinheiro": "repete o valor e pergunta se precisa de troco",
+      "_porque": "Falar o valor antes de ser perguntado tira uma ida e volta. E em dinheiro o valor tem que vir junto do troco, senao o cliente nao sabe de quanto precisa."
+    }
   }
 }

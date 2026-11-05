@@ -133,6 +133,53 @@ function somar(p, cardapio) {
 }
 
 const PAGAMENTO_PT = { pix: "Pix", card: "Cartão", cash: "Dinheiro" };
+const br = (v) => "R$ " + Number(v).toFixed(2).replace(".", ",");
+
+// ──────────────────────────────────────────────
+// O que o bot fala a cada passo.
+//
+// A ordem veio da observação do dono: o cliente pergunta "quanto ficou?"
+// LOGO depois de pedir. Então o bot não espera ser perguntado — diz o
+// valor assim que souber. Isso tira uma ida e volta inteira.
+//
+// E em dinheiro o valor vem JUNTO da pergunta do troco: sem saber quanto
+// é, o cliente não tem como dizer de quanto precisa.
+// ──────────────────────────────────────────────
+function perguntar(falta, p, conta) {
+  const primeiro = falta[0];
+
+  if (primeiro === "coca") {
+    const combo = p.itens.find((i) => i.cat === "combo" && !i.coca);
+    return `${combo.nome} — ${br(combo.preco)} 🍔\n\nQual coca, zero ou normal?`;
+  }
+
+  if (primeiro === "endereco") {
+    // Já diz quanto deu dos produtos, antes de ser perguntado.
+    const itens = p.itens.map((i) => `${i.qtd || 1}x ${i.nome}`).join("\n");
+    return `${itens}\n*${br(conta.produtos)}* 🍔\n\nMe passa o endereço com o bairro, pra calcular a entrega?`;
+  }
+
+  if (primeiro === "pagamento") {
+    return `Fechou! 🙌\n\n${conta.linhas.map((l) => `${l.qtd}x ${l.nome} — ${br(l.subtotal)}`).join("\n")}\nEntrega (${p.bairro.bairro}) — ${br(conta.entrega)}\n\n*Total: ${br(conta.total)}*\n\nVai ser Pix, cartão ou dinheiro?`;
+  }
+
+  if (primeiro === "troco") {
+    // O valor repetido aqui não é redundância: é dele que sai a conta do
+    // troco, e o cliente acabou de ler outra coisa.
+    return `Deu *${br(conta.total)}* 💵\n\nPrecisa de troco? Se sim, pra quanto?`;
+  }
+
+  return null;
+}
+
+// Confirmação final, depois que tudo está completo.
+function confirmarParaCliente(p, conta) {
+  const linhas = conta.linhas.map((l) => `${l.qtd}x ${l.nome} — ${br(l.subtotal)}`);
+  linhas.push(`Entrega (${p.bairro.bairro}) — ${br(conta.entrega)}`);
+  linhas.push("", `*Total: ${br(conta.total)}*`);
+  if (p.pagamento === "cash" && p.troco) linhas.push(`Troco para ${br(p.troco)}`);
+  return `Anotado! 📝\n\n${linhas.join("\n")}\n\nJá vamos preparar 🔥`;
+}
 
 // Como o pedido chega para o dono: pronto para ele lançar sem reler a
 // conversa inteira. É este o ganho — tirar o vai-e-vem da mão dele.

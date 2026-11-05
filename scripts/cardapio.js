@@ -35,8 +35,19 @@ const VAZIAS = new Set([
   "me", "ve", "manda", "por", "favor", "pra", "para", "no", "na", "bruthus",
 ]);
 
+// O que vem entre parênteses é descrição, não nome.
+//
+// "Smash Bruthus ( carne 80g )" virava três palavras — smash, carne,
+// 80g —, então "smash" sozinho cobria um terço dele e metade de "Duplo
+// Smash Bruthus". Resultado: quem pedia "um smash" recebia o duplo, R$ 4
+// mais caro e maior do que pediu. O dono avisou que esses quatro itens
+// eram perigosos justamente por isso.
+function semParenteses(txt) {
+  return String(txt || "").replace(/\([^)]*\)/g, " ");
+}
+
 function palavras(txt) {
-  return normalizar(txt).split(" ").filter((p) => p && !VAZIAS.has(p));
+  return normalizar(semParenteses(txt)).split(" ").filter((p) => p && !VAZIAS.has(p));
 }
 
 // Distância de edição: quantas letras mudam de uma palavra para a outra.
