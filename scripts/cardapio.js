@@ -74,6 +74,26 @@ function mesmaPalavra(a, b) {
   return Math.min(a.length, b.length) >= 5 && distancia(a, b) <= limite;
 }
 
+// Quanto cada palavra vale. Palavra que aparece em muitos itens não
+// distingue nada.
+//
+// Caso real que obrigou isto: "queria um x tudo com bacon extra" casava
+// com "Cheddar & Bacon" com confiança ALTA. O cliente pediu um x-tudo,
+// que nem existe no cardápio, e citou bacon como ADICIONAL — e o bot
+// responderia o preço de outro lanche. "bacon" está em vários itens;
+// "coalho" e "melt" estão em dois e identificam de verdade.
+const PESO = (() => {
+  const freq = {};
+  CARDAPIO.itens.forEach((i) => {
+    new Set(palavras(i.nome)).forEach((p) => { freq[p] = (freq[p] || 0) + 1; });
+  });
+  return (p) => {
+    const n = freq[p] || 1;
+    // Em 1 item vale 1; em 2 vale 0,7; em 5 vale ~0,36; em 10, ~0,2.
+    return 1 / (1 + Math.log2(n) * 0.5 + (n - 1) * 0.08);
+  };
+})();
+
 // Quanto o texto do cliente se parece com o nome do item. Conta quantas
 // palavras do item aparecem na frase, e vice-versa.
 function pontuar(consulta, item) {
@@ -81,18 +101,21 @@ function pontuar(consulta, item) {
   const pi = palavras(item.nome);
   if (!pc.length || !pi.length) return 0;
 
-  let acertos = 0;
+  let ganho = 0;
+  let total = 0;
   for (const p of pi) {
+    const peso = PESO(p);
+    total += peso;
     // Casa palavra inteira, começo dela, ou quase ela: "classic" acha
     // "classico", e "calabresa" acha "calabrese".
-    if (pc.some((q) => mesmaPalavra(q, p))) acertos++;
+    if (pc.some((q) => mesmaPalavra(q, p))) ganho += peso;
   }
-  if (!acertos) return 0;
+  if (!ganho || !total) return 0;
 
-  // Proporção do nome do item que foi mencionada. "melt" sozinho cobre
-  // metade de "Bruthus Melt" (porque "bruthus" é palavra vazia), e isso
-  // basta — ninguém escreve o nome completo.
-  return acertos / pi.length;
+  // Proporção do nome que foi mencionada, pesada pela raridade. "melt"
+  // sozinho cobre quase todo "Bruthus Melt" porque é raro; "bacon"
+  // sozinho cobre pouco de "Cheddar & Bacon" porque está em todo canto.
+  return ganho / total;
 }
 
 // O cliente pediu combo? "combo", "completo", "com batata e refri".
@@ -133,9 +156,18 @@ function buscarItem(consulta) {
   // Se o segundo colocado chega perto, é ambíguo — melhor perguntar.
   const folga = segundo ? melhor.nota - segundo.nota : melhor.nota;
 
+  // 0,7 e não 0,5: meia palavra do nome NÃO é certeza. Com 0,5, "bacon
+  // extra" virava "Cheddar & Bacon" com confiança alta — o cliente tinha
+  // pedido um x-tudo, que nem existe no cardápio, e citado bacon como
+  // adicional. Metade de um nome de duas palavras passava raspando.
+  //
+  // O corte considera o peso: em "Batata Frita Média", "média" é a
+  // palavra que distingue e vale mais que "batata" e "frita", que se
+  // repetem em três itens. Por isso "batata media" continua certeza e
+  // "bacon extra" não.
   return {
     item: melhor.item,
-    confianca: folga >= 0.25 && melhor.nota >= 0.5 ? "alta" : "baixa",
+    confianca: folga >= 0.25 && melhor.nota >= 0.7 ? "alta" : "baixa",
     alternativas: notas.slice(0, 3).map((n) => n.item),
   };
 }
