@@ -100,6 +100,10 @@ services:
       PIX_CHAVE: ${PIX_CHAVE}
       PIX_NOME: ${PIX_NOME}
       ORDER_LINK: ${ORDER_LINK}
+      # Para onde vai o aviso quando o bot encosta no limite: o WhatsApp
+      # da própria loja. ALERTAR_DONO=0 desliga.
+      ALERTA_NUMERO: ${ALERTA_NUMERO}
+      ALERTAR_DONO: ${ALERTAR_DONO:-1}
       DIARIO: /dados/observacao.jsonl
       TZ: America/Fortaleza
     volumes:

@@ -220,6 +220,19 @@ async function decidir(texto, msg) {
     };
   }
 
+  // Endereço ou pedido errado — o outro caso que o dono apontou como
+  // "só eu consigo resolver". Mexer num pedido já feito significa falar
+  // com a cozinha ou com o entregador, e às vezes refazer. Nada disso o
+  // bot alcança, e tentar consertar sozinho estraga mais.
+  if (/\b(errad[oa]|troquei|mudei o endereco|outro endereco|me enganei|pedi errado|coloquei errado|cancelar|trocar)\b/.test(n)) {
+    return {
+      intencao: "pedido_ou_endereco_errado",
+      escalar: true,
+      acao: "SEGURA e chama o dono — mexer em pedido feito depende dele",
+      mensagem: respostas.vouVerificar(),
+    };
+  }
+
   // Endereço da loja: pedido 26 vezes no histórico, sempre para retirada,
   // e o bot não sabia responder. Vale antes da checagem de fechado — o
   // endereço é o mesmo com a loja aberta ou não.
@@ -322,6 +335,52 @@ async function decidir(texto, msg) {
 }
 
 // ──────────────────────────────────────────────
+// Avisa o dono quando o bot encosta no limite do que pode responder.
+//
+// Marcar a conversa como "dele" não serve de nada se ele não ficar
+// sabendo: no meio do movimento ninguém está olhando o WhatsApp Web. O
+// aviso vai para o WhatsApp DA PRÓPRIA LOJA — a conversa consigo mesmo —
+// porque é onde ele já está durante o expediente, e porque não exige
+// credencial nenhuma além da que a Evolution já tem.
+//
+// Vale MESMO em modo de observação: o alerta é para ele, não para
+// cliente, e é justamente agora que ele precisa saber o que o bot
+// deixaria passar.
+// ──────────────────────────────────────────────
+const ALERTA_NUMERO = process.env.ALERTA_NUMERO || "";
+const ALERTAR = process.env.ALERTAR_DONO !== "0" && Boolean(ALERTA_NUMERO);
+
+// Sem rajada: se cinco clientes cobrarem ao mesmo tempo, ele recebe um
+// aviso, não cinco. Guarda por conversa.
+const ALERTADO = new Map();
+const ALERTA_JANELA_MS = 20 * 60 * 1000;
+
+async function alertarDono(msg, leitura) {
+  if (!ALERTAR) return null;
+  const ultimo = ALERTADO.get(msg.conversa);
+  if (ultimo && Date.now() - ultimo < ALERTA_JANELA_MS) return "repetido";
+  ALERTADO.set(msg.conversa, Date.now());
+
+  const motivo = leitura.intencao === "cobranca_de_pedido"
+    ? "está cobrando o pedido"
+    : "diz que errou o pedido ou o endereço";
+  const quem = msg.nome ? `*${msg.nome}*` : "Um cliente";
+  const texto = `🔔 ${quem} ${motivo}:\n\n_"${String(msg.texto || "").slice(0, 160)}"_\n\nO bot segurou e não respondeu. Assume aí 🙏`;
+
+  try {
+    await axios.post(
+      `${EVO_URL}/message/sendText/${EVO_INSTANCE}`,
+      { number: ALERTA_NUMERO, text: texto },
+      { headers: { apikey: EVO_KEY, "Content-Type": "application/json" }, timeout: 15000 }
+    );
+    return "enviado";
+  } catch (e) {
+    console.error("[alerta]", e.response?.data?.message || e.message);
+    return "falhou: " + (e.response?.status || e.message);
+  }
+}
+
+// ──────────────────────────────────────────────
 app.post("/webhook/evolution", async (req, res) => {
   // Confirma na hora: a Evolution reenvia o que demora, e processar antes
   // de responder geraria mensagem duplicada.
@@ -360,7 +419,12 @@ app.post("/webhook/evolution", async (req, res) => {
       delete leitura.mensagem;
     }
 
+    // O aviso ao dono sai mesmo em observação: é para ele, não para
+    // cliente, e é agora que ele precisa saber o que o bot não resolve.
+    const alerta = leitura.escalar ? await alertarDono(msg, leitura) : null;
+
     registrar({
+      alerta: alerta || undefined,
       conversa: msg.conversa,
       nome: msg.nome,
       tipo: msg.tipo,
