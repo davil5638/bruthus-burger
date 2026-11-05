@@ -300,6 +300,41 @@ async function avisarNoTelegram(resultados, data) {
 }
 
 // ──────────────────────────────────────────────
+// Recuperação no boot.
+//
+// O cron das 19h só dispara se o processo estiver vivo na hora, e o
+// Render dorme quando fica ocioso. Os outros trabalhos diários já
+// conferiam isso ao acordar; este não conferia, e era o único que podia
+// deixar de rodar calado — ninguém percebe uma campanha que não saiu.
+//
+// Só age depois do horário e quando NADA saiu hoje. Se já saiu alguma
+// coisa, não mexe: reprocessar renderia outros cinco clientes no mesmo
+// dia, que é o dobro do combinado.
+//
+// Rodar de novo é seguro: `rodarHoje` reaplica todas as travas — dia da
+// semana, pausa do dono, e a checagem de que entrou pedido hoje.
+// ──────────────────────────────────────────────
+async function rodarSeNaoRodou({ hora = 19 } = {}) {
+  const hoje = hojeFortaleza();
+  const agora = Number(
+    new Date().toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", hour12: false })
+  );
+  if (agora < hora) return { ignorado: "ainda_nao_deu_a_hora", data: hoje, agora };
+
+  const { pool, conectar } = require("./dbClientes");
+  await conectar();
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM campanhas_envios
+      WHERE (enviado_em AT TIME ZONE 'America/Fortaleza')::date = $1::date`,
+    [hoje]
+  );
+  if (rows[0].n > 0) return { ignorado: "ja_rodou_hoje", data: hoje, envios: rows[0].n };
+
+  const r = await rodarHoje();
+  return { recuperado: true, ...r };
+}
+
+// ──────────────────────────────────────────────
 if (require.main === module) {
   const arg = (n) => (process.argv.find((a) => a.startsWith(`--${n}=`)) || "").split("=")[1];
   rodarHoje({
@@ -321,4 +356,5 @@ module.exports = {
   linkWhatsapp,
   filaDoDia,
   rodarHoje,
+  rodarSeNaoRodou,
 };

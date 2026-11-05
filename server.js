@@ -1807,6 +1807,24 @@ app.listen(PORT, () => {
       console.error("⚠️  Gasto de anúncios no boot falhou:", e.message);
     }
   })();
+
+  // Campanha de recuperação: era o único trabalho diário SEM conferência
+  // no boot, e o único que podia deixar de rodar calado — ninguém percebe
+  // uma campanha que não saiu. Se já passou das 19h e nada saiu hoje,
+  // roda agora; as travas de dia, pausa e movimento da loja continuam
+  // valendo dentro dela.
+  (async () => {
+    try {
+      const { rodarSeNaoRodou } = require("./scripts/campanhaDiaria");
+      const r = await rodarSeNaoRodou();
+      if (r.ignorado === "ainda_nao_deu_a_hora") return;          // silencioso: é o caso comum
+      if (r.ignorado)      console.log(`ℹ️  Campanha diária: ${r.ignorado}`);
+      else if (r.enviados) console.log(`🔔 Campanha diária recuperada no boot: ${r.enviados} mensagem(ns)`);
+      else                 console.log(`🔔 Campanha diária conferida no boot — nada a enviar.`);
+    } catch (e) {
+      console.error("⚠️  Campanha diária no boot falhou:", e.message);
+    }
+  })();
 });
 
 module.exports = app;
