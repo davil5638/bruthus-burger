@@ -449,8 +449,47 @@ const MOTIVO = {
   pedido_escrito:            "pediu algo e não tenho certeza do item",
 };
 
+// Telegram como segundo canal. O WhatsApp da loja sozinho não basta: o
+// aviso cai no meio de dezenas de conversas de cliente e se perde. No
+// Telegram só tem ele, então o aviso fica visível.
+//
+// Os dois saem juntos, de propósito. Se um canal falhar — token expirado,
+// Telegram fora do ar, WhatsApp desconectado —, o outro ainda chega. Para
+// um aviso que existe justamente porque alguém está esperando resposta,
+// redundância vale mais que economia.
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const TG_CHAT  = process.env.TELEGRAM_CHAT_ID || "";
+
+async function avisarTelegram(texto) {
+  if (!TG_TOKEN || !TG_CHAT) return null;
+  try {
+    await axios.post(
+      `https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,
+      { chat_id: TG_CHAT, text: texto, parse_mode: "Markdown" },
+      { timeout: 15000 }
+    );
+    return "ok";
+  } catch (e) {
+    // O Markdown do Telegram recusa a mensagem INTEIRA quando há um
+    // underscore ou asterisco solto — já aconteceu nesta base. Então
+    // tenta de novo sem formatação antes de desistir.
+    try {
+      await axios.post(
+        `https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,
+        { chat_id: TG_CHAT, text: texto.replace(/[*_`]/g, "") },
+        { timeout: 15000 }
+      );
+      return "ok (sem formatação)";
+    } catch (e2) {
+      const d = e2.response?.data?.description || e2.message;
+      console.error("[telegram]", d);
+      return "falhou: " + d;
+    }
+  }
+}
+
 async function alertarDono(msg, leitura) {
-  if (!ALERTAR) return null;
+  if (!ALERTAR && !TG_TOKEN) return null;
   const ultimo = ALERTADO.get(msg.conversa);
   if (ultimo && Date.now() - ultimo < ALERTA_JANELA_MS) return "repetido";
   ALERTADO.set(msg.conversa, Date.now());
@@ -462,17 +501,26 @@ async function alertarDono(msg, leitura) {
     : "";
   const texto = `🔔 ${quem} ${motivo}:\n\n_"${String(msg.texto || "").slice(0, 160)}"_${dica}\n\nO bot não respondeu. Assume aí 🙏`;
 
-  try {
-    await axios.post(
-      `${EVO_URL}/message/sendText/${EVO_INSTANCE}`,
-      { number: ALERTA_NUMERO, text: texto },
-      { headers: { apikey: EVO_KEY, "Content-Type": "application/json" }, timeout: 15000 }
-    );
-    return "enviado";
-  } catch (e) {
-    console.error("[alerta]", e.response?.data?.message || e.message);
-    return "falhou: " + (e.response?.status || e.message);
-  }
+  // Os dois canais ao mesmo tempo, e nenhum espera pelo outro.
+  const [zap, tg] = await Promise.all([
+    (async () => {
+      if (!ALERTAR) return "desligado";
+      try {
+        await axios.post(
+          `${EVO_URL}/message/sendText/${EVO_INSTANCE}`,
+          { number: ALERTA_NUMERO, text: texto },
+          { headers: { apikey: EVO_KEY, "Content-Type": "application/json" }, timeout: 15000 }
+        );
+        return "ok";
+      } catch (e) {
+        console.error("[alerta zap]", e.response?.data?.message || e.message);
+        return "falhou: " + (e.response?.status || e.message);
+      }
+    })(),
+    avisarTelegram(texto),
+  ]);
+
+  return `zap:${zap}` + (tg ? ` tg:${tg}` : " tg:nao-configurado");
 }
 
 // ──────────────────────────────────────────────

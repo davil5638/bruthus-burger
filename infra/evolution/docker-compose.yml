@@ -108,6 +108,10 @@ services:
       # responde 200 e não faz nada — um webhook aberto deixaria qualquer
       # um disparar mensagem em nome da loja.
       HOOK_SEGREDO: ${HOOK_SEGREDO}
+      # Segundo canal de aviso. O WhatsApp da loja sozinho se perde no
+      # meio das conversas de cliente; no Telegram so tem ele.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
       DIARIO: /dados/observacao.jsonl
       TZ: America/Fortaleza
     volumes:
