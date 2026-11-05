@@ -1,391 +1,970 @@
 {
-  "_nota": "Retrato do cardapio publicado em 04/11/2026, tirado da API do OlaClick. O bot usa isto para identificar item e preco sem depender de uma chamada externa a cada mensagem. PRECISA ser atualizado quando preco ou item mudar — ver scripts/cardapio.js.",
-  "atualizado_em": "2026-11-04",
-  "taxa_entrega_modo": "BY_DISTRICT",
+  "_nota": "Gerado por scripts/atualizarCardapio.js. NÃO editar à mão: rode o script depois de mexer no OlaClick.",
+  "atualizado_em": "2026-11-05",
+  "loja": "Bruthus Burger & Pizza",
+  "pedido_minimo": 15,
+  "tempo_entrega": "uns 40min (o que ele responde no WhatsApp; o cardapio anuncia 45-65min)",
+  "endereco": "Rua Manoel Messias, 233 — Alto Guaramiranga, Caninde-CE",
   "itens": [
     {
-      "id": "9fe55d72-3057-444a-9b91-822c44fbecd3",
-      "nome": "Smash Bruthus ( carne 80g )",
-      "preco": 22.99,
-      "cat": "hamburguer"
-    },
-    {
-      "id": "9fd6d75d-7491-41b6-bee9-eefca064c433",
-      "nome": "Simple Bruthus",
-      "preco": 24.99,
-      "cat": "hamburguer"
-    },
-    {
-      "id": "a22c3140-df2d-4cc6-9889-4b342986e28a",
-      "nome": "Bruthus Raiz",
-      "preco": 26.99,
-      "cat": "hamburguer"
-    },
-    {
-      "id": "a00cd06b-d83d-47e1-84b9-2a204068a8ec",
-      "nome": "Duplo Smash Bruthus",
-      "preco": 26.99,
-      "cat": "hamburguer"
-    },
-    {
-      "id": "9fd6d646-25c7-49cf-bbe5-c9e77505b35c",
-      "nome": "Cheddar & Bacon",
-      "preco": 26.99,
-      "cat": "hamburguer"
-    },
-    {
-      "id": "9fd6d383-d87f-475a-aca8-1d5e005329c2",
-      "nome": "Clássico Bruthus",
-      "preco": 26.99,
-      "cat": "hamburguer"
-    },
-    {
-      "id": "9fd6d6eb-e6de-4418-9fab-f7e93d50a1b1",
-      "nome": "American Bruthus",
-      "preco": 27.99,
-      "cat": "hamburguer"
-    },
-    {
-      "id": "9fd6d7ea-9f2b-48fe-bd54-63ebaca82ed0",
-      "nome": "Bruthus Melt",
-      "preco": 28.99,
-      "cat": "hamburguer"
-    },
-    {
       "id": "9fd6d687-db65-40e4-9c64-f9f561c67d22",
+      "variant_id": "9fd6d687-dd9f-4098-a7bb-7d36c9aa4a2a",
       "nome": "Crispy Cream",
       "preco": 28.99,
-      "cat": "hamburguer"
-    },
-    {
-      "id": "a10214e7-004e-444f-b73b-5f9fbffca1bf",
-      "nome": "Bruthus Coalho",
-      "preco": 31.99,
-      "cat": "hamburguer"
-    },
-    {
-      "id": "9fd6d6c2-7901-491d-ad66-42ebc83c9c92",
-      "nome": "Bruthus Onion",
-      "preco": 32.99,
-      "cat": "hamburguer"
-    },
-    {
-      "id": "9fd6d935-e4e1-4c7f-9723-e27260174d73",
-      "nome": "Smash Bruthus - Combo",
-      "preco": 36.99,
-      "cat": "combo"
-    },
-    {
-      "id": "9fe56021-35c8-494c-b268-c2cef0b8100f",
-      "nome": "Simple Bruthus - Combo",
-      "preco": 38.99,
-      "cat": "combo"
-    },
-    {
-      "id": "9fd6d9ef-94a6-4327-8c55-f8f60a4133f3",
-      "nome": "Clássico Bruthus - Combo",
-      "preco": 39.99,
-      "cat": "combo"
-    },
-    {
-      "id": "a22c3218-2c4b-4f49-891f-ff09cc1bce51",
-      "nome": "Bruthus Raiz - Combo",
-      "preco": 40.99,
-      "cat": "combo"
-    },
-    {
-      "id": "a00cd959-ff92-4712-bdcb-8253f64acabb",
-      "nome": "Duplo Smash Bruthus - Combo",
-      "preco": 40.99,
-      "cat": "combo"
-    },
-    {
-      "id": "9fd6dadc-5ab0-4426-8c31-8e5e9d8a8d1b",
-      "nome": "Cheddar & Bacon - Combo",
-      "preco": 40.99,
-      "cat": "combo"
-    },
-    {
-      "id": "9fd6db32-2210-48c9-883b-601e043d8f4d",
-      "nome": "American Bruthus - Combo",
-      "preco": 41.99,
-      "cat": "combo"
-    },
-    {
-      "id": "9fd6da96-2406-48cc-bcbc-63f2138d6aaf",
-      "nome": "Bruthus Melt - Combo",
-      "preco": 42.99,
-      "cat": "combo"
-    },
-    {
-      "id": "9fd6db63-83be-4a91-ba41-2f536246d273",
-      "nome": "Crispy Cream - Combo",
-      "preco": 42.99,
-      "cat": "combo"
-    },
-    {
-      "id": "a1021c15-7575-44b8-8ba3-28d03833fd0c",
-      "nome": "Bruthus Coalho - Combo",
-      "preco": 45.99,
-      "cat": "combo"
-    },
-    {
-      "id": "9fd6db8b-c054-45bf-b4eb-df8f208163b6",
-      "nome": "Bruthus Onion - Combo",
-      "preco": 46.99,
-      "cat": "combo"
-    },
-    {
-      "id": "a044f6c1-1805-431f-9523-d1df7cc3153d",
-      "nome": "Combo Quinta do Hamburger",
-      "preco": 47.99,
-      "cat": "combo"
-    },
-    {
-      "id": "a04c10eb-e297-468b-963c-670304e571b7",
-      "nome": "Combo Casal",
-      "preco": 54.99,
-      "cat": "combo"
-    },
-    {
-      "id": "a0919afc-2fab-4eef-9c59-f531d9c1cb3f",
-      "nome": "Combo Família",
-      "preco": 80.99,
-      "cat": "combo"
-    },
-    {
-      "id": "a2c6e974-0f8d-439e-a185-bfc5221228b7",
-      "nome": "Margherita",
-      "preco": 43,
-      "cat": "pizza"
-    },
-    {
-      "id": "a2c6ee00-5f99-4f81-b366-14f4d9fc6baf",
-      "nome": "Calabrese",
-      "preco": 49,
-      "cat": "pizza"
-    },
-    {
-      "id": "a2c6f0a1-db4a-427f-946b-badbf54ec000",
-      "nome": "Pepperoni",
-      "preco": 55,
-      "cat": "pizza"
-    },
-    {
-      "id": "a2c6f058-e783-4f5e-9ea5-db0fc4595130",
-      "nome": "Frango Crema",
-      "preco": 56,
-      "cat": "pizza"
-    },
-    {
-      "id": "a2c6f0db-a709-45cf-9005-f116329942fd",
-      "nome": "Pepperoni al miele",
-      "preco": 58,
-      "cat": "pizza"
-    },
-    {
-      "id": "a2c6f10d-967b-42f6-b2ce-7ae52ea5b60b",
-      "nome": "Pepperoni Crema",
-      "preco": 61,
-      "cat": "pizza"
-    },
-    {
-      "id": "a2c6f16e-3002-4bf7-b4ce-360874f6e2bc",
-      "nome": "Calabrese al gorgonzola",
-      "preco": 64,
-      "cat": "pizza"
-    },
-    {
-      "id": "a2e0b04d-7143-4909-80d1-23d2b90afd87",
-      "nome": "Manzo Crema",
-      "preco": 64,
-      "cat": "pizza"
-    },
-    {
-      "id": "a2c6f131-8ac8-4d1b-aeef-318072bdea8f",
-      "nome": "Manzo & Coalho al miele",
-      "preco": 66,
-      "cat": "pizza"
-    },
-    {
-      "id": "609f3b70-7bad-11ef-9bdd-537b5a8782d4",
-      "nome": "Batata Frita Pequena",
-      "preco": 9.99,
-      "cat": "acompanhamento"
-    },
-    {
-      "id": "9e78c32f-ac61-429e-9235-25968c94d378",
-      "nome": "Batata Frita Média",
-      "preco": 15.99,
-      "cat": "acompanhamento"
+      "cat": "promocao",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
     },
     {
       "id": "9e78c3d9-6e14-4278-a3bb-b2326e76fcdb",
+      "variant_id": "9e78c3d9-6f47-492d-9b2d-50df5ddb68ef",
       "nome": "Batata Frita M com Cheddar e Bacon",
       "preco": 22.99,
-      "cat": "acompanhamento"
-    },
-    {
-      "id": "9fd6d8c7-0428-44b9-83a7-c7e6c212e6d6",
-      "nome": "Coca-Cola Lata Tradicional",
-      "preco": 6.99,
-      "cat": "bebida"
+      "cat": "promocao",
+      "modificadores": []
     },
     {
       "id": "9fd6d8f1-4bea-4272-8a12-73ada9181f00",
+      "variant_id": "9fd6d8f1-4e02-4936-bf42-44e9fde095fe",
       "nome": "Coca-Cola Lata Zero",
       "preco": 6.99,
-      "cat": "bebida"
+      "cat": "promocao",
+      "modificadores": []
     },
     {
-      "id": "80250420-7ba9-11ef-8f21-f32d151ae979",
-      "nome": "Coca-Cola Original 600ml",
-      "preco": 9.99,
-      "cat": "bebida"
+      "id": "a044f6c1-1805-431f-9523-d1df7cc3153d",
+      "variant_id": "a044f6c1-1c04-4d1d-a11a-3cf1634945db",
+      "nome": "Combo Quinta do Hamburger",
+      "preco": 47.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "a201767d-b722-4e76-8e9a-24b972522723",
+        "a28042d3-f932-4e0f-8239-c56f214a1561"
+      ]
     },
     {
-      "id": "81a8d210-7ba9-11ef-acdc-cf5190b2ca09",
-      "nome": "Coca-Cola Zero 600ml",
+      "id": "9fe55d72-3057-444a-9b91-822c44fbecd3",
+      "variant_id": "9fe55d72-360a-4b70-ae4f-42628c0fccd9",
+      "nome": "Smash Bruthus ( carne 80g )",
+      "preco": 22.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
+    },
+    {
+      "id": "a22c3140-df2d-4cc6-9889-4b342986e28a",
+      "variant_id": "a22c3140-e0d8-4b05-8148-ad0e66afe2cb",
+      "nome": "Bruthus Raiz",
+      "preco": 26.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
+    },
+    {
+      "id": "a00cd06b-d83d-47e1-84b9-2a204068a8ec",
+      "variant_id": "a00cd06b-dcc9-4d36-ab4f-9847d61ed2e6",
+      "nome": "Duplo Smash Bruthus",
+      "preco": 26.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
+    },
+    {
+      "id": "9fd6d75d-7491-41b6-bee9-eefca064c433",
+      "variant_id": "9fd6d75d-7627-4e26-aab3-563f5ec285af",
+      "nome": "Simple Bruthus",
+      "preco": 24.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
+    },
+    {
+      "id": "9fd6d646-25c7-49cf-bbe5-c9e77505b35c",
+      "variant_id": "9fd6d646-28df-47b2-a313-26606380cbf6",
+      "nome": "Cheddar & Bacon",
+      "preco": 26.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
+    },
+    {
+      "id": "9fd6d383-d87f-475a-aca8-1d5e005329c2",
+      "variant_id": "9fd6d383-dba9-4457-9f5f-c0d3dc9c3da5",
+      "nome": "Clássico Bruthus",
+      "preco": 26.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
+    },
+    {
+      "id": "9fd6d6eb-e6de-4418-9fab-f7e93d50a1b1",
+      "variant_id": "9fd6d6eb-e901-4189-9e90-c076c9627b24",
+      "nome": "American Bruthus",
+      "preco": 27.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
+    },
+    {
+      "id": "9fd6d7ea-9f2b-48fe-bd54-63ebaca82ed0",
+      "variant_id": "9fd6d7ea-a09a-482f-abe5-c34362f48deb",
+      "nome": "Bruthus Melt",
+      "preco": 28.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
+    },
+    {
+      "id": "a10214e7-004e-444f-b73b-5f9fbffca1bf",
+      "variant_id": "a10214e7-0267-4ac8-af40-6f805b2946e0",
+      "nome": "Bruthus Coalho",
+      "preco": 31.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
+    },
+    {
+      "id": "9fd6d6c2-7901-491d-ad66-42ebc83c9c92",
+      "variant_id": "9fd6d6c2-7ab8-47fa-99de-ee36e6703df0",
+      "nome": "Bruthus Onion",
+      "preco": 32.99,
+      "cat": "hamburguer",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30"
+      ]
+    },
+    {
+      "id": "a2d51388-c8a2-479d-b8ca-5655eb08ed7d",
+      "variant_id": "a2d51388-cb7f-458d-9062-10f77cab7d36",
+      "nome": "Pizza Metade/Metade",
+      "preco": 0,
+      "cat": "pizza",
+      "modificadores": [
+        "a2d516df-956d-444d-b4da-ce05b0afa2c9",
+        "a2daebf2-a8a6-4582-bfdc-945f202f9057"
+      ]
+    },
+    {
+      "id": "a2c6e974-0f8d-439e-a185-bfc5221228b7",
+      "variant_id": "a2c6e974-11ae-42d7-9c28-297be3947ed6",
+      "nome": "Margherita",
+      "preco": 43,
+      "cat": "pizza",
+      "modificadores": []
+    },
+    {
+      "id": "a2c6ee00-5f99-4f81-b366-14f4d9fc6baf",
+      "variant_id": "a2c6ee00-6164-44b3-9b7a-581e8aace7fb",
+      "nome": "Calabrese",
+      "preco": 49,
+      "cat": "pizza",
+      "modificadores": []
+    },
+    {
+      "id": "a2c6f0a1-db4a-427f-946b-badbf54ec000",
+      "variant_id": "a2c6f0a1-dd72-46d5-949d-c7eae32f45df",
+      "nome": "Pepperoni",
+      "preco": 55,
+      "cat": "pizza",
+      "modificadores": []
+    },
+    {
+      "id": "a2c6f058-e783-4f5e-9ea5-db0fc4595130",
+      "variant_id": "a2c6f058-e932-4b08-a65d-aa00bde4e103",
+      "nome": "Frango Crema",
+      "preco": 56,
+      "cat": "pizza",
+      "modificadores": []
+    },
+    {
+      "id": "a2c6f0db-a709-45cf-9005-f116329942fd",
+      "variant_id": "a2c6f0db-a88e-4c7a-a3b3-1d329da2c1da",
+      "nome": "Pepperoni al miele",
+      "preco": 58,
+      "cat": "pizza",
+      "modificadores": []
+    },
+    {
+      "id": "a2c6f10d-967b-42f6-b2ce-7ae52ea5b60b",
+      "variant_id": "a2c6f10d-98f6-40ce-8a33-63d5b311b175",
+      "nome": "Pepperoni Crema",
+      "preco": 61,
+      "cat": "pizza",
+      "modificadores": []
+    },
+    {
+      "id": "a2c6f16e-3002-4bf7-b4ce-360874f6e2bc",
+      "variant_id": "a2c6f16e-320f-46e8-9e1e-1a7e0e33f19c",
+      "nome": "Calabrese al gorgonzola",
+      "preco": 64,
+      "cat": "pizza",
+      "modificadores": []
+    },
+    {
+      "id": "a2e0b04d-7143-4909-80d1-23d2b90afd87",
+      "variant_id": "a2e0b04d-7598-4d02-b0d1-eb0f5348c460",
+      "nome": "Manzo Crema",
+      "preco": 64,
+      "cat": "pizza",
+      "modificadores": []
+    },
+    {
+      "id": "a2c6f131-8ac8-4d1b-aeef-318072bdea8f",
+      "variant_id": "a2c6f131-8c6a-4c77-9dc9-96cbabcec460",
+      "nome": "Manzo & Coalho al miele",
+      "preco": 66,
+      "cat": "pizza",
+      "modificadores": []
+    },
+    {
+      "id": "9fd6d935-e4e1-4c7f-9723-e27260174d73",
+      "variant_id": "9fd6d935-e75d-4690-a7d0-1d3ac2671d93",
+      "nome": "Smash Bruthus - Combo",
+      "preco": 36.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "a22c3218-2c4b-4f49-891f-ff09cc1bce51",
+      "variant_id": "a22c3218-2f09-4afe-8f0b-3bfece50ce80",
+      "nome": "Bruthus Raiz - Combo",
+      "preco": 40.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "a00cd959-ff92-4712-bdcb-8253f64acabb",
+      "variant_id": "a00cd95a-0574-4cba-a845-fd14d7de0889",
+      "nome": "Duplo Smash Bruthus - Combo",
+      "preco": 40.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "9fe56021-35c8-494c-b268-c2cef0b8100f",
+      "variant_id": "9fe56021-3982-4073-8996-99f533cdd8ba",
+      "nome": "Simple Bruthus - Combo",
+      "preco": 38.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "9fd6dadc-5ab0-4426-8c31-8e5e9d8a8d1b",
+      "variant_id": "9fd6dadc-5cd2-4fe1-a0e8-12a86f2d4b64",
+      "nome": "Cheddar & Bacon - Combo",
+      "preco": 40.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "9fd6d9ef-94a6-4327-8c55-f8f60a4133f3",
+      "variant_id": "9fd6d9ef-96c0-4183-b48e-ef702f0c523d",
+      "nome": "Clássico Bruthus - Combo",
+      "preco": 39.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "9fd6db32-2210-48c9-883b-601e043d8f4d",
+      "variant_id": "9fd6db32-23a1-4f70-a539-921a2a04074a",
+      "nome": "American Bruthus - Combo",
+      "preco": 41.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "9fd6da96-2406-48cc-bcbc-63f2138d6aaf",
+      "variant_id": "9fd6da96-2b41-4cd8-9bab-4ca08811a553",
+      "nome": "Bruthus Melt - Combo",
+      "preco": 42.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "9fd6db63-83be-4a91-ba41-2f536246d273",
+      "variant_id": "9fd6db63-8610-4fd7-a167-c770b38fa69f",
+      "nome": "Crispy Cream - Combo",
+      "preco": 42.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "a1021c15-7575-44b8-8ba3-28d03833fd0c",
+      "variant_id": "a1021c15-7a49-4cb4-b76f-80e1e0ed4ffc",
+      "nome": "Bruthus Coalho - Combo",
+      "preco": 45.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "9fd6db8b-c054-45bf-b4eb-df8f208163b6",
+      "variant_id": "9fd6db8b-c201-485c-8fb2-9d80bfc9e6ec",
+      "nome": "Bruthus Onion - Combo",
+      "preco": 46.99,
+      "cat": "combo",
+      "modificadores": [
+        "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+        "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+        "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c"
+      ]
+    },
+    {
+      "id": "a04c10eb-e297-468b-963c-670304e571b7",
+      "variant_id": "a04c10eb-e629-4996-8c8a-223549971d6b",
+      "nome": "Combo Casal",
+      "preco": 54.99,
+      "cat": "combo",
+      "modificadores": [
+        "a201767d-b722-4e76-8e9a-24b972522723",
+        "a28042d3-f932-4e0f-8239-c56f214a1561"
+      ]
+    },
+    {
+      "id": "a0919afc-2fab-4eef-9c59-f531d9c1cb3f",
+      "variant_id": "a0919afc-33b4-4e99-864d-312361b99c18",
+      "nome": "Combo Família",
+      "preco": 80.99,
+      "cat": "combo",
+      "modificadores": [
+        "a2017834-2799-41bf-a8f2-f744ec913a07",
+        "a280436b-5246-43c4-a99c-05b8f31e345f"
+      ]
+    },
+    {
+      "id": "609f3b70-7bad-11ef-9bdd-537b5a8782d4",
+      "variant_id": "60a01630-7bad-11ef-85e1-c9382e4687a7",
+      "nome": "Batata Frita Pequena",
       "preco": 9.99,
-      "cat": "bebida"
+      "cat": "acompanhamento",
+      "modificadores": []
+    },
+    {
+      "id": "9e78c32f-ac61-429e-9235-25968c94d378",
+      "variant_id": "9e78c32f-b008-4bce-900e-ec01a38f450d",
+      "nome": "Batata Frita Média",
+      "preco": 15.99,
+      "cat": "acompanhamento",
+      "modificadores": []
+    },
+    {
+      "id": "9fd6d8c7-0428-44b9-83a7-c7e6c212e6d6",
+      "variant_id": "9fd6d8c7-0605-487e-b91f-ede5dd5e9171",
+      "nome": "Coca-Cola Lata Tradicional",
+      "preco": 6.99,
+      "cat": "bebida",
+      "modificadores": []
     },
     {
       "id": "9fe56351-c0b3-4869-9e6d-25e221c2e584",
+      "variant_id": "9fe56351-c42d-4686-95f2-1db12146a150",
       "nome": "Coca-Cola Normal 1L",
       "preco": 11.99,
-      "cat": "bebida"
+      "cat": "bebida",
+      "modificadores": []
     },
     {
       "id": "9edf38f2-618c-4134-a205-cb282f54d427",
+      "variant_id": "9edf38f2-640b-4fc3-a416-e2ebb1292d73",
       "nome": "Coca-Cola Zero 1L",
       "preco": 11.99,
-      "cat": "bebida"
+      "cat": "bebida",
+      "modificadores": []
+    },
+    {
+      "id": "80250420-7ba9-11ef-8f21-f32d151ae979",
+      "variant_id": "8026cac0-7ba9-11ef-aa02-671352a7fd7f",
+      "nome": "Coca-Cola Original 600ml",
+      "preco": 9.99,
+      "cat": "bebida",
+      "modificadores": []
+    },
+    {
+      "id": "81a8d210-7ba9-11ef-acdc-cf5190b2ca09",
+      "variant_id": "81aab990-7ba9-11ef-869c-efd33976495c",
+      "nome": "Coca-Cola Zero 600ml",
+      "preco": 9.99,
+      "cat": "bebida",
+      "modificadores": []
     }
   ],
-  "_pizza_metade": "Pizza Metade/Metade tem preco 0 no catalogo: o valor vem dos modificadores dos dois sabores. Tratada a parte.",
-  "bairros": {
-    "imaculada conceicao": 2,
-    "japuara": 5,
-    "jardineira": 5,
-    "joao paulo 2": 2,
-    "jubaia": 5,
-    "loteamento colinas": 2,
-    "alto guaramiranga": 2,
-    "bairro do s": 2,
-    "bela vista": 2,
-    "boa vista": 6,
-    "br020": 5,
-    "cachoeira da pasta": 2,
-    "campinas": 2,
-    "can": 2,
-    "canindezinho": 2,
-    "centro": 2,
-    "conjunto habitacional": 2,
-    "conviver da palestina": 2,
-    "conviver da upa": 2,
-    "faculdade estacio": 2,
-    "loteamento jardim das oliveiras": 2,
-    "loteamento juazeiro": 2,
-    "loteamento monaco ville": 2,
-    "loteamento sagrada familia": 2,
-    "loteamento santa edwirgens": 2,
-    "loteamento sao pedro": 2,
-    "loteamento vitoria regia": 2,
-    "monte": 2,
-    "monte libano": 2,
-    "palestina": 2,
-    "riacho sao francisco": 2,
-    "riacho sujo": 2,
-    "santa clara": 2,
-    "santa luzia": 2,
-    "sao matheus": 2
-  },
-  "adicionais": {
-    "potinho de maionese da casa": 2,
-    "potinho com barbecue": 2,
-    "cebola caramelizada": 3,
-    "tomate": 1,
-    "alface": 1,
-    "picles": 2,
-    "bacon": 3,
-    "carne 150g": 10,
-    "onion rings": 3,
-    "carne 80g": 7,
-    "cheddar": 1.5,
-    "cream cheese": 4,
-    "cheddar cremoso": 4,
-    "geleia de pimenta": 4,
-    "mel": 4,
-    "queijo coalho": 4
-  },
-  "escolhas_de_combo": {
-    "_nota": "So nos combos. A batata muda o preco.",
-    "coca": [
-      "coca lata normal",
-      "coca lata zero"
-    ],
-    "batata": {
-      "batata pequena": 0,
-      "batata media": 9,
-      "batata com cheddar e bacon": 13
+  "modificadores": {
+    "sabor 2": {
+      "id": "a2daebf2-a8a6-4582-bfdc-945f202f9057",
+      "obrigatorio": true,
+      "opcoes": [
+        {
+          "id": "a2daebf2-aad0-4064-8578-45616fddc0e9",
+          "nome": "1/2 Margeritha ( Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, finalizado com azeite, parmesão ralado, manjericão e azeitona )",
+          "preco": 22.5
+        },
+        {
+          "id": "a2daebf2-abd5-4df4-bff6-b6b8cf7e78b8",
+          "nome": "1/2 Calabrese (Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, calabresa, cebola roxa, finalizado com azeite, parmesão ralado, manjericão e azeitona)",
+          "preco": 24.5
+        },
+        {
+          "id": "a2daebf2-ace9-4813-8e79-ad9b5f5fd206",
+          "nome": "1/2 Pepperoni ( Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, pepperoni, finalizado com azeite, parmesão ralado, manjericão e azeitona )",
+          "preco": 27.5
+        },
+        {
+          "id": "a2daebf2-aee2-4e34-ab4e-48cbd9bc7250",
+          "nome": "1/2 Diavola al miele ( Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, pepperoni, mel, finalizado com azeite, parmesão ralado, manjericão e azeitona )",
+          "preco": 29
+        },
+        {
+          "id": "a2daebf2-afcc-4280-8a50-5a28afc071e4",
+          "nome": "1/2 Diavola Crema ( Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, pepperoni, cream cheese, finalizado com azeite, parmesão ralado, manjericão e azeitona )",
+          "preco": 30.5
+        },
+        {
+          "id": "a2daebf2-b0b9-4e23-946b-72f27fd25ac8",
+          "nome": "1/2 Calab Gorgonzola( Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, calabresa, gorgonzola, mel, finalizado com azeite, parmesão ralado, manjericão e azeitona",
+          "preco": 32
+        },
+        {
+          "id": "a2e0b13c-8beb-4f72-b2d7-3fca136cbe24",
+          "nome": "1/2 Manzo Crema (Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, carne do sol, cream cheese, finalizado com azeite, parmesão ralado, manjericão e azeitona)",
+          "preco": 32
+        },
+        {
+          "id": "a2daebf2-b1ad-4232-8234-9cd0ff321803",
+          "nome": "1/2 Manzo Formagio(Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, carne do sol, queijo coalho, mel, finalizado com azeite, parmesão ralado, manjericão e azeiton",
+          "preco": 33
+        }
+      ]
+    },
+    "sabor 1": {
+      "id": "a2d516df-956d-444d-b4da-ce05b0afa2c9",
+      "obrigatorio": true,
+      "opcoes": [
+        {
+          "id": "a2d516df-9711-4256-9e7a-33520229ed42",
+          "nome": "1/2 Margeritha ( Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, finalizado com azeite, parmesão ralado, manjericão e azeitona )",
+          "preco": 22.5
+        },
+        {
+          "id": "a2d516df-9806-4ba6-9520-efea8a991b7e",
+          "nome": "1/2 Calabrese (Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, calabresa, cebola roxa, finalizado com azeite, parmesão ralado, manjericão e azeitona)",
+          "preco": 24.5
+        },
+        {
+          "id": "a2d516df-98c0-4779-8a80-27bab8920ac3",
+          "nome": "1/2 Pepperoni ( Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, pepperoni, finalizado com azeite, parmesão ralado, manjericão e azeitona )",
+          "preco": 27.5
+        },
+        {
+          "id": "a2d516df-9a2e-49c1-b92c-6c111f2dcb4e",
+          "nome": "1/2 Diavola al miele ( Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, pepperoni, mel, finalizado com azeite, parmesão ralado, manjericão e azeitona )",
+          "preco": 29
+        },
+        {
+          "id": "a2d516df-9ae3-44be-9da2-6752d99450d3",
+          "nome": "1/2 Diavola Crema ( Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, pepperoni, cream cheese, finalizado com azeite, parmesão ralado, manjericão e azeitona )",
+          "preco": 30.5
+        },
+        {
+          "id": "a2daeb09-1bc4-4b3c-be67-f4b38d09a5df",
+          "nome": "1/2 Calab Gorgonzola( Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, calabresa, gorgonzola, mel, finalizado com azeite, parmesão ralado, manjericão e azeitona",
+          "preco": 32
+        },
+        {
+          "id": "a2e0b0d0-3732-4844-b3e7-413a89bfefb6",
+          "nome": "1/2 Manzo Crema (Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, carne do sol, cream cheese, finalizado com azeite, parmesão ralado, manjericão e azeitona)",
+          "preco": 32
+        },
+        {
+          "id": "a2d516df-9c50-430c-8e2d-69bc1cf59119",
+          "nome": "1/2 Manzo Formagio(Massa de longa fermentação (33cm), molho de tomate pelado italiano, muçarela, carne do sol, queijo coalho, mel, finalizado com azeite, parmesão ralado, manjericão e azeiton",
+          "preco": 33
+        }
+      ]
+    },
+    "sabores metade metade": {
+      "id": "a2d37966-5197-423e-a38e-bdb753e7775d",
+      "obrigatorio": false,
+      "opcoes": [
+        {
+          "id": "a2d37966-c815-4400-a1b0-152c90a3566e",
+          "nome": "Metade",
+          "preco": 0
+        },
+        {
+          "id": "a2d37967-5f83-4737-b1bb-ed898059cc7f",
+          "nome": "Sem nome",
+          "preco": 0
+        }
+      ]
+    },
+    "coca 1 litro zero ou normal": {
+      "id": "a280436b-5246-43c4-a99c-05b8f31e345f",
+      "obrigatorio": false,
+      "opcoes": [
+        {
+          "id": "a280436b-bb29-46aa-8bf4-3c9be34c0b02",
+          "nome": "Coca 1 litro zero",
+          "preco": 0
+        },
+        {
+          "id": "a280436c-20ac-4679-842d-afbf75c57d97",
+          "nome": "Coca 1 litro normal",
+          "preco": 0
+        }
+      ]
+    },
+    "sem nome": {
+      "id": "a28042be-c48c-4699-8737-849358618219",
+      "obrigatorio": false,
+      "opcoes": [
+        {
+          "id": "a28042bf-2cab-42f5-bdf6-f7ab5b0e107a",
+          "nome": "Sem nome",
+          "preco": 0
+        },
+        {
+          "id": "a28042bf-91b9-493f-8c48-7c277785ecda",
+          "nome": "Sem nome",
+          "preco": 0
+        }
+      ]
+    },
+    "coca 600 zero ou normal": {
+      "id": "a28042d3-f932-4e0f-8239-c56f214a1561",
+      "obrigatorio": false,
+      "opcoes": [
+        {
+          "id": "a28042d4-639d-417a-bf4f-c2696fdfa005",
+          "nome": "Coca 600 zero",
+          "preco": 0
+        },
+        {
+          "id": "a28042d4-de6d-4829-a5e7-b48ce6c65f18",
+          "nome": "Coca 600 normal",
+          "preco": 0
+        }
+      ]
+    },
+    "tamanho da carne": {
+      "id": "a201767d-b722-4e76-8e9a-24b972522723",
+      "obrigatorio": true,
+      "opcoes": [
+        {
+          "id": "a201767e-0d88-4f37-b026-964c5f1ed9fd",
+          "nome": "smash de 80g nos 2 hamburguer",
+          "preco": 0
+        },
+        {
+          "id": "a201767e-679b-40bf-b9d9-0fb4b9aa599f",
+          "nome": "blend de 150g nos 2 hamburguer",
+          "preco": 10
+        }
+      ]
+    },
+    "ponto da carne": {
+      "id": "9fd6d5bf-c81c-4a51-9a75-06aee345d95c",
+      "obrigatorio": true,
+      "opcoes": [
+        {
+          "id": "9fd6d5c1-07b3-42a0-9d89-e7cbea0a7872",
+          "nome": "Mal passada",
+          "preco": 0
+        },
+        {
+          "id": "9fd6d5c1-9e6e-46f3-abce-df760030ecce",
+          "nome": "Ao Ponto",
+          "preco": 0
+        },
+        {
+          "id": "9fd6d5e2-ddea-4cf8-9437-662fbd09acf8",
+          "nome": "Bem passada",
+          "preco": 0
+        }
+      ]
+    },
+    "qual batata deseja": {
+      "id": "9e7c6b20-42ce-4eaf-b72f-631d0670ed2e",
+      "obrigatorio": false,
+      "opcoes": [
+        {
+          "id": "9e7c6b20-a570-4e81-a921-5613ad19c417",
+          "nome": "Batata Pequena",
+          "preco": 0
+        },
+        {
+          "id": "9e7c6b21-0502-438e-b4cd-dbaba5913722",
+          "nome": "Batata Média",
+          "preco": 9
+        },
+        {
+          "id": "9e7c6b6d-1a96-43d8-911f-c6a4055b625b",
+          "nome": "Batata com cheddar e bacon",
+          "preco": 13
+        }
+      ]
+    },
+    "coca zero ou normal": {
+      "id": "d0f40660-7bad-11ef-ad9e-0d7603ed0e0c",
+      "obrigatorio": true,
+      "opcoes": [
+        {
+          "id": "d1698d60-7bad-11ef-9518-f1ff8bc12aad",
+          "nome": "Coca Lata Normal",
+          "preco": 0
+        },
+        {
+          "id": "d263f6a0-7bad-11ef-8048-172da3298752",
+          "nome": "Coca Lata Zero",
+          "preco": 0
+        }
+      ]
+    },
+    "adicionais": {
+      "id": "3f60d3f0-7bad-11ef-bffb-dddb8a476d30",
+      "obrigatorio": false,
+      "opcoes": [
+        {
+          "id": "3f627d20-7bad-11ef-93b1-2be645e1df62",
+          "nome": "Potinho de Maionese da casa",
+          "preco": 2
+        },
+        {
+          "id": "a25647a6-fa97-46e6-a613-69e4b4bd1619",
+          "nome": "Potinho com barbecue",
+          "preco": 2
+        },
+        {
+          "id": "3f64e370-7bad-11ef-8920-a7ca90982689",
+          "nome": "Cebola Caramelizada",
+          "preco": 3
+        },
+        {
+          "id": "3f661000-7bad-11ef-8216-a3ad9853233f",
+          "nome": "Tomate",
+          "preco": 1
+        },
+        {
+          "id": "3f6750e0-7bad-11ef-b4a0-93f2e58c4afb",
+          "nome": "Alface",
+          "preco": 1
+        },
+        {
+          "id": "9fd6d553-c0b5-468c-893f-9aa687010d97",
+          "nome": "Picles",
+          "preco": 2
+        },
+        {
+          "id": "3f688120-7bad-11ef-a532-8beac5f69c33",
+          "nome": "Bacon",
+          "preco": 3
+        },
+        {
+          "id": "3f69dfa0-7bad-11ef-a2c3-471965b849c3",
+          "nome": "Carne 150g",
+          "preco": 10
+        },
+        {
+          "id": "3f6c8b30-7bad-11ef-8fc2-99b683677b2d",
+          "nome": "Onion Rings",
+          "preco": 3
+        },
+        {
+          "id": "3f6b3e00-7bad-11ef-bffa-7346bf1b7f02",
+          "nome": "Carne 80g",
+          "preco": 7
+        },
+        {
+          "id": "3f6dd230-7bad-11ef-b33e-4be355923178",
+          "nome": "Cheddar",
+          "preco": 1.5
+        },
+        {
+          "id": "9fd6d517-8700-4fc1-9e95-c1e0c3c22a74",
+          "nome": "Cream cheese",
+          "preco": 4
+        },
+        {
+          "id": "9fd6d55f-d5be-4351-8643-d7ad2ee8dbb6",
+          "nome": "Cheddar cremoso",
+          "preco": 4
+        },
+        {
+          "id": "a1021647-3e6b-4eea-b114-09aa4a304636",
+          "nome": "Geleia de pimenta",
+          "preco": 4
+        },
+        {
+          "id": "a256477c-9fa1-4a8d-a331-a5f9c1483ee6",
+          "nome": "Mel",
+          "preco": 4
+        },
+        {
+          "id": "a256478f-a042-4f3e-af27-67a93ed0fca9",
+          "nome": "Queijo Coalho",
+          "preco": 4
+        }
+      ]
+    },
+    "escolha a maionese": {
+      "id": "01de51d0-7bad-11ef-90e9-a9a2b4547a47",
+      "obrigatorio": true,
+      "opcoes": [
+        {
+          "id": "025cc520-7bad-11ef-94da-91904b6f8fbc",
+          "nome": "Maionese Verde",
+          "preco": 0
+        },
+        {
+          "id": "03135650-7bad-11ef-ae90-35c4a87a39e8",
+          "nome": "Maionese de Bacon",
+          "preco": 0
+        },
+        {
+          "id": "2577a400-7c08-11ef-b3f2-0f00b604b6a5",
+          "nome": "Sem Maionese",
+          "preco": 0
+        }
+      ]
     }
   },
-  "meia_pizza": {
-    "_nota": "Pizza Metade/Metade = soma das duas metades. Preco do produto e 0.",
-    "margherita": 22.5,
-    "calabrese": 24.5,
-    "pepperoni": 27.5,
-    "diavola al miele": 29,
-    "diavola crema": 30.5,
-    "calabrese gorgonzola": 32,
-    "manzo crema": 32,
-    "manzo formagio": 33
-  },
-  "pix": {
-    "_nota": "Chave fica no .env da VM, nao aqui.",
-    "tipo": "CNPJ"
-  },
-  "como_detectar_indisponibilidade": {
-    "_nota": "O dono NAO usa esgotado/available. Ele deixa o item INVISIVEL, e usa o botao de pausa para alta demanda. Sao mecanismos diferentes e o bot responde diferente em cada um.",
-    "item_acabou": "list_products -> visible:false. Da o nome do item ao cliente e oferece os que restam.",
-    "massa_acabou": "TODAS as pizzas invisiveis ao mesmo tempo. Nao oferecer pizza, so hamburguer.",
-    "pausado_por_demanda": "get_company -> currently_open:false DENTRO do horario de business_hours.",
-    "fechado_normal": "get_company -> currently_open:false FORA do horario. Usa a mensagem de ausencia.",
-    "_regra": "E o relogio contra business_hours que separa pausado de fechado. Sem isso o bot diria que esta fechado quando na verdade esta so pausado, e perderia a venda de quem esperaria."
-  },
-  "pedido_minimo": 15,
-  "tempo_entrega": "uns 40min (o que ele responde no WhatsApp; o cardapio anuncia 45-65min)",
-  "_notas_da_loja": {
-    "pedido_minimo": "R$ 15,00, lido na propria pagina do cardapio. Sem isto o bot calcularia o total de um pedido pequeno e mandaria o valor, e o pedido seria recusado depois.",
-    "agendamento": "Com a loja fechada o cardapio mostra \"Fechado\" e \"Pedir para depois\", e avisa: \"Nesse momento so recebemos pedidos agendados\". Entao convidar para agendar e verdade, nao promessa vazia."
-  },
-  "endereco": "Rua Manoel Messias, 233 — Alto Guaramiranga, Caninde-CE",
-  "escolhas_por_produto": {
-    "_nota": "Conferido no cardapio ATIVO, lendo modifier_category_ids de cada produto — nao a lista de grupos. Ponto da carne e Escolha a maionese existem no catalogo mas NAO estao ligados a produto nenhum: sao restos. Hamburguer nao exige escolha nenhuma.",
-    "hamburguer": {
-      "obrigatorio": [],
-      "opcional": [
-        "adicionais"
-      ]
+  "pagamentos": {
+    "cash": {
+      "id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+      "descricao": "Precisa de troco?"
     },
-    "combo": {
-      "obrigatorio": [
-        "coca zero ou normal"
-      ],
-      "opcional": [
-        "adicionais"
-      ],
-      "muda_preco": {
-        "batata pequena": 0,
-        "batata media": 9,
-        "batata com cheddar e bacon": 13
-      }
+    "card": {
+      "id": "7cbab49b-d4c4-4eef-ad28-d2f221eb4dff",
+      "descricao": null
     },
-    "pizza_metade": {
-      "obrigatorio": [
-        "sabor 1",
-        "sabor 2"
-      ]
+    "pix": {
+      "id": "ae0f5dc0-9e2a-11eb-b247-83729fba605a",
+      "descricao": "Por favor, enviar o comprovante via whatsapp "
+    }
+  },
+  "bairros": {
+    "imaculada conceicao": {
+      "id": "a39019a0-6207-43b0-a26a-d44d8bface78",
+      "taxa": 2,
+      "nome": "Imaculada Conceição"
+    },
+    "japuara": {
+      "id": "426d7844-23da-44d9-8234-7785395e511e",
+      "taxa": 5,
+      "nome": "Japuara"
+    },
+    "jardineira": {
+      "id": "699b7a71-6243-4981-8076-ff257d62a553",
+      "taxa": 5,
+      "nome": "Jardineira"
+    },
+    "joao paulo 2": {
+      "id": "4a700ec4-7f05-4c28-90a6-c2326636a2e9",
+      "taxa": 2,
+      "nome": "João Paulo 2"
+    },
+    "jubaia": {
+      "id": "92d1577e-7414-47df-9bb8-098962fb0ae9",
+      "taxa": 5,
+      "nome": "Jubaia"
+    },
+    "loteamento colinas": {
+      "id": "343e28c4-7707-4ed7-b03b-b99d90aab49f",
+      "taxa": 2,
+      "nome": "Loteamento Colinas"
+    },
+    "alto guaramiranga": {
+      "id": "a5f4c4a4-b324-44b7-8b00-ae9df7115e21",
+      "taxa": 2,
+      "nome": "Alto Guaramiranga"
+    },
+    "bairro do s": {
+      "id": "28818d99-bd28-4e5e-8de9-6dcd92c516bb",
+      "taxa": 2,
+      "nome": "Bairro do S"
+    },
+    "bela vista": {
+      "id": "b71230b1-91d1-46b3-8afc-36bd24237f00",
+      "taxa": 2,
+      "nome": "Bela Vista"
+    },
+    "boa vista": {
+      "id": "98e8cf26-978e-4123-abdb-60eb01c13c00",
+      "taxa": 6,
+      "nome": "Boa vista"
+    },
+    "br020": {
+      "id": "7f189bc3-5f7d-408a-baf1-2b93a11b407c",
+      "taxa": 5,
+      "nome": "BR020"
+    },
+    "cachoeira da pasta": {
+      "id": "b38b87f5-cf70-42ca-bbdd-f63454f07e55",
+      "taxa": 2,
+      "nome": "Cachoeira da pasta"
+    },
+    "campinas": {
+      "id": "a4d4fc7e-2e31-49c9-92ed-80a43408f5d1",
+      "taxa": 2,
+      "nome": "Campinas"
+    },
+    "can": {
+      "id": "1e2f752a-da8d-4ffd-8626-4482f0874fb0",
+      "taxa": 2,
+      "nome": "CAN"
+    },
+    "canindezinho": {
+      "id": "386b7a39-0d32-4157-93e8-7a9e1465b088",
+      "taxa": 2,
+      "nome": "Canindezinho"
+    },
+    "centro": {
+      "id": "967d2742-842c-4c46-a3c6-fd0abcf6c287",
+      "taxa": 2,
+      "nome": "Centro"
+    },
+    "conjunto habitacional": {
+      "id": "52d314e3-cb72-425a-a620-e93b0fe2d8f8",
+      "taxa": 2,
+      "nome": "Conjunto Habitacional"
+    },
+    "conviver da palestina": {
+      "id": "7dc4e7f5-b988-47fc-8e0d-14f9b440abc6",
+      "taxa": 2,
+      "nome": "Conviver da palestina"
+    },
+    "conviver da upa": {
+      "id": "71cb75b9-fee4-4aea-807b-237d1c6f8736",
+      "taxa": 2,
+      "nome": "Conviver da upa"
+    },
+    "faculdade estacio": {
+      "id": "afd64bac-fd8a-4e46-9944-842402cc83a3",
+      "taxa": 2,
+      "nome": "Faculdade Estácio"
+    },
+    "loteamento jardim das oliveiras": {
+      "id": "267c451e-b12f-47f8-8168-c7b411d20b49",
+      "taxa": 2,
+      "nome": "Loteamento jardim das oliveiras"
+    },
+    "loteamento juazeiro": {
+      "id": "e89b6f81-46dc-4916-aa24-db99a55d3861",
+      "taxa": 2,
+      "nome": "Loteamento Juazeiro"
+    },
+    "loteamento monaco ville": {
+      "id": "a8b02734-6d2d-4276-962b-8e1e6edf0acc",
+      "taxa": 2,
+      "nome": "Loteamento monaco ville"
+    },
+    "loteamento sagrada familia": {
+      "id": "af236920-0da4-418e-aa90-b2a85dba49d9",
+      "taxa": 2,
+      "nome": "Loteamento sagrada familia"
+    },
+    "loteamento santa edwirgens": {
+      "id": "9cfc442b-cb1b-43d4-828c-9e611bbbfd32",
+      "taxa": 2,
+      "nome": "Loteamento Santa Edwirgens"
+    },
+    "loteamento sao pedro": {
+      "id": "3a550d8e-e3cd-4856-b7ff-92942c446634",
+      "taxa": 2,
+      "nome": "Loteamento São pedro"
+    },
+    "loteamento vitoria regia": {
+      "id": "58cdd4f2-062b-4204-9e03-4a4d25bcff84",
+      "taxa": 2,
+      "nome": "Loteamento Vitória Régia"
+    },
+    "monte": {
+      "id": "266f635b-2e0d-4422-bd60-a8bc43d32541",
+      "taxa": 2,
+      "nome": "Monte"
+    },
+    "monte libano": {
+      "id": "b98de67c-d93a-486b-bccb-288217736e19",
+      "taxa": 2,
+      "nome": "Monte libano"
+    },
+    "palestina": {
+      "id": "b2360417-2690-4df8-8372-d9c7fd81e6be",
+      "taxa": 2,
+      "nome": "Palestina"
+    },
+    "riacho sao francisco": {
+      "id": "7c9b9221-1366-442b-beb7-aa7d4570a392",
+      "taxa": 2,
+      "nome": "Riacho são francisco"
+    },
+    "riacho sujo": {
+      "id": "30ce9bbd-515e-4649-9996-b02dc3237856",
+      "taxa": 2,
+      "nome": "Riacho Sujo"
+    },
+    "santa clara": {
+      "id": "392dbe13-f2a5-4dc8-b3e4-7ed455ca0093",
+      "taxa": 2,
+      "nome": "Santa clara"
+    },
+    "santa luzia": {
+      "id": "7ce04adb-29cc-4d0d-af95-9dfc2714c7ff",
+      "taxa": 2,
+      "nome": "Santa luzia"
+    },
+    "sao matheus": {
+      "id": "f3ba990e-4919-4792-b36f-0dd3fdb2824c",
+      "taxa": 2,
+      "nome": "São Matheus"
     }
   },
   "pedido_pelo_whatsapp": {
@@ -418,5 +997,41 @@
       "4_se_dinheiro": "repete o valor e pergunta se precisa de troco",
       "_porque": "Falar o valor antes de ser perguntado tira uma ida e volta. E em dinheiro o valor tem que vir junto do troco, senao o cliente nao sabe de quanto precisa."
     }
+  },
+  "escolhas_por_produto": {
+    "_nota": "Conferido no cardapio ATIVO, lendo modifier_category_ids de cada produto — nao a lista de grupos. Ponto da carne e Escolha a maionese existem no catalogo mas NAO estao ligados a produto nenhum: sao restos. Hamburguer nao exige escolha nenhuma.",
+    "hamburguer": {
+      "obrigatorio": [],
+      "opcional": [
+        "adicionais"
+      ]
+    },
+    "combo": {
+      "obrigatorio": [
+        "coca zero ou normal"
+      ],
+      "opcional": [
+        "adicionais"
+      ],
+      "muda_preco": {
+        "batata pequena": 0,
+        "batata media": 9,
+        "batata com cheddar e bacon": 13
+      }
+    },
+    "pizza_metade": {
+      "obrigatorio": [
+        "sabor 1",
+        "sabor 2"
+      ]
+    }
+  },
+  "como_detectar_indisponibilidade": {
+    "_nota": "O dono NAO usa esgotado/available. Ele deixa o item INVISIVEL, e usa o botao de pausa para alta demanda. Sao mecanismos diferentes e o bot responde diferente em cada um.",
+    "item_acabou": "list_products -> visible:false. Da o nome do item ao cliente e oferece os que restam.",
+    "massa_acabou": "TODAS as pizzas invisiveis ao mesmo tempo. Nao oferecer pizza, so hamburguer.",
+    "pausado_por_demanda": "get_company -> currently_open:false DENTRO do horario de business_hours.",
+    "fechado_normal": "get_company -> currently_open:false FORA do horario. Usa a mensagem de ausencia.",
+    "_regra": "E o relogio contra business_hours que separa pausado de fechado. Sem isso o bot diria que esta fechado quando na verdade esta so pausado, e perderia a venda de quem esperaria."
   }
 }

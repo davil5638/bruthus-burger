@@ -216,14 +216,24 @@ function taxaBairro(texto) {
   if (!n) return null;
 
   let achado = null;
-  for (const [bairro, taxa] of Object.entries(CARDAPIO.bairros)) {
+  for (const [chave, dados] of Object.entries(CARDAPIO.bairros)) {
     // O cliente escreve o endereço inteiro: "rua tal, 123, centro".
     // Procura o nome do bairro dentro da frase.
-    const re = new RegExp("(^|\\s)" + bairro.replace(/\s+/g, "\\s+") + "(\\s|$)");
+    const re = new RegExp("(^|\\s)" + chave.replace(/\s+/g, "\\s+") + "(\\s|$)");
     if (re.test(n)) {
       // Fica com o nome mais longo que casar: "boa vista" antes de "vista",
       // "loteamento juazeiro" antes de "juazeiro".
-      if (!achado || bairro.length > achado.bairro.length) achado = { bairro, taxa };
+      if (!achado || chave.length > achado.chave.length) {
+        achado = {
+          chave,
+          // O nome como o OlaClick escreve, para aparecer igual no pedido.
+          bairro: dados.nome || chave,
+          taxa: Number(dados.taxa),
+          // `area_id` é o que `create_address` exige para a taxa ser
+          // aplicada pelo OlaClick, e não só calculada por nós.
+          area_id: dados.id || null,
+        };
+      }
     }
   }
   return achado;
