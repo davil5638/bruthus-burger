@@ -1,7 +1,16 @@
 # O Caddy pede e renova o certificado do Let's Encrypt sozinho. Para isso
 # funcionar, as portas 80 e 443 precisam estar abertas na Security List do
-# Oracle e o domínio precisa apontar para o IP desta máquina — os dois já
-# estão assim desde o projeto anterior.
+# Oracle e o domínio precisa apontar para o IP desta máquina.
 {$DOMINIO} {
-	reverse_proxy evolution:8080
+	# Webhooks vão para o atendente, não para a Evolution. O caminho leva
+	# um segredo no final, então não basta descobrir o domínio: sem ele o
+	# bot devolve 200 e não faz nada. O atendente continua sem porta
+	# publicada — só o Caddy o alcança.
+	handle /hooks/* {
+		reverse_proxy bot:3000
+	}
+
+	handle {
+		reverse_proxy evolution:8080
+	}
 }

@@ -591,6 +591,113 @@ function donoFalouHaPouco(conversa) {
   return Boolean(t) && Date.now() - t < JANELA_DONO_MS;
 }
 
+// ──────────────────────────────────────────────
+// Mensagens de status do pedido.
+//
+// Eram da OlaClick e foram desligadas junto com o chatbot dela. São as
+// que o cliente espera: "recebemos", "foi aceito", "está a caminho",
+// "chegou". O dono tinha exatamente essas quatro ligadas; "pronto",
+// "entregue" e "cancelado" ficavam desligadas, e isso é mantido.
+//
+// Vem pelo webhook do OlaClick, não por polling: o cliente está olhando
+// o celular esperando, e meio minuto importa.
+//
+// Os status de transição não aparecem em pedido antigo (fica tudo
+// FINALIZED), então o mapa cobre o que se sabe e o que não casar é
+// REGISTRADO em vez de ignorado — é assim que se descobre o resto na
+// primeira noite, em vez de adivinhar agora.
+// ──────────────────────────────────────────────
+const STATUS_MENSAGEM = {
+  PENDING:   "recebido",
+  PREPARING: "aceito",
+  ACCEPTED:  "aceito",
+  ON_THE_WAY: "a_caminho",
+  IN_ROUTE:   "a_caminho",
+  DISPATCHED: "a_caminho",
+  ARRIVED:    "chegou",
+  DELIVERED:  "chegou",
+};
+// Desligadas de propósito, como ele tinha na OlaClick.
+const STATUS_IGNORADOS = new Set(["READY", "FINALIZED", "CANCELLED", "CANCELED", "INITIATED"]);
+
+// Cada pedido avança uma vez por etapa. ORDER_UPDATED dispara varias
+// vezes pela mesma mudança, e mandar "seu pedido foi aceito" três vezes
+// é pior do que não mandar.
+const JA_AVISOU = new Map();
+
+function proximoAviso(pedidoId, etapa) {
+  const chave = pedidoId + "|" + etapa;
+  if (JA_AVISOU.has(chave)) return false;
+  JA_AVISOU.set(chave, Date.now());
+  // Não cresce para sempre: limpa o que tem mais de 12h.
+  if (JA_AVISOU.size > 2000) {
+    const limite = Date.now() - 12 * 3600 * 1000;
+    for (const [k, t] of JA_AVISOU) if (t < limite) JA_AVISOU.delete(k);
+  }
+  return true;
+}
+
+app.post("/hooks/olaclick/:segredo", async (req, res) => {
+  res.status(200).json({ ok: true });
+  if (req.params.segredo !== (process.env.HOOK_SEGREDO || "")) return;
+
+  try {
+    const corpo = req.body || {};
+    const pedido = corpo.data || corpo.order || corpo;
+    const evento = String(corpo.event_type || corpo.type || "").toUpperCase();
+    if (/DELET|CANCEL/.test(evento)) return;
+
+    const status  = String(pedido?.status || "").toUpperCase();
+    const entrega = String(pedido?.delivery_status || "").toUpperCase();
+    // A entrega manda mais que o status geral: um pedido "PREPARING" com
+    // delivery "ON_THE_WAY" já saiu.
+    const etapa = STATUS_MENSAGEM[entrega] || STATUS_MENSAGEM[status] || null;
+
+    const numero = [pedido?.client?.country_calling_code, pedido?.client?.phone_number]
+      .filter(Boolean).join("").replace(/\D/g, "");
+    const codigo = pedido?.public_id || pedido?.id;
+    const nome = String(pedido?.client?.name || "").split(" ")[0] || null;
+
+    if (!etapa) {
+      // Não sei o que é isto — registra para aprendermos, não ignora.
+      if (!STATUS_IGNORADOS.has(status) && !STATUS_IGNORADOS.has(entrega)) {
+        registrar({ hook: "olaclick", pedido: codigo, status, entrega, leitura: { intencao: "status_desconhecido" } });
+      }
+      return;
+    }
+
+    // iFood mascara o telefone ("0800 700 3020 | ..."), então não dá para
+    // avisar esse cliente — e nem precisa, o iFood já avisa ele.
+    if (!numero || numero.length < 12 || numero.startsWith("550800")) {
+      registrar({ hook: "olaclick", pedido: codigo, etapa, leitura: { intencao: "sem_telefone_util" } });
+      return;
+    }
+
+    if (!proximoAviso(codigo, etapa)) return;
+
+    const texto = respostas.status(etapa, codigo, nome);
+    if (!texto) return;
+
+    let envio = "observando";
+    if (RESPONDER) {
+      try {
+        await axios.post(
+          `${EVO_URL}/message/sendText/${EVO_INSTANCE}`,
+          { number: numero, text: texto, delay: 800, linkPreview: false },
+          { headers: { apikey: EVO_KEY, "Content-Type": "application/json" }, timeout: 20000 }
+        );
+        envio = "enviado";
+      } catch (e) {
+        envio = "falhou: " + (e.response?.data?.message || e.message);
+        console.error("[status]", envio);
+      }
+    }
+    registrar({ hook: "olaclick", pedido: codigo, etapa, envio, texto, leitura: { intencao: "status_do_pedido" } });
+  } catch (e) {
+    console.error("[hook olaclick]", e.message);
+  }
+});
+
 app.get("/saude", async (req, res) => {
   let observadas = 0;
   try { observadas = fs.readFileSync(DIARIO, "utf8").split("\n").filter(Boolean).length; } catch {}

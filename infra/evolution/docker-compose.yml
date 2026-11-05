@@ -104,6 +104,10 @@ services:
       # da própria loja. ALERTAR_DONO=0 desliga.
       ALERTA_NUMERO: ${ALERTA_NUMERO}
       ALERTAR_DONO: ${ALERTAR_DONO:-1}
+      # Vai no fim da URL do webhook do OlaClick. Sem ele o endpoint
+      # responde 200 e não faz nada — um webhook aberto deixaria qualquer
+      # um disparar mensagem em nome da loja.
+      HOOK_SEGREDO: ${HOOK_SEGREDO}
       DIARIO: /dados/observacao.jsonl
       TZ: America/Fortaleza
     volumes:
