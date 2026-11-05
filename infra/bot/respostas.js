@@ -72,7 +72,16 @@ function ausencia(abertura, funcionamento) {
       : `Abrimos ${abertura.dia} às ${abertura.hora} ⏰`);
   }
 
-  linhas.push("", "Caso queira, já pode deixar seu pedido agendado pelo link 👇", `🔗 ${LINK}`);
+  // O agendado precisa dizer QUANDO chega, senão o cliente agenda achando
+  // que sai às 18:30 e cobra às 18:40. O entregador chega às 19h, e o
+  // pedido sai assim que ele chega — é o combinado da casa.
+  linhas.push(
+    "",
+    "Caso queira, já pode deixar seu pedido agendado pelo link 👇",
+    `🔗 ${LINK}`,
+    "",
+    "_O entregador chega às 19h, e os pedidos agendados saem assim que ele chegar_ 🛵"
+  );
   return linhas.join("\n");
 }
 

@@ -576,7 +576,14 @@ app.post("/webhook/evolution", async (req, res) => {
       try {
         await axios.post(
           `${EVO_URL}/message/sendText/${EVO_INSTANCE}`,
-          { number: msg.conversa.replace(/@.*/, ""), text: leitura.mensagem, delay: 1200, linkPreview: false },
+          // O identificador vai INTEIRO, com o domínio.
+          //
+          // Eu cortava o "@lid" e mandava só os dígitos — a Evolution
+          // então assumia "@s.whatsapp.net", procurava um telefone que não
+          // existe e devolvia 400. O bot decidia certo e falhava calado no
+          // envio; a mulher do dono mandou "bom dia" e não recebeu nada.
+          // Com 90% das conversas em LID, isso derrubava quase tudo.
+          { number: msg.conversa, text: leitura.mensagem, delay: 1200, linkPreview: false },
           { headers: { apikey: EVO_KEY, "Content-Type": "application/json" }, timeout: 20000 }
         );
         envio = "enviado";
