@@ -40,7 +40,18 @@ services:
       - evolution
 
   evolution:
-    image: evoapicloud/evolution-api:v2.3.0
+    # v2.3.7 (dez/2025), sete correções à frente da v2.3.0 em que ficamos.
+    #
+    # A troca foi feita atrás de um sintoma concreto: no aparelho do dono
+    # as mensagens enviadas por aqui apareciam como "Aguardando mensagem",
+    # o aviso do WhatsApp para o que não deu para descriptografar. A
+    # mensagem chegava no cliente, mas ele não via — e sem ver não dá para
+    # confiar. Falha de cifra entre aparelhos conectados é o tipo de coisa
+    # que anda nesses patches do Baileys.
+    #
+    # Não subimos para 2.4.x: ela exige ativação de licença, e trocar de
+    # linha menor antes de uma noite de operação é risco sem necessidade.
+    image: evoapicloud/evolution-api:v2.3.7
     container_name: evolution
     restart: unless-stopped
     # Só o localhost da própria VM alcança a 8080 direto. Quem vem de fora
