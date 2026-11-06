@@ -58,9 +58,16 @@ function dentroDaFaixa(hhmm, faixas = []) {
  *   "pausada"  — dentro do horário, mas o dono pausou (alta demanda)
  *   "fechada"  — fora do horário cadastrado
  */
-async function estado() {
-  const empresa = await olaclick.buscarEmpresa();
-  const { hhmm, dia } = agoraEm();
+// `opcoes` existe só para ensaio: `{ empresa, agora: { hhmm, dia } }`
+// substitui a consulta à API e o relógio. Em operação ninguém passa nada.
+//
+// Sem isso não havia como testar as regras de horário que o dono ditou
+// (dia fechado não oferece agendar; dia que abre e antes das 18:30
+// oferece e avisa do entregador; depois das 23h não oferece) a não ser
+// esperando o relógio chegar lá — ou seja, na noite de operação.
+async function estado(opcoes = {}) {
+  const empresa = opcoes.empresa || await olaclick.buscarEmpresa();
+  const { hhmm, dia } = opcoes.agora || agoraEm();
   const hoje = empresa?.business_hours?.[dia] || {};
   const deveriaEstarAberta = Boolean(hoje.is_active) && dentroDaFaixa(hhmm, hoje.hours);
   const aberta = empresa?.currently_open === true;

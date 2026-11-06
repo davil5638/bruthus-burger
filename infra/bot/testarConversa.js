@@ -27,8 +27,33 @@ for (const f of [process.env.DIARIO, process.env.PEDIDOS_EM_CURSO]) {
   try { fs.unlinkSync(f); } catch {} // eslint-disable-line no-empty
 }
 
+// ── NADA VAI PARA O OLACLICK NESTE ENSAIO ──
+// `criarPedido.criar` é substituído ANTES do index.js carregar. O bot
+// chama por propriedade (`criarPedido.criar(...)`), então pega esta.
+// Sem isto, ensaiar o "sim" criaria pedido de verdade na cozinha.
+const criarPedido = (() => {
+  try { return require("./scripts/criarPedido"); }
+  catch { return require("../../scripts/criarPedido"); }
+})();
+
+const pedidosCriados = [];
+criarPedido.criar = async (dados) => {
+  pedidosCriados.push(dados);
+  return {
+    ok: true,
+    public_id: "BR-ENSAIO" + pedidosCriados.length,
+    total: dados.itens
+      ? dados.itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0)
+      : 0,
+  };
+};
+
 const bot = require("./index");
 const pedidos = require("./pedidoEmCurso");
+const loja = (() => {
+  try { return require("./scripts/loja"); }
+  catch { return require("../../scripts/loja"); }
+})();
 
 // Mesma dança do index.js: no container os scripts ficam em /app/scripts,
 // no repositório na raiz. Esqueci disto aqui e o ensaio rodava inteiro,
@@ -54,16 +79,66 @@ const LOJA_ABERTA = {
   abertura: { hoje: true },
 };
 
+// ── O HORÁRIO REAL, CONGELADO ──
+// Retrato do que a API devolvia em 06/11/2026: quarta a domingo,
+// 18:30–23:00, segunda e terça fechadas. Fica aqui para o ensaio dar o
+// mesmo resultado na minha máquina e na VM, com ou sem token.
+//
+// Se o dono mexer nos dias, isto envelhece — e é por isso que o ensaio
+// compara com a API quando consegue falar com ela (veja `conferirHorario`).
+const HORARIO_REAL = {
+  sunday: { is_active: true, hours: [{ open: "18:30", close: "23:00" }] },
+  monday: { is_active: false, hours: [{ open: "18:30", close: "23:00" }] },
+  tuesday: { is_active: false, hours: [] },
+  wednesday: { is_active: true, hours: [{ open: "18:30", close: "23:00" }] },
+  thursday: { is_active: true, hours: [{ open: "18:30", close: "23:00" }] },
+  friday: { is_active: true, hours: [{ open: "18:30", close: "23:00" }] },
+  saturday: { is_active: true, hours: [{ open: "18:30", close: "23:00" }] },
+};
+
+// Monta o estado da loja com a LÓGICA REAL de scripts/loja.js, mudando
+// só o relógio. É o que evita testar em cima de um estado inventado por
+// mim — que foi exatamente o erro de ontem.
+async function lojaEm(dia, hhmm, { pausada = false, fora = [], massaAcabou = false } = {}) {
+  const dentro = loja.dentroDaFaixa(hhmm, HORARIO_REAL[dia].hours) && HORARIO_REAL[dia].is_active;
+  const e = await loja.estado({
+    empresa: { business_hours: HORARIO_REAL, currently_open: dentro && !pausada },
+    agora: { hhmm, dia },
+  });
+  return { ...e, indisponiveis: { nomes: fora, massaAcabou } };
+}
+
+// Avisa se o horário cadastrado mudou e este arquivo ficou para trás.
+async function conferirHorario() {
+  if (!process.env.OLACLICK_API_TOKEN) {
+    console.log("(horário: usando o retrato de 06/11/2026 — sem token para conferir)");
+    return;
+  }
+  try {
+    const olaclick = (() => {
+      try { return require("./scripts/olaclickApi"); }
+      catch { return require("../../scripts/olaclickApi"); }
+    })();
+    const empresa = await olaclick.buscarEmpresa();
+    const igual = JSON.stringify(empresa?.business_hours) === JSON.stringify(HORARIO_REAL);
+    console.log(igual
+      ? "(horário: o retrato ainda bate com o OlaClick)"
+      : "(ATENÇÃO: o horário no OlaClick MUDOU — atualize HORARIO_REAL neste arquivo)");
+  } catch {
+    console.log("(horário: não deu para conferir com a API agora)");
+  }
+}
+
 let falhas = 0;
 
-async function ensaiar(titulo, conversa, turnos) {
+async function ensaiar(titulo, conversa, turnos, estadoLoja = LOJA_ABERTA) {
   console.log(`\n── ${titulo}`);
   pedidos.fechar(conversa);
 
   for (const turno of turnos) {
     const msg = { conversa, nome: "Ensaio", texto: turno.diz, tipo: "conversation" };
-    let leitura = await bot.tratarPedidoEmCurso(msg, turno.diz, LOJA_ABERTA);
-    if (!leitura) leitura = await bot.decidir(turno.diz, msg, LOJA_ABERTA);
+    let leitura = await bot.tratarPedidoEmCurso(msg, turno.diz, estadoLoja);
+    if (!leitura) leitura = await bot.decidir(turno.diz, msg, estadoLoja);
 
     const responde = bot.podeResponder(leitura) && Boolean(leitura.mensagem);
     const saida = responde ? leitura.mensagem : `«não responde — ${leitura.acao || leitura.intencao}»`;
@@ -81,6 +156,19 @@ async function ensaiar(titulo, conversa, turnos) {
     if (turno.naoPodeCalar && !responde) {
       falhas += 1;
       console.log("  >>> FALHA: calou, e aqui calar perde o pedido");
+    }
+    if (turno.naoPode && turno.naoPode.test(String(saida))) {
+      falhas += 1;
+      console.log(`  >>> FALHA: NÃO podia dizer ${turno.naoPode}`);
+    }
+    // "chama o dono" = o bot NÃO responde sozinho. No serviço real, todo
+    // turno sem resposta que não seja repetição silenciada dispara o
+    // aviso no WhatsApp e no Telegram — então calar aqui é o alerta.
+    // (Checar `leitura.escalar` era asserção errada minha: o aviso não
+    // depende dele.)
+    if (turno.chamaODono && responde) {
+      falhas += 1;
+      console.log("  >>> FALHA: respondeu sozinho, e isto é do dono");
     }
   }
 
@@ -129,6 +217,148 @@ async function ensaiar(titulo, conversa, turnos) {
     { diz: "1 litro", naoPodeCalar: true },
   ]);
 
+  // ──────────────────────────────────────────────
+  // ONDE O DINHEIRO ANDA: a confirmação
+  // ──────────────────────────────────────────────
+
+  // Pix tem que vir com a CHAVE: sem ela o cliente não tem como pagar, e
+  // o pedido já está na cozinha.
+  await ensaiar("Diz SIM no Pix — tem que criar E mandar a chave", "ensaio-sim@lid", [
+    { diz: "1 calabresa", naoPodeCalar: true },
+    { diz: "Rua do Cajueiro 50, Centro", naoPodeCalar: true },
+    { diz: "pix", naoPodeCalar: true },
+    { diz: "sim", esperar: /chave pix|comprovante/i, naoPodeCalar: true },
+  ]);
+
+  // Dinheiro e cartão não têm chave nenhuma a mandar.
+  await ensaiar("Diz SIM no dinheiro — sem chave de Pix", "ensaio-sim-dinheiro@lid", [
+    { diz: "1 calabresa", naoPodeCalar: true },
+    { diz: "Rua do Cajueiro 50, Centro", naoPodeCalar: true },
+    { diz: "dinheiro", naoPodeCalar: true },
+    { diz: "troco pra 60", naoPodeCalar: true },
+    { diz: "sim", esperar: /anotado|preparar/i, naoPode: /chave pix/i, naoPodeCalar: true },
+  ]);
+
+  await ensaiar("Diz NÃO — não pode criar, e tem que chamar o dono", "ensaio-nao@lid", [
+    { diz: "1 calabresa", naoPodeCalar: true },
+    { diz: "Rua do Cajueiro 50, Centro", naoPodeCalar: true },
+    { diz: "cartão", naoPodeCalar: true },
+    { diz: "não, tá errado", chamaODono: true },
+  ]);
+
+  // Pedido mínimo é R$ 15. Uma coca sozinha dá R$ 11,99.
+  await ensaiar("Abaixo do mínimo", "ensaio-minimo@lid", [
+    { diz: "1 coca 1 litro zero", naoPodeCalar: true },
+    { diz: "Rua do Cajueiro 50, Centro", naoPodeCalar: true },
+    { diz: "dinheiro", naoPodeCalar: true },
+    { diz: "não precisa de troco", esperar: /mínimo|minimo|faltam/i, naoPodeCalar: true },
+  ]);
+
+  // ──────────────────────────────────────────────
+  // AS REGRAS DE HORÁRIO QUE O DONO DITOU
+  // Estado vindo da lógica real de loja.js, só com o relógio mudado.
+  // ──────────────────────────────────────────────
+
+  // "em dias que eu não abro, pode mandar só a mensagem que abrimos
+  //  apenas de quarta a domingo, mande a opção de agendar somente em
+  //  dias que eu abro"
+  await ensaiar(
+    "Terça (não abre) — horário, SEM agendar",
+    "ensaio-terca@lid",
+    [{ diz: "boa noite", esperar: /quarta|domingo/i, naoPode: /agendar|agende|programar/i, naoPodeCalar: true }],
+    await lojaEm("tuesday", "19:00"),
+  );
+
+  // "caso uma pessoa peça antes de 18:30 em dias que eu abro, aí vc
+  //  avisa sobre o entregador"
+  await ensaiar(
+    "Sexta 16h (abre hoje, ainda não) — pode agendar",
+    "ensaio-antes@lid",
+    [{ diz: "boa noite", esperar: /18:30|hoje/i, naoPodeCalar: true }],
+    await lojaEm("friday", "16:00"),
+  );
+
+  // "dps das 23 n ofereça agendar, diga apenas que já encerramos ou
+  //  mande nosso horario padrão de funcionamento"
+  await ensaiar(
+    "Sexta 23:40 (já encerrou) — SEM agendar",
+    "ensaio-depois@lid",
+    [{ diz: "ainda tem?", naoPode: /agendar|agende|programar/i, naoPodeCalar: true }],
+    await lojaEm("friday", "23:40"),
+  );
+
+  // Preço com a loja fechada: quem pergunta de tarde pede de noite.
+  await ensaiar(
+    "Sexta 15h — pergunta preço: responde preço E avisa",
+    "ensaio-preco@lid",
+    [{ diz: "quanto é o combo do duplo smash?", esperar: /40,99|R\$/i, naoPodeCalar: true }],
+    await lojaEm("friday", "15:00"),
+  );
+
+  // ──────────────────────────────────────────────
+  // LOJA PAUSADA E ITEM ESGOTADO
+  // O dono esconde item por item; massa acabou derruba todas as pizzas.
+  // ──────────────────────────────────────────────
+
+  await ensaiar(
+    "Pausada (produção cheia) — não toma pedido",
+    "ensaio-pausada@lid",
+    [{ diz: "quero 1 smash", naoPodeCalar: true }],
+    await lojaEm("friday", "20:00", { pausada: true }),
+  );
+
+  // A lista de alternativas NÃO pode conter o que acabou — nem o próprio
+  // item, nem outro que também está escondido.
+  await ensaiar(
+    "Calabresa esgotada — avisa e oferece só o que tem",
+    "ensaio-esgotado@lid",
+    [{
+      diz: "1 calabresa",
+      esperar: /acabou|esgot|hoje/i,
+      naoPode: /tem:[^\n]*Calabrese/i,
+      naoPodeCalar: true,
+    }],
+    await lojaEm("friday", "20:00", { fora: ["Calabrese"] }),
+  );
+
+  await ensaiar(
+    "Duas pizzas fora — não oferece nenhuma das duas",
+    "ensaio-esgotado2@lid",
+    [{
+      diz: "1 calabresa",
+      // "Pepperoni al miele" é OUTRO item e continua disponível — a
+      // borda de palavra evita acusar o código por acerto dele.
+      naoPode: /tem:[^\n]*(\bCalabrese\b|\bPepperoni\b(?!\s+al))/i,
+      naoPodeCalar: true,
+    }],
+    await lojaEm("friday", "20:00", { fora: ["Calabrese", "Pepperoni"] }),
+  );
+
+  await ensaiar(
+    "Massa acabou — todas as pizzas fora",
+    "ensaio-massa@lid",
+    [{ diz: "1 calabresa", naoPodeCalar: true }],
+    await lojaEm("friday", "20:00", { fora: ["Calabrese", "Margherita", "Pepperoni"], massaAcabou: true }),
+  );
+
+  // ──────────────────────────────────────────────
+  // O QUE O BOT NÃO PODE RESPONDER SOZINHO
+  // ──────────────────────────────────────────────
+
+  // "cadê meu pedido?" depende do OlaClick, não do bot.
+  await ensaiar("Pergunta de pedido já feito — chama o dono", "ensaio-cade@lid", [
+    { diz: "cadê meu pedido BR-1234567890?", chamaODono: true },
+  ]);
+
+  // Meio a meio: existe "Pizza Metade/Metade" no cardápio, mas qual
+  // metade com qual o bot não sabe montar. Tem que perguntar ou chamar,
+  // nunca mandar uma pizza inteira errada para a chapa.
+  await ensaiar("Pizza meio a meio — não pode chutar uma inteira", "ensaio-meia@lid", [
+    { diz: "quero uma pizza meia calabresa meia frango", naoPode: /^1x Calabrese\n\*R\$ 49,00\*/ },
+  ]);
+
+  await conferirHorario();
+  console.log(`\npedidos criados no ensaio (nenhum foi para o OlaClick): ${pedidosCriados.length}`);
   console.log(falhas ? `\n${falhas} FALHA(S) — não suba assim.` : "\nTodos os ensaios passaram.");
   process.exit(falhas ? 1 : 0);
 })();

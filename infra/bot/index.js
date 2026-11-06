@@ -290,6 +290,20 @@ function pendenciaEmpacou(p) {
   return (p.perguntas || []).some((q) => (q.tentativas || 0) >= 2);
 }
 
+// O que oferecer quando o pedido do cliente acabou.
+//
+// Tirando o próprio item e tudo o mais que está escondido. A lista vinha
+// crua do cardápio e produzia a mensagem "Calabrese acabou hoje... mas
+// ainda tem: Margherita, Calabrese, Pepperoni" — oferecendo o que acabou
+// de acabar, e mandando o cliente pedir outro item que também não tem.
+function alternativasQueSobraram(item, fora = []) {
+  const indisponivel = new Set(fora.map((f) => cardapio.normalizar(f)));
+  indisponivel.add(cardapio.normalizar(item.nome));
+  return cardapio.CARDAPIO.itens
+    .filter((i) => i.cat === item.cat && !indisponivel.has(cardapio.normalizar(i.nome)))
+    .map((i) => i.nome);
+}
+
 // Palavras que só aparecem em endereço. Sem elas, o bot não tem como
 // saber se "233" é número de casa ou quantidade de hambúrguer.
 const RUA = /\b(rua|r|av|avenida|travessa|tv|praca|sitio|estrada|rodovia|conjunto|cond|condominio|loteamento|lot|beco|alameda|bairro|proximo|perto|frente)\b/;
@@ -352,12 +366,20 @@ async function tratarPedidoEmCurso(msg, texto, estado) {
         mensagem: "Anotei seu pedido! Já te confirmo aqui 🙏",
       };
     }
+    // PIX PRECISA DA CHAVE, senão o cliente não tem como pagar.
+    //
+    // A chave só era enviada no caminho do pedido vindo do botão do
+    // OlaClick. No fluxo que o bot conduz, quem escolhia Pix recebia
+    // "Já vamos preparar" e mais nada — pedido na cozinha, sem chave e
+    // sem comprovante. Apareceu no ensaio do "sim", não em operação.
+    const chavePix = p.pagamento === "pix" ? respostas.pix() : null;
+
     return {
       intencao: "pedido_criado",
       pedido: r.public_id,
       total: r.total,
-      acao: "pedido cadastrado no OlaClick",
-      mensagem: pedidos.confirmarParaCliente(p, conta),
+      acao: "pedido cadastrado no OlaClick" + (chavePix ? " — e mandou a chave do Pix" : ""),
+      mensagem: pedidos.confirmarParaCliente(p, conta) + (chavePix ? `\n\n${chavePix}` : ""),
       avisarDono: `✅ *Pedido novo pelo WhatsApp*\n${r.public_id} — ${msg.nome || "cliente"}\nR$ ${Number(r.total).toFixed(2).replace(".", ",")}\nJá está no OlaClick 🔥`,
     };
   }
@@ -700,7 +722,7 @@ async function decidir(texto, msg, estadoInjetado) {
       mensagem: esgotado
         ? (estado?.indisponiveis?.massaAcabou && /pizza|margherita|calabres|pepperoni|manzo/i.test(achado.item.nome)
             ? respostas.massaAcabou()
-            : respostas.esgotado(achado.item.nome, cardapio.CARDAPIO.itens.filter((i) => i.cat === achado.item.cat).map((i) => i.nome)))
+            : respostas.esgotado(achado.item.nome, alternativasQueSobraram(achado.item, fora)))
         : achado.confianca === "baixa"
           ? respostas.qualDeles(achado.alternativas.map((a) => a.nome))
           // Loja fechada: diz o preço e avisa. Não há pedido a tomar.
@@ -782,13 +804,22 @@ function podeResponder(leitura) {
   if (leitura.escalar) return false;
   if (leitura.erro) return false;
 
+  // ITEM ESGOTADO é informação, não pedido — e vale com a loja aberta.
+  //
+  // O dono sinaliza "acabou" escondendo o item, e faz isso várias vezes
+  // por noite. Mas a regra abaixo exigia loja FECHADA para o bot falar
+  // de item, então, com a loja aberta, quem pedia o que tinha acabado
+  // recebia silêncio: nem soube que acabou, nem viu o que ainda tem.
+  // Pior cenário possível, no horário de maior movimento.
+  if (leitura.esgotado) return Boolean(leitura.mensagem);
+
   // Pedido escrito: o bot diz o preço só quando a loja está FECHADA —
   // aí não há pedido a tomar, é informação e ponto.
   //
-  // Com a loja aberta, pedido é do dono. Fechar um pedido exige ponto da
-  // carne, maionese, endereço e forma de pagamento, e o bot não conduz
-  // essa conversa ainda. Responder "R$ 42,99" e parar aí deixaria o
-  // cliente achando que pediu quando não pediu — pior que não responder.
+  // Com a loja aberta e item identificado com certeza, o pedido é TOMADO
+  // (intenção "tomando_pedido"), não respondido aqui. Cair neste ramo com
+  // a loja aberta significa confiança baixa — e aí o certo é perguntar
+  // qual item, não responder preço de um palpite.
   if (leitura.intencao === "pedido_escrito") {
     return leitura.confianca === "alta" && Boolean(leitura.loja);
   }
