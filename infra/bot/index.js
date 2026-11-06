@@ -905,15 +905,30 @@ function donoFalouHaPouco(conversa) {
 // REGISTRADO em vez de ignorado — é assim que se descobre o resto na
 // primeira noite, em vez de adivinhar agora.
 // ──────────────────────────────────────────────
+// Os nomes vieram da primeira noite, não de chute.
+//
+// Eu tinha mapeado ON_THE_WAY / IN_ROUTE / DISPATCHED, e nenhum existe. O
+// OlaClick manda DRIVER_ON_THE_WAY_TO_DESTINATION e
+// DRIVER_ARRIVED_AT_DESTINATION — por isso "a caminho" nunca saiu ontem,
+// 13 vezes. Só soubemos porque o bot grava o que não conhece em vez de
+// ignorar; se ignorasse, o aviso simplesmente nunca existiria e ninguém
+// descobriria o motivo.
 const STATUS_MENSAGEM = {
   PENDING:   "recebido",
   PREPARING: "aceito",
   ACCEPTED:  "aceito",
-  ON_THE_WAY: "a_caminho",
-  IN_ROUTE:   "a_caminho",
-  DISPATCHED: "a_caminho",
-  ARRIVED:    "chegou",
-  DELIVERED:  "chegou",
+  DRIVER_ON_THE_WAY_TO_DESTINATION: "a_caminho",
+  DRIVER_ARRIVED_AT_DESTINATION:    "chegou",
+  DELIVERED: "chegou",
+};
+
+// O status da ENTREGA, quando vem, manda mais que o do pedido.
+// RIDER_ASSIGNED é o entregador saindo; DELIVERING é ele na rua.
+const ENTREGA_MENSAGEM = {
+  RIDER_ASSIGNED: "a_caminho",
+  DELIVERING:     "a_caminho",
+  DELIVERED:      "chegou",
+  ARRIVED:        "chegou",
 };
 // Desligadas de propósito, como ele tinha na OlaClick.
 const STATUS_IGNORADOS = new Set(["READY", "FINALIZED", "CANCELLED", "CANCELED", "INITIATED"]);
@@ -947,9 +962,10 @@ app.post("/hooks/olaclick/:segredo", async (req, res) => {
 
     const status  = String(pedido?.status || "").toUpperCase();
     const entrega = String(pedido?.delivery_status || "").toUpperCase();
-    // A entrega manda mais que o status geral: um pedido "PREPARING" com
-    // delivery "ON_THE_WAY" já saiu.
-    const etapa = STATUS_MENSAGEM[entrega] || STATUS_MENSAGEM[status] || null;
+    // O status do PEDIDO vem primeiro: DRIVER_ARRIVED_AT_DESTINATION com
+    // entrega DELIVERING é "chegou", e olhar só a entrega diria "a
+    // caminho" — mandaria o aviso errado na última etapa.
+    const etapa = STATUS_MENSAGEM[status] || ENTREGA_MENSAGEM[entrega] || null;
 
     const numero = [pedido?.client?.country_calling_code, pedido?.client?.phone_number]
       .filter(Boolean).join("").replace(/\D/g, "");
