@@ -57,9 +57,18 @@ function novo() {
   return {
     itens: [],          // { nome, preco, cat, qtd, coca, batataExtra }
     endereco: null,
+    // A rua, guardada mesmo quando o bairro ainda não foi reconhecido.
+    // Antes o endereço inteiro era descartado nesse caso, e o bot
+    // repetia "me passa o endereço" para quem acabara de passar —
+    // travou o pedido do Renan em 05/11/2026.
+    enderecoTexto: null,
     bairro: null,       // { bairro, taxa }
     pagamento: null,    // "pix" | "card" | "cash"
     troco: null,
+    // O que precisa ser PERGUNTADO ao cliente antes de seguir: qual
+    // coca, qual dos itens parecidos. Regra do dono: na dúvida pergunta,
+    // não chuta e não cala.
+    perguntas: [],
     criadoEm: Date.now(),
     mexidoEm: Date.now(),
   };
@@ -96,11 +105,18 @@ function fechar(conversa) {
 // ──────────────────────────────────────────────
 function oQueFalta(p) {
   const faltas = [];
-  if (!p.itens.length) faltas.push("item");
+  const pendentes = p.perguntas || [];
+  if (!p.itens.length && !pendentes.length) faltas.push("item");
   // Só os combos têm coca a escolher.
   const combosSemCoca = p.itens.filter((i) => i.cat === "combo" && !i.coca);
   if (combosSemCoca.length) faltas.push("coca");
-  if (!p.bairro) faltas.push("endereco");
+  // Dúvida sobre O QUE vai ser feito vem antes de endereço e pagamento:
+  // é a informação que a cozinha precisa.
+  if (pendentes.length) faltas.push("pendencia");
+  // Com a rua já na mão, falta só o bairro — e é só o bairro que o bot
+  // pergunta. Pedir "o endereço" de novo a quem já mandou parece que
+  // ninguém leu.
+  if (!p.bairro) faltas.push(p.enderecoTexto ? "bairro" : "endereco");
   if (!p.pagamento) faltas.push("pagamento");
   // Troco só faz sentido em dinheiro, e só se ele ainda não disse.
   if (p.pagamento === "cash" && p.troco === null) faltas.push("troco");
@@ -145,12 +161,51 @@ const br = (v) => "R$ " + Number(v).toFixed(2).replace(".", ",");
 // E em dinheiro o valor vem JUNTO da pergunta do troco: sem saber quanto
 // é, o cliente não tem como dizer de quanto precisa.
 // ──────────────────────────────────────────────
-function perguntar(falta, p, conta) {
+function perguntar(falta, p, conta, cardapio) {
   const primeiro = falta[0];
 
   if (primeiro === "coca") {
     const combo = p.itens.find((i) => i.cat === "combo" && !i.coca);
     return `${combo.nome} — ${br(combo.preco)} 🍔\n\nQual coca, zero ou normal?`;
+  }
+
+  // Dúvida pendente: pergunta a coisa exata que falta, com as opções
+  // reais e o preço de cada uma. Os tamanhos de coca custam diferente
+  // (lata, 600ml, 1 litro), então nenhum pode ter padrão: adivinhar
+  // barato come a margem e adivinhar caro irrita o cliente.
+  if (primeiro === "pendencia") {
+    const q = (p.perguntas || [])[0];
+    if (!q) return null;
+
+    if (q.tipo === "coca") {
+      const tamanhos = cardapio ? cardapio.cocaTamanhos() : [];
+      const lista = tamanhos
+        .map((t) => `• ${t.rotulo.charAt(0).toUpperCase()}${t.rotulo.slice(1)} — ${br(t.preco)}`)
+        .join("\n");
+
+      if (q.falta === "tamanho") {
+        return `Coca ${q.versao === "zero" ? "zero" : "normal"} 🥤\n\nQual tamanho?\n${lista}`;
+      }
+      if (q.falta === "versao") {
+        const rotulo = cardapio ? cardapio.TAMANHO_PT[q.tamanho] : q.tamanho;
+        return `Coca de ${rotulo} 🥤\n\nZero ou normal?`;
+      }
+      return `Qual coca? 🥤\n\n${lista}\n\nE zero ou normal?`;
+    }
+
+    if (q.tipo === "qual_item") {
+      const op = (q.alternativas || []).slice(0, 4);
+      return op.length
+        ? `Só pra eu não errar: qual desses? 🙌\n\n${op.map((nome) => `• ${nome}`).join("\n")}`
+        : `Não achei "${q.consulta}" no cardápio 🙏\n\nMe diz o nome como está no cardápio?\n${cardapio ? cardapio.CARDAPIO.link || "" : ""}`.trim();
+    }
+    return null;
+  }
+
+  // Só o bairro: a rua já veio. Repetir "me passa o endereço" para quem
+  // acabou de mandar o endereço é o jeito mais rápido de perder a venda.
+  if (primeiro === "bairro") {
+    return `Anotei: ${p.enderecoTexto} 📍\n\nE qual o bairro? É pra calcular a entrega.`;
   }
 
   if (primeiro === "endereco") {

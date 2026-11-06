@@ -112,6 +112,16 @@ const PESO = (() => {
 
 // Quanto o texto do cliente se parece com o nome do item. Conta quantas
 // palavras do item aparecem na frase, e vice-versa.
+// Como o cliente chama cada categoria do cardápio. Serve para a palavra
+// de categoria deixar de ser tratada como palavra de nome em `pontuar`.
+const CATEGORIA_DA_PALAVRA = {
+  pizza: "pizza", pizzas: "pizza",
+  hamburguer: "hamburguer", hamburger: "hamburguer", burger: "hamburguer",
+  lanche: "hamburguer", lanches: "hamburguer", sanduiche: "hamburguer",
+  combo: "combo", combos: "combo",
+  bebida: "bebida", bebidas: "bebida", refri: "bebida", refrigerante: "bebida",
+};
+
 function pontuar(consulta, item) {
   const pc = palavras(consulta);
   const pi = palavras(item.nome);
@@ -146,6 +156,22 @@ function pontuar(consulta, item) {
   for (const q of pc) {
     if (!VOCABULARIO.has(q)) continue;
     if (pi.some((p) => mesmaPalavra(q, p))) continue;
+
+    // Palavra de CATEGORIA não é palavra de nome. "2 pizza calabresa"
+    // caía em confiança baixa porque "pizza" não está escrito em
+    // "Calabrese" — e aí a penalidade derrubava o item certo. Mas o
+    // cliente não errou: ele disse a categoria, que é como as pessoas
+    // falam ("pizza de calabresa", "o lanche smash").
+    //
+    // Então categoria nunca pune, e quando bate com a do item ajuda um
+    // pouco — "pizza calabresa" deve preferir a pizza Calabrese a
+    // qualquer outra coisa parecida.
+    const cat = CATEGORIA_DA_PALAVRA[q];
+    if (cat) {
+      if (cat === item.cat) nota += 0.15;
+      continue;
+    }
+
     nota -= 0.5 * PESO(q);
   }
 
@@ -282,6 +308,211 @@ function resumoParaCliente(conta, bairro) {
 }
 
 // ──────────────────────────────────────────────
+// A COCA PRECISA DE LEITURA PRÓPRIA
+//
+// Medido, não suposto: `buscarItem` devolve TODA coca com confiança
+// baixa, porque as seis variações pontuam praticamente igual e a folga
+// entre primeira e segunda é mínima. Pior, as palavras de tamanho não
+// pesam nada no escore — "coca 1 litro" e "coca lata" voltavam as duas
+// como "Coca-Cola Lata Zero", R$ 6,99.
+//
+// Isso é dinheiro: lata 6,99, 600ml 9,99, 1 litro 11,99. Chutar barato
+// come a margem; chutar caro irrita o cliente. E como o fluxo de pedido
+// só aceita item com confiança alta, a coca era simplesmente DESCARTADA
+// no meio do pedido — foi o que engoliu a coca do Renan em 05/11.
+//
+// Então tamanho e versão saem de regra explícita, e o que o cliente não
+// disser é PERGUNTADO, nunca adivinhado.
+// ──────────────────────────────────────────────
+
+// Monta o mapa a partir do cardápio real, por nome, para os preços
+// continuarem certos quando o dono reajustar.
+function acharCoca(regra) {
+  return CARDAPIO.itens.find((i) => regra.test(i.nome)) || null;
+}
+
+const COCAS = {
+  lata: { normal: acharCoca(/^Coca-Cola Lata Tradicional/i), zero: acharCoca(/^Coca-Cola Lata Zero/i) },
+  "600": { normal: acharCoca(/^Coca-Cola Original 600/i), zero: acharCoca(/^Coca-Cola Zero 600/i) },
+  "1l": { normal: acharCoca(/^Coca-Cola Normal 1L/i), zero: acharCoca(/^Coca-Cola Zero 1L/i) },
+};
+
+const TAMANHO_PT = { lata: "lata", "600": "600ml", "1l": "1 litro" };
+
+// Falou de coca sem dizer qual? Então falta perguntar.
+function mencionouCoca(n) {
+  return /\b(coca|cocacola|coca cola|refri|refrigerante)\b/.test(n);
+}
+
+function lerTamanhoCoca(n) {
+  if (/\b(1\s*l|1l|1\s*litro|um\s*litro|litrao|litrão)\b/.test(n)) return "1l";
+  if (/\b(600|600\s*ml)\b/.test(n)) return "600";
+  if (/\b(lata|latinha|350|350\s*ml)\b/.test(n)) return "lata";
+  return null;
+}
+
+function lerVersaoCoca(n) {
+  if (/\b(zero|diet|light|sem acucar|sem açúcar)\b/.test(n)) return "zero";
+  if (/\b(normal|tradicional|comum|original|com acucar)\b/.test(n)) return "normal";
+  return null;
+}
+
+// Os tamanhos de coca com o preço de hoje, para a pergunta ao cliente
+// mostrar valor real. Lido do cardápio, não escrito na mão: quando o
+// dono reajustar, a pergunta acompanha.
+function cocaTamanhos() {
+  return Object.keys(COCAS)
+    .map((t) => {
+      const ref = COCAS[t].normal || COCAS[t].zero;
+      return ref ? { tamanho: t, rotulo: TAMANHO_PT[t], preco: ref.preco } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.preco - b.preco);
+}
+
+// Devolve { item } quando dá para resolver, ou { falta } com o que
+// perguntar: "tamanho", "versao" ou "ambos".
+function lerCocaPedida(texto) {
+  const n = normalizar(texto);
+  if (!mencionouCoca(n)) return null;
+
+  const tamanho = lerTamanhoCoca(n);
+  const versao = lerVersaoCoca(n);
+
+  if (tamanho && versao) {
+    const item = COCAS[tamanho]?.[versao];
+    return item ? { item, tamanho, versao } : { falta: "ambos" };
+  }
+  if (!tamanho && !versao) return { falta: "ambos" };
+  return { falta: tamanho ? "versao" : "tamanho", tamanho, versao };
+}
+
+// ──────────────────────────────────────────────
+// VÁRIOS ITENS NUMA MENSAGEM
+//
+// Até aqui era UM `buscarItem` para a mensagem inteira, e o resto se
+// perdia calado. "1 calabresa e 1 coca 1l" devolvia só a coca — o item
+// caro era o que sumia. "2 smash" virava 1, porque a quantidade era
+// fixa em 1 no código.
+//
+// Cortar em " e " não serve: quebraria "Batata com cheddar e bacon" e
+// "cheddar e bacon" no meio. O corte é feito antes de cada MARCADOR DE
+// QUANTIDADE, que é como as pessoas de fato escrevem: "1 smash e 1
+// coca", "2 pizza, 1 refri".
+// ──────────────────────────────────────────────
+
+const QTD_PALAVRA = {
+  um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6,
+};
+
+// O que vem depois de "com"/"sem" é acompanhamento ou recheio, não o
+// nome do item. Tratado à parte por `lerBatata`.
+const SO_MODIFICADOR = /\b(com|sem)\s+(batata|cheddar|bacon|queijo|maionese|salada|cebola|tomate|molho|refri|refrigerante|coca)\b[\wáâãéêíóôõúç\s]*/gi;
+
+// Volumes e unidades NÃO são quantidade. Sem isso, "coca 600" virava
+// "coca" + "600 (seiscentas unidades)", e "coca 1 litro" se partia em
+// duas, destruindo justamente a informação de tamanho.
+const VOLUME = /^(350|473|600|1000|1500|2000|2l|1l)$/;
+const UNIDADE = /^(ml|l|lt|litro|litros|g|kg|real|reais)$/;
+
+function ehQuantidade(numero, proxima) {
+  if (VOLUME.test(numero)) return false;
+  if (proxima && UNIDADE.test(proxima)) return false;
+  const v = Number(numero);
+  return Number.isInteger(v) && v >= 1 && v <= 20;
+}
+
+// Quebra a mensagem em pedaços, um por item pedido.
+function fatiar(texto) {
+  const palavras = texto.split(/\s+/).filter(Boolean);
+  const cortes = [];
+
+  palavras.forEach((p, i) => {
+    const limpa = normalizar(p).replace(/[^\w]/g, "");
+    const proxima = palavras[i + 1] ? normalizar(palavras[i + 1]).replace(/[^\w]/g, "") : null;
+
+    // "2x smash" também é quantidade.
+    const digito = limpa.match(/^(\d{1,4})x?$/);
+    if (digito && ehQuantidade(digito[1], proxima) && proxima) {
+      cortes.push({ i, qtd: Number(digito[1]) });
+      return;
+    }
+    if (QTD_PALAVRA[limpa] && proxima) cortes.push({ i, qtd: QTD_PALAVRA[limpa] });
+  });
+
+  // Nenhum marcador: a mensagem inteira é um pedaço só, com quantidade 1.
+  // É o comportamento antigo, que vale para "quero um combo do duplo
+  // smash" e para "manda uma calabresa".
+  if (!cortes.length) return [{ trecho: texto, qtd: 1 }];
+
+  const pedacos = [];
+  // O que vem ANTES do primeiro marcador não é lixo: em "quero coca e 2
+  // smash" o "quero coca" é um pedido de verdade.
+  if (cortes[0].i > 0) {
+    pedacos.push({ trecho: palavras.slice(0, cortes[0].i).join(" "), qtd: 1 });
+  }
+  cortes.forEach((c, k) => {
+    const fim = cortes[k + 1] ? cortes[k + 1].i : palavras.length;
+    pedacos.push({ trecho: palavras.slice(c.i + 1, fim).join(" "), qtd: c.qtd });
+  });
+  return pedacos.filter((p) => p.trecho.trim());
+}
+
+// ──────────────────────────────────────────────
+// A leitura completa de uma mensagem de pedido.
+//
+//   itens      → o que deu para cadastrar, com quantidade
+//   perguntas  → o que precisa ser PERGUNTADO ao cliente (regra do dono:
+//                na dúvida, pergunta — não chuta e não cala)
+// ──────────────────────────────────────────────
+function buscarItens(texto) {
+  const itens = [];
+  const perguntas = [];
+
+  for (const { trecho, qtd } of fatiar(texto)) {
+    // Coca vem antes: `buscarItem` não sabe distinguir as seis.
+    const coca = lerCocaPedida(trecho);
+    if (coca) {
+      if (coca.item) itens.push({ item: coca.item, qtd });
+      else perguntas.push({ tipo: "coca", falta: coca.falta, tamanho: coca.tamanho, versao: coca.versao, qtd });
+      continue;
+    }
+
+    let achado = buscarItem(trecho);
+
+    // "1 smash com batata media" — "batata" e "media" existem no
+    // cardápio (Batata Frita Média), então puniam o nome do lanche e o
+    // smash caía para confiança baixa. Mas elas não descrevem QUAL item
+    // é: descrevem o acompanhamento, que o `lerBatata` já trata à parte.
+    //
+    // Só tenta sem elas se a leitura direta ficou incerta — assim um
+    // nome que casa inteiro ("Batata Frita M com Cheddar e Bacon")
+    // nunca é mutilado.
+    if (!achado || achado.confianca !== "alta") {
+      const limpo = trecho.replace(SO_MODIFICADOR, " ").trim();
+      if (limpo && limpo !== trecho.trim()) {
+        const outra = buscarItem(limpo);
+        if (outra && outra.confianca === "alta") achado = outra;
+      }
+    }
+
+    if (!achado) continue;
+    if (achado.confianca === "alta") {
+      itens.push({ item: achado.item, qtd });
+    } else {
+      perguntas.push({
+        tipo: "qual_item",
+        consulta: trecho.trim(),
+        alternativas: (achado.alternativas || []).map((a) => a.nome),
+        qtd,
+      });
+    }
+  }
+
+  return { itens, perguntas };
+}
+
+// ──────────────────────────────────────────────
 // node scripts/cardapio.js --conferir
 // Confere o retrato contra o que a API devolve hoje.
 // ──────────────────────────────────────────────
@@ -295,6 +526,14 @@ module.exports = {
   CARDAPIO,
   normalizar,
   buscarItem,
+  buscarItens,
+  lerCocaPedida,
+  cocaTamanhos,
+  mencionouCoca,
+  lerTamanhoCoca,
+  lerVersaoCoca,
+  COCAS,
+  TAMANHO_PT,
   taxaBairro,
   precificar,
   resumoParaCliente,

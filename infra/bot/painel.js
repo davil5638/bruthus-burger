@@ -44,7 +44,7 @@ function agrupar(linhas) {
   const lista = [...conversas.values()].map((c) => ({
     ...c,
     ultima: c.turnos[c.turnos.length - 1]?.em,
-    precisaDeVoce: c.turnos.some((t) => t.decisao === "chama_o_dono"),
+    precisaDeVoce: c.turnos.some((t) => t.decisao === "chama_o_dono" || t.decisao === "travou"),
   }));
   lista.sort((a, b) => String(b.ultima).localeCompare(String(a.ultima)));
   return { conversas: lista, hooks: hooks.slice(-40).reverse() };
@@ -72,6 +72,10 @@ function montarHtml({ conversas, hooks }, estado) {
       partes.push(`<div class="bot ${falhou ? "erro" : ""}">${esc(resposta)}<i>${falhou ? "FALHOU: " + esc(t.envio) : "enviado"}</i></div>`);
     } else if (t.decisao === "chama_o_dono") {
       partes.push(`<div class="voce">⚠️ ${esc(t.leitura?.acao || "precisa de você")}<i>não respondeu</i></div>`);
+    } else if (t.decisao === "travou") {
+      // Pedido rodando em círculo. É o pior caso: cliente esperando com
+      // pedido pela metade. Vermelho, não laranja.
+      partes.push(`<div class="travou">🛑 ${esc(t.leitura?.acao || "travou no meio do pedido")}<i>pedido em curso — assume você</i></div>`);
     } else if (t.decisao === "calou") {
       partes.push(`<div class="calou">— não repetiu o que já tinha dito —</div>`);
     } else if (t.leitura?.intencao === "dono_assumiu") {
@@ -100,6 +104,8 @@ main{padding:16px;display:grid;gap:14px;max-width:760px;margin:0 auto}
 .bot{background:var(--bot);margin-left:22px}
 .bot.erro{background:#4a1d1d}
 .voce{background:var(--voce);margin-left:22px}
+.travou{background:#4a1d1d;border:1px solid var(--err);padding:8px 10px;border-radius:9px;margin:5px 0 5px 22px;font-size:14px;white-space:pre-wrap}
+.travou i{color:var(--err)}
 .calou{color:var(--mut);font-size:12px;font-style:italic;margin:4px 0 4px 22px}
 i{display:block;font-size:11px;color:var(--mut);font-style:normal;margin-top:4px}
 .bot.erro i{color:var(--err)}

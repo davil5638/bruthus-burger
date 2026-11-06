@@ -32,11 +32,30 @@ const path    = require("path");
 
 const painel   = require("./painel");
 const pedidos  = require("./pedidoEmCurso");
-const criarPedido = require("./scripts/criarPedido");
-const cardapio = require("./scripts/cardapio");
-const loja     = require("./scripts/loja");
-const olaclick = require("./scripts/olaclickApi");
 const respostas = require("./respostas");
+
+// Os módulos compartilhados com o resto do sistema ficam em dois lugares
+// diferentes: no container, copiados para o lado do index.js
+// (/app/scripts); no repositório, na raiz (../../scripts). Aceitar os
+// dois é o que permite ensaiar a conversa local, com `node
+// infra/bot/testarConversa.js`, sem copiar pasta nenhuma.
+//
+// O catch é estreito de propósito: só engole "não achei ESTE caminho".
+// Erro DENTRO do módulo tem que estourar, não virar outro require.
+function compartilhado(nome) {
+  const aqui = `./scripts/${nome}`;
+  try {
+    return require(aqui);
+  } catch (e) {
+    if (e.code !== "MODULE_NOT_FOUND" || !String(e.message).includes(aqui)) throw e;
+    return require(`../../scripts/${nome}`);
+  }
+}
+
+const criarPedido = compartilhado("criarPedido");
+const cardapio = compartilhado("cardapio");
+const loja     = compartilhado("loja");
+const olaclick = compartilhado("olaclickApi");
 
 const PORTA        = Number(process.env.PORTA || 3000);
 const RESPONDER    = process.env.RESPONDER === "1";
@@ -216,6 +235,74 @@ function idsDasEscolhas(item) {
   return [idModificador(item.coca), idModificador(item.batataNome)].filter(Boolean);
 }
 
+// ──────────────────────────────────────────────
+// A resposta do cliente a uma pergunta que o bot fez.
+//
+// Ele pode responder só parte ("zero", sem o tamanho), então o que já se
+// sabia é preservado e o que ainda falta continua pendente.
+// ──────────────────────────────────────────────
+// Devolve true quando a mensagem foi consumida como RESPOSTA. Nesse caso
+// ela não pode ser lida outra vez como pedido novo: "lata normal" entrava
+// como a coca certa e, na mesma passada, virava uma pergunta nova ("qual
+// desses? Coca-Cola Normal 1L"), que travava a conversa para sempre.
+function responderPendencia(p, texto, n) {
+  const q = (p.perguntas || [])[0];
+  if (!q) return false;
+
+  if (q.tipo === "coca") {
+    const tamanho = q.tamanho || cardapio.lerTamanhoCoca(n);
+    const versao = q.versao || cardapio.lerVersaoCoca(n);
+    if (tamanho && versao) {
+      const item = (cardapio.COCAS[tamanho] || {})[versao];
+      if (item) {
+        p.itens.push({ ...item, qtd: q.qtd || 1 });
+        p.perguntas.shift();
+        return true;
+      }
+    }
+    // Respondeu metade: guarda a metade e segue perguntando a outra.
+    const avancou = Boolean((tamanho && !q.tamanho) || (versao && !q.versao));
+    q.tamanho = tamanho || null;
+    q.versao = versao || null;
+    q.falta = tamanho ? "versao" : "tamanho";
+    if (avancou) return true;
+    // Não respondeu nada do que foi perguntado. Duas vezes assim é hora
+    // de chamar o dono, não de perguntar uma terceira.
+    q.tentativas = (q.tentativas || 0) + 1;
+    return false;
+  }
+
+  if (q.tipo === "qual_item") {
+    const achado = cardapio.buscarItem(texto);
+    if (achado && achado.confianca === "alta") {
+      p.itens.push({ ...achado.item, qtd: q.qtd || 1 });
+      p.perguntas.shift();
+      return true;
+    }
+    q.tentativas = (q.tentativas || 0) + 1;
+  }
+  return false;
+}
+
+// Pergunta que o cliente já tentou responder duas vezes e não saiu do
+// lugar: insistir uma terceira irrita e não resolve. Chama o dono.
+function pendenciaEmpacou(p) {
+  return (p.perguntas || []).some((q) => (q.tentativas || 0) >= 2);
+}
+
+// Palavras que só aparecem em endereço. Sem elas, o bot não tem como
+// saber se "233" é número de casa ou quantidade de hambúrguer.
+const RUA = /\b(rua|r|av|avenida|travessa|tv|praca|sitio|estrada|rodovia|conjunto|cond|condominio|loteamento|lot|beco|alameda|bairro|proximo|perto|frente)\b/;
+
+function pareceEndereco(texto, falta, achados) {
+  // Se achou item na frase, é pedido, não endereço.
+  if (achados.itens.length || achados.perguntas.length) return false;
+  if (RUA.test(cardapio.normalizar(texto))) return true;
+  // O bot ACABOU de pedir o endereço: a resposta é o endereço, mesmo
+  // escrita sem "rua".
+  return falta[0] === "endereco" && /\d/.test(texto) && texto.trim().split(/\s+/).length >= 2;
+}
+
 async function tratarPedidoEmCurso(msg, texto, estado) {
   const p = pedidos.pegar(msg.conversa);
   if (!p) return null;
@@ -278,6 +365,10 @@ async function tratarPedidoEmCurso(msg, texto, estado) {
   // Preenche o que o cliente acabou de dizer.
   const falta = pedidos.oQueFalta(p);
 
+  // A resposta de uma pergunta que o bot fez vem antes de tudo: é o
+  // cliente destravando o pedido.
+  const eraResposta = responderPendencia(p, texto, n);
+
   if (falta.includes("coca")) {
     const coca = lerCoca(n);
     if (coca) p.itens.filter((i) => i.cat === "combo" && !i.coca).forEach((i) => { i.coca = coca; });
@@ -286,11 +377,28 @@ async function tratarPedidoEmCurso(msg, texto, estado) {
   if (batata) p.itens.filter((i) => i.cat === "combo").forEach((i) => {
     if (!i.batataNome) { i.batataNome = batata.nome; i.batataExtra = batata.extra; }
   });
+  // Itens novos na mesma conversa — e o que ficou em dúvida neles.
+  // Mensagem que JÁ foi usada como resposta não é lida como pedido novo.
+  const achados = eraResposta ? { itens: [], perguntas: [] } : cardapio.buscarItens(texto);
+
   if (!p.bairro) {
     const b = cardapio.taxaBairro(texto);
-    // Só aceita como endereço se reconheceu o bairro: endereço sem bairro
-    // vira taxa zerada e o dono descobre no caixa.
-    if (b) { p.bairro = b; p.endereco = texto.trim().slice(0, 191); }
+    if (b) {
+      p.bairro = b;
+      // A rua pode ter vindo numa mensagem anterior. Junta as duas em vez
+      // de guardar só o bairro — o entregador precisa da rua.
+      const rua = p.enderecoTexto;
+      p.endereco = (rua && !cardapio.normalizar(rua).includes(cardapio.normalizar(b.bairro))
+        ? `${rua}, ${texto.trim()}`
+        : texto.trim()).slice(0, 191);
+    } else if (!p.enderecoTexto && pareceEndereco(texto, falta, achados)) {
+      // Bairro não reconhecido NÃO significa endereço inválido. Guarda a
+      // rua e pergunta só o bairro. Antes o endereço inteiro era jogado
+      // fora aqui, o bot repetia a mesma pergunta, a trava anti-repetição
+      // calava, e o cliente ficava sem resposta — pedido do Renan,
+      // 05/11/2026.
+      p.enderecoTexto = texto.trim().slice(0, 191);
+    }
   }
   if (!p.pagamento) {
     const pg = lerPagamento(n);
@@ -301,10 +409,17 @@ async function tratarPedidoEmCurso(msg, texto, estado) {
     if (t !== null) p.troco = t;
   }
 
-  // Mais algum item na mesma conversa?
-  const maisUm = cardapio.buscarItem(texto);
-  if (maisUm && maisUm.confianca === "alta" && !p.itens.some((i) => i.id === maisUm.item.id)) {
-    p.itens.push({ ...maisUm.item, qtd: 1 });
+  // Mais algum item na mesma conversa? Agora lê VÁRIOS por mensagem e
+  // respeita a quantidade — "1 calabresa e 1 coca 1l" perdia a calabresa.
+  for (const achado of achados.itens) {
+    if (!p.itens.some((i) => i.id === achado.item.id)) {
+      p.itens.push({ ...achado.item, qtd: achado.qtd });
+    }
+  }
+  // Item que o bot não tem certeza de qual é vira pergunta, não palpite
+  // e não silêncio.
+  for (const q of achados.perguntas) {
+    if (!p.perguntas.some((a) => a.tipo === q.tipo && a.consulta === q.consulta)) p.perguntas.push(q);
   }
 
   pedidos.guardar(msg.conversa, p);
@@ -316,7 +431,7 @@ async function tratarPedidoEmCurso(msg, texto, estado) {
       intencao: "tomando_pedido",
       falta: aindaFalta,
       acao: "pergunta: " + aindaFalta[0],
-      mensagem: pedidos.perguntar(aindaFalta, p, conta),
+      mensagem: pedidos.perguntar(aindaFalta, p, conta, cardapio),
     };
   }
 
@@ -342,8 +457,16 @@ async function tratarPedidoEmCurso(msg, texto, estado) {
 // ──────────────────────────────────────────────
 // O que o bot entendeu e o que faria.
 // ──────────────────────────────────────────────
-async function decidir(texto, msg) {
-  const estado = await estadoDaLoja().catch(() => null);
+// `estadoInjetado` existe só para o ensaio de conversa poder fixar a
+// loja como aberta. Em operação ninguém passa esse argumento.
+//
+// Sem ele o ensaio era uma ilusão: ele passava na minha máquina porque a
+// chamada ao OlaClick falhava sem token e o `catch` devolvia null, que o
+// código trata como loja aberta. Na VM, com token, a loja respondia
+// "fechada" às 12h e os mesmos arquivos davam 18 falhas. Teste que passa
+// por acidente é pior do que teste nenhum.
+async function decidir(texto, msg, estadoInjetado) {
+  const estado = estadoInjetado || await estadoDaLoja().catch(() => null);
 
   // Já existe um pedido sendo tomado nesta conversa? Então o que o
   // cliente acabou de dizer é resposta a uma pergunta minha — endereço,
@@ -504,28 +627,59 @@ async function decidir(texto, msg) {
   }
 
   // 4. Pediu alguma coisa do cardápio.
+  //
+  // A leitura é da mensagem INTEIRA, pedaço por pedaço. O portão antigo
+  // usava um `buscarItem` da frase toda e exigia confiança alta: "quero 2
+  // smash bruthus e uma coca 600 zero" caía em confiança baixa, porque a
+  // frase mistura dois itens, e o bot calava — com dois itens claríssimos
+  // dentro dela.
+  const tudo = cardapio.buscarItens(texto);
   const achado = cardapio.buscarItem(texto);
-  if (achado) {
+  if (achado || tudo.itens.length || tudo.perguntas.length) {
     const fora = estado?.indisponiveis?.nomes || [];
-    const esgotado = fora.some((f) => cardapio.normalizar(f) === cardapio.normalizar(achado.item.nome));
+    const nomesPedidos = tudo.itens.map((i) => i.item.nome).concat(achado ? [achado.item.nome] : []);
+    const esgotado = fora.some((f) => nomesPedidos.some((nome) => cardapio.normalizar(f) === cardapio.normalizar(nome)));
 
     // Loja aberta, item identificado com certeza e disponível: começa a
     // tomar o pedido. É a dor que o dono quer resolver — hoje ele lê a
     // conversa e digita tudo no OlaClick na mão.
-    if (!avisoFechado && !esgotado && achado.confianca === "alta") {
+    //
+    // Pergunta pendente também abre pedido: "1 coca" não dá para
+    // cadastrar, mas dá para PERGUNTAR qual — e é o que o dono pediu.
+    const temCerteza = tudo.itens.length > 0 || tudo.perguntas.length > 0
+      || (achado && achado.confianca === "alta");
+
+    if (!avisoFechado && !esgotado && temCerteza) {
       const p = pedidos.abrirOuPegar(msg.conversa);
-      p.itens.push({ ...achado.item, qtd: 1 });
+      const itens = tudo.itens.length
+        ? tudo.itens
+        : (achado && achado.confianca === "alta" ? [{ item: achado.item, qtd: 1 }] : []);
+      for (const i of itens) {
+        if (!p.itens.some((j) => j.id === i.item.id)) p.itens.push({ ...i.item, qtd: i.qtd });
+      }
+      for (const q of tudo.perguntas) p.perguntas.push(q);
       pedidos.guardar(msg.conversa, p);
       const falta = pedidos.oQueFalta(p);
       return {
         intencao: "tomando_pedido",
-        item: achado.item.nome,
-        preco: achado.item.preco,
+        itens: p.itens.map((i) => `${i.qtd}x ${i.nome}`),
         falta,
         acao: "começou a tomar o pedido; pergunta: " + falta[0],
-        mensagem: pedidos.perguntar(falta, p, pedidos.somar(p, cardapio)),
+        mensagem: pedidos.perguntar(falta, p, pedidos.somar(p, cardapio), cardapio),
       };
     }
+    // Chegou aqui sem item resolvido (loja fechada e só dúvida na
+    // frase, por exemplo). Não dá para falar de preço do que não se
+    // sabe qual é — e `achado.item` aqui embaixo seria crash.
+    if (!achado) {
+      return {
+        intencao: "duvida",
+        loja: avisoFechado || undefined,
+        acao: "não deu para identificar o item; responde o que sabe",
+        mensagem: avisoFechado ? textoFechado() : respostas.vouVerificar(),
+      };
+    }
+
     return {
       intencao: "pedido_escrito",
       item: achado.item.nome,
@@ -786,15 +940,37 @@ app.post("/webhook/evolution", async (req, res) => {
       delete leitura.mensagem;
     }
 
+    // Calar no meio de um pedido em curso NÃO é a mesma coisa que calar
+    // numa conversa solta.
+    //
+    // Sem esta distinção, foi o que aconteceu com o pedido do Renan em
+    // 05/11/2026: o bot ia repetir "me passa o endereço", a trava
+    // engoliu a repetição, e ninguém soube — nem o cliente, que ficou
+    // sem resposta, nem o dono, que não recebeu aviso. Pedido morreu em
+    // silêncio.
+    //
+    // Repetir a mesma frase enquanto há pedido aberto significa que o bot
+    // está rodando em círculo. Aí é exatamente a hora de chamar o dono.
+    const travou = Boolean(leitura.repetida) && Boolean(pedidos.pegar(msg.conversa));
+    if (travou) {
+      leitura.acao = "TRAVOU num pedido em curso: ia repetir a mesma pergunta. Assume você.";
+      leitura.escalar = true;
+    }
+
     // Responde, cala, ou chama o dono.
     const responde = podeResponder(leitura) && Boolean(leitura.mensagem);
-    leitura.decisao = responde ? "responde" : (leitura.repetida ? "calou" : "chama_o_dono");
+    leitura.decisao = responde
+      ? "responde"
+      : travou ? "travou" : (leitura.repetida ? "calou" : "chama_o_dono");
 
-    // Repetição silenciada NÃO é pedido de ajuda: o bot sabia a resposta
-    // e escolheu não repetir. Alertar aqui enchia o dono de aviso de
-    // coisa resolvida — e foi o que aconteceu no primeiro teste dele, que
-    // pareceu falha do bot quando era decisão correta mal comunicada.
-    const alerta = responde || leitura.repetida ? null : await alertarDono(msg, leitura);
+    // Repetição silenciada FORA de pedido não é pedido de ajuda: o bot
+    // sabia a resposta e escolheu não repetir. Alertar ali enchia o dono
+    // de aviso de coisa resolvida — e foi o que aconteceu no primeiro
+    // teste dele, que pareceu falha quando era decisão correta mal
+    // comunicada.
+    const alerta = responde || (leitura.repetida && !travou)
+      ? null
+      : await alertarDono(msg, leitura);
 
     // Pedido criado: o dono precisa saber na hora, mesmo sem ter sido
     // chamado. É venda entrando, não problema — e ele vai querer olhar o
@@ -1059,6 +1235,15 @@ app.get("/observacao", (req, res) => {
   }
 });
 
-app.listen(PORTA, () => {
-  console.log(`Atendente na porta ${PORTA} — modo ${RESPONDER ? "RESPONDENDO" : "observação"}`);
-});
+// Só sobe o servidor quando é o processo principal. Assim o teste de
+// conversa (`node infra/bot/testarConversa.js`) consegue exercitar a
+// decisão sem abrir porta, sem webhook e sem mandar mensagem para
+// ninguém — era o que faltava para ensaiar um pedido inteiro fora do
+// horário da loja, em vez de testar na noite de operação.
+if (require.main === module) {
+  app.listen(PORTA, () => {
+    console.log(`Atendente na porta ${PORTA} — modo ${RESPONDER ? "RESPONDENDO" : "observação"}`);
+  });
+}
+
+module.exports = { decidir, tratarPedidoEmCurso, podeResponder, estadoDaLoja };
