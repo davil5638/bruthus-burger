@@ -30,6 +30,7 @@ const axios   = require("axios");
 const fs      = require("fs");
 const path    = require("path");
 
+const painel   = require("./painel");
 const pedidos  = require("./pedidoEmCurso");
 const criarPedido = require("./scripts/criarPedido");
 const cardapio = require("./scripts/cardapio");
@@ -1010,6 +1011,23 @@ app.post("/hooks/olaclick/:segredo", async (req, res) => {
   } catch (e) {
     console.error("[hook olaclick]", e.message);
   }
+});
+
+// ──────────────────────────────────────────────
+// Página para o dono ver o que o bot está respondendo.
+//
+// Ele não consegue ler isso no WhatsApp: no aparelho dele aparece
+// "Aguardando mensagem", o aviso de mensagem que não deu para
+// descriptografar. Chega no cliente; quem fica sem ver é ele — e sem
+// ver não dá para confiar.
+//
+// Atrás do mesmo segredo do webhook: são conversas de cliente.
+// ──────────────────────────────────────────────
+app.get("/painel/:segredo", async (req, res) => {
+  if (req.params.segredo !== (process.env.HOOK_SEGREDO || "")) return res.status(404).end();
+  const estado = await estadoDaLoja().catch(() => null);
+  const dados = painel.agrupar(painel.lerDiario(DIARIO));
+  res.type("html").send(painel.montarHtml(dados, estado));
 });
 
 app.get("/saude", async (req, res) => {

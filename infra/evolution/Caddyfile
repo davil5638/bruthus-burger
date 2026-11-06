@@ -6,6 +6,10 @@
 	# um segredo no final, então não basta descobrir o domínio: sem ele o
 	# bot devolve 200 e não faz nada. O atendente continua sem porta
 	# publicada — só o Caddy o alcança.
+	handle /painel/* {
+		reverse_proxy bot:3000
+	}
+
 	handle /hooks/* {
 		reverse_proxy bot:3000
 	}
