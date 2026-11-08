@@ -1735,7 +1735,7 @@ app.get("/saude", async (req, res) => {
     loja: estado?.situacao || estado,
     indisponiveis: estado?.indisponiveis?.total,
     cardapio: cardapio.CARDAPIO.itens.length,
-    openai: Boolean(OPENAI_KEY),
+    ia_modelo: cerebro.emUso(),
     ia: modoIA.ligada() ? "ligada" : "pausada",
   });
 });

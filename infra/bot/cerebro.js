@@ -464,4 +464,12 @@ if (require.main === module) {
 module.exports = {
   pensar, listaDeItens, itemPorNumero, precosConferem, MODELO,
   usoDeTokens: () => ULTIMO_USO,
+  // Qual IA está REALMENTE no ar agora. O /saude dizia só se havia
+  // chave da OpenAI, o que não é a mesma pergunta: com as duas chaves
+  // presentes, quem responde é o Claude, e o painel dizia "openai".
+  emUso: () => {
+    const p = qualProvedor();
+    if (!p) return "nenhuma (sem chave)";
+    return p === "claude" ? MODELO : MODELO_OPENAI;
+  },
 };
