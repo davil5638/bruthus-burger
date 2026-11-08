@@ -1603,6 +1603,39 @@ const TG_DESLIGAR = ["/semia", "/iaoff", "/pausaria", "/iapausa", "/pausa"];
 const TG_LIGAR    = ["/comia", "/iaon", "/voltaria", "/iavolta", "/volta"];
 const TG_ESTADO   = ["/ia", "/comoesta"];
 
+const TG_AJUDA    = ["/ajuda", "/start", "/help", "/comandos"];
+
+// A ajuda é respondida AQUI, não no Render, por um motivo simples: este
+// processo é o único que conhece os dois lados — os comandos de IA, que
+// são dele, e os de gasto, que ele repassa. Se a lista morasse no
+// Render, ela nunca falaria dos comandos que nem passam por lá.
+//
+// ATENÇÃO A QUEM MEXER DEPOIS: a parte de gastos abaixo é cópia do que
+// scripts/telegramBot.js (Render) aceita. Mudou comando de gasto lá?
+// Muda este texto também, senão a ajuda mente.
+const TG_TEXTO_AJUDA = [
+  "🍔 *Bruthus — comandos do Telegram*",
+  "",
+  "*IA do atendimento*",
+  "/semia — pausa a IA; o bot volta para a regra escrita à mão",
+  "/comia — religa a IA",
+  "/ia — mostra como está agora",
+  "",
+  "*Gastos*",
+  "`150` — registra R$ 150 em Outros",
+  "`200 ingredientes` — registra já na categoria",
+  "`20 45 80` — três despesas de uma vez",
+  "/resumo — faturamento, gastos e lucro dos últimos 7 dias",
+  "",
+  "*Dia a dia*",
+  "/fechado — hoje a loja não abre (ou `/fechado 11/11`)",
+  "/abrir — desfaz o /fechado",
+  "/enviei — confirma que você mandou a lista de recuperação",
+  "",
+  "_Categorias de gasto: ingrediente, embalagem, marketing, funcionario, aluguel, gas, equipamento_",
+].join("\n");
+
+
 function comandoDoTelegram(texto) {
   const primeiro = String(texto || "").trim().split(" ")[0];
   return primeiro.split("@")[0].toLowerCase();
@@ -1626,9 +1659,10 @@ app.post("/hooks/telegram/:segredo", async (req, res) => {
     : TG_LIGAR.includes(cmd) ? true
       : null;
   const soOlhar = TG_ESTADO.includes(cmd);
+  const querAjuda = TG_AJUDA.includes(cmd);
 
   // Não é comando de IA: é assunto do bot de gastos. Repassa e sai.
-  if (quer === null && !soOlhar) {
+  if (quer === null && !soOlhar && !querAjuda) {
     // O Render dorme no plano free: medi 31,7s para ele acordar de vez.
     // Um timeout curto aqui perderia a despesa EM SILÊNCIO — e despesa
     // perdida é número errado no financeiro para sempre. Então espera,
@@ -1652,7 +1686,15 @@ app.post("/hooks/telegram/:segredo", async (req, res) => {
   // ter achado o bot. Fora do chat do dono: ignora em silêncio, sem nem
   // confirmar que o comando existe.
   if (TG_CHAT && chat !== String(TG_CHAT)) {
-    console.error("[telegram] comando de IA recusado, chat", chat);
+    console.error("[telegram] comando recusado, chat", chat);
+    return;
+  }
+
+  // A ajuda fica aqui embaixo da conferência de chat de propósito:
+  // ela sai no chat do DONO, então um estranho mandando /ajuda
+  // encheria o Telegram dele de texto que ele não pediu.
+  if (querAjuda) {
+    await avisarTelegram(TG_TEXTO_AJUDA);
     return;
   }
 

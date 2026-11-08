@@ -98,6 +98,12 @@ async function processarMensagem(msg) {
   }
 
   // ── /start ──
+  // ATENÇÃO: na prática /start e /ajuda não chegam mais aqui. O webhook
+  // do Telegram passa pelo atendente na VM (infra/bot/index.js), que
+  // responde a ajuda ele mesmo, porque é o único que conhece também os
+  // comandos de IA (/semia, /comia). Este texto ficou como reserva: se o
+  // webhook voltar a apontar para o Render, ele volta a valer. Mudou
+  // comando de gasto aqui? Atualize TG_TEXTO_AJUDA lá também.
   if (texto === "/start" || texto === "/ajuda") {
     await enviar(chatId, [
       "🍔 *Bruthus Burger — Bot de Gastos*",
