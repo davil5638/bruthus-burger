@@ -308,6 +308,19 @@ async function perguntarAoOpenAI(sistema, mensagens) {
     },
     { headers: { Authorization: `Bearer ${chaveOpenAI()}` }, timeout: TIMEOUT }
   );
+  // A conta do mês sai daqui. Sem registrar o uso, "quanto vou gastar"
+  // só teria resposta por chute — e a OpenAI devolve o número exato em
+  // toda chamada. `cached_tokens` é o desconto automático da OpenAI para
+  // prefixo repetido (o cardápio e as regras, idênticos toda noite):
+  // custa metade do token de entrada normal.
+  const u = r.data?.usage || {};
+  ULTIMO_USO = {
+    provedor: "openai",
+    modelo: MODELO_OPENAI,
+    entrada: u.prompt_tokens,
+    cacheLido: u.prompt_tokens_details?.cached_tokens || 0,
+    saida: u.completion_tokens,
+  };
   return r.data?.choices?.[0]?.message?.content || "";
 }
 
