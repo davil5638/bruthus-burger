@@ -256,10 +256,78 @@ function qualDeles(opcoes) {
   return `Só pra confirmar, qual desses? 🤔\n\n${opcoes.slice(0, 3).map((o, i) => `${i + 1}. ${o}`).join("\n")}`;
 }
 
+// ──────────────────────────────────────────────
+// "MANDA O CARDÁPIO"
+//
+// Quatro pessoas pediram isso nas duas primeiras noites — "me envia o
+// cardápio", "Cardápio", "Qual cardápio?", "Manda o cardápio por favor"
+// — e o bot não respondeu NENHUMA. É o pedido mais simples que existe e
+// a resposta é um link que ele já tinha na mão.
+// ──────────────────────────────────────────────
+function cardapio() {
+  return `${sortear([
+    "Claro! Nosso cardápio tá aqui 👇",
+    "Segue o cardápio 👇",
+    "Tá aqui o cardápio 👇",
+  ])}
+
+🔗 ${LINK}
+
+${sortear([
+  "Qualquer dúvida é só chamar 🙌",
+  "Se precisar de ajuda pra escolher, me fala 🙌",
+])}`;
+}
+
+// ──────────────────────────────────────────────
+// "QUAIS AS OPÇÕES DE PIZZA?"
+//
+// Regra do dono: manda o cardápio normal e AVISA que as pizzas também
+// estão no link. Antes isso virava pedido: "pizza" casava com confiança
+// baixa em "Pizza Metade/Metade" e o bot pedia para a cliente escolher
+// numa lista de um item só. Ela respondeu "Sim" e o pedido travou.
+//
+// Pergunta sobre o cardápio é informação, não pedido.
+// ──────────────────────────────────────────────
+function pizzas() {
+  return `${sortear([
+    "Temos pizza sim! 🍕",
+    "Fazemos pizza sim 🍕",
+  ])}
+
+Dá uma olhada no cardápio 👇
+🔗 ${LINK}
+
+_As pizzas estão nesse mesmo link, junto com os hambúrgueres_ 🍕🍔
+
+🍕 Produção limitada por dia — se não aparecer no cardápio, é porque já esgotou.`;
+}
+
+// Elogio. "Deliciosa batata viu" virava "qual desses? • Batata Frita
+// Pequena • Batata Frita Média" — o bot lia elogio como pedido.
+function elogio() {
+  return sortear([
+    "Que bom que gostou! 🙌🔥",
+    "Aaah que bom! Obrigado 🙌",
+    "Fico feliz que gostou! 🔥 Volta sempre 🙌",
+  ]);
+}
+
+// "Obrigada", "valeu", "tmj". Fechar a conversa é educação, e custa uma
+// linha — o bot chamava o dono para isso.
+function disponha() {
+  return sortear([
+    "Disponha! 🙌",
+    "Qualquer coisa é só chamar 🙌",
+    "Tamo junto! 🍔",
+  ]);
+}
+
 module.exports = {
   LOJA, LINK,
   boasVindas, ausencia, pausado, esgotado, massaAcabou,
   pix, agradecimento, status, qualDeles,
   jaEncerramos, endereco, tempoEntrega, vouVerificar, ENDERECO,
+  cardapio, pizzas, disponha, elogio,
   temPix: () => Boolean(PIX_CHAVE),
 };

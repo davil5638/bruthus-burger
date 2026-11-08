@@ -174,6 +174,34 @@ const RAMO_PAGAMENTO = {
 };
 
 // ──────────────────────────────────────────────
+// A FORMA DE PAGAMENTO ESTÁ NA PRÓPRIA MENSAGEM
+//
+// O pedido que o cliente reenvia pelo WhatsApp (botão do OlaClick) traz
+// o pagamento escrito no fim:
+//
+//   *Total a pagar: R$ 84,97*
+//   Cartão 84.97
+//
+//   *Total a pagar: R$ 28,99*
+//   PIX 28.99
+//   Por favor, enviar o comprovante via whatsapp
+//
+// O código ia buscar isso na API, em `payments[0]`, e ali ainda não tem
+// nada: a própria mensagem diz "Estado do pagamento: Não pago". Nas duas
+// noites de operação deu `pagamento: null` em TODOS os 26 pedidos — 10
+// de Pix ficaram sem a chave, e o dono mandou as 10 na mão.
+//
+// Ler do texto resolve porque é dali que a informação vem: foi o
+// OlaClick que escreveu, no formato dele.
+function pagamentoNoTexto(texto) {
+  const n = cardapio.normalizar(texto);
+  if (/\bpix\b/.test(n)) return "pix";
+  if (/\bcart(ao|ão)\b|\bcredito\b|\bdebito\b|\bmaquin/.test(n)) return "card";
+  if (/\bdinheiro\b|\bespecie\b/.test(n)) return "cash";
+  return null;
+}
+
+// ──────────────────────────────────────────────
 // TOMAR O PEDIDO
 //
 // É a maior dor do dono: hoje ele lê a conversa, abre o OlaClick e
@@ -288,6 +316,39 @@ function responderPendencia(p, texto, n) {
 // lugar: insistir uma terceira irrita e não resolve. Chama o dono.
 function pendenciaEmpacou(p) {
   return (p.perguntas || []).some((q) => (q.tentativas || 0) >= 2);
+}
+
+// ──────────────────────────────────────────────
+// É PERGUNTA OU É PEDIDO?
+//
+// A diferença decide se o bot informa ou se abre pedido, e errar isso
+// foi o que produziu a pior conversa das duas primeiras noites.
+// ──────────────────────────────────────────────
+const PERGUNTA = /\?|\b(quais|qual|quantos|quanto|tem|teria|voce tem|vc tem|oq|o que|opcoes|opcao|sabores|cardapio|menu|fazendo|faz)\b/;
+
+function ehPergunta(n) {
+  return PERGUNTA.test(n);
+}
+
+// Sinal de que a pessoa está PEDINDO, não perguntando.
+const QUER_PEDIR = /\b(quero|queria|vou querer|vou de|manda|mandar|me ve|me da|pode mandar|bora|fechou|anota|vai ser)\b/;
+
+// ──────────────────────────────────────────────
+// SAUDAÇÃO, com a folga que a vida real exige.
+//
+// A regex antiga exigia a frase exata e nada mais, então "Boa noitee"
+// (com dois e) e "Boa noite meu patrão" caíam em "não entendi" e
+// chamavam o dono. Abrir conversa é o caso mais comum que existe: 135
+// das conversas do histórico começam só com um cumprimento.
+// ──────────────────────────────────────────────
+const SAUDACAO = /\b(oi+|ol+a+|al+o+|opa+|bo[am]\s*(dia|tarde|noite)s?e*|e\s*ai|eai)\b/g;
+const RESTO_INOFENSIVO = /^(meu\s+)?(patrao|chefe|amigo|amiga|moco|moca|senhor|senhora|tudo\s+bem|td\s+bem|beleza|blz|boa|boas|ai|pessoal|galera|\W|\s)*$/;
+
+function ehSaudacao(n) {
+  SAUDACAO.lastIndex = 0;
+  if (!SAUDACAO.test(n)) return false;
+  const resto = n.replace(SAUDACAO, " ").replace(/\s+/g, " ").trim();
+  return RESTO_INOFENSIVO.test(resto);
 }
 
 // O que oferecer quando o pedido do cliente acabou.
@@ -540,27 +601,38 @@ async function decidir(texto, msg, estadoInjetado) {
   }
 
   if (codigo) {
+    // O TEXTO MANDA, a API é só complemento.
+    //
+    // Quem escreveu a forma de pagamento aqui foi o próprio OlaClick, no
+    // formato dele. A API, nesse instante, ainda não tem pagamento
+    // lançado — por isso o `payments[0]` dava null nas 26 vezes das duas
+    // primeiras noites. Então: lê do texto, e a API fica para o total.
+    const forma = pagamentoNoTexto(texto);
+
+    // Pix pede a chave e o comprovante; cartão e dinheiro só agradecem.
+    const mensagem = forma === "pix"
+      ? respostas.pix()
+      : forma ? respostas.agradecimento() : null;
+
+    let total = null;
     try {
       // Pelo código público, não pelo UUID: `/orders/{BR-x}` devolve 422.
       const pedido = await olaclick.buscarPedidoPorCodigo(codigo);
-      if (!pedido) return { intencao: "pedido_pelo_botao", pedido: codigo, erro: "não achei esse pedido" };
-      const forma = pedido?.payments?.[0]?.payment_method?.code || null;
-      // Pix pede a chave e o comprovante; cartão e dinheiro só agradecem.
-      const mensagem = forma === "pix"
-        ? respostas.pix()
-        : forma ? respostas.agradecimento() : null;
-
-      return {
-        intencao: "pedido_pelo_botao",
-        pedido: codigo,
-        total: pedido?.total,
-        pagamento: forma,
-        acao: forma ? RAMO_PAGAMENTO[forma] : "forma de pagamento ainda não definida",
-        mensagem,
-      };
-    } catch (e) {
-      return { intencao: "pedido_pelo_botao", pedido: codigo, erro: e.message };
+      total = pedido?.total ?? null;
+    } catch {
+      // A consulta é enfeite: o que o cliente precisa receber já está
+      // decidido pelo texto. Antes, uma falha aqui engolia a resposta
+      // inteira e o cliente ficava sem nada.
     }
+
+    return {
+      intencao: "pedido_pelo_botao",
+      pedido: codigo,
+      total,
+      pagamento: forma,
+      acao: forma ? RAMO_PAGAMENTO[forma] : "forma de pagamento não escrita na mensagem",
+      mensagem,
+    };
   }
 
   // Como avisar que não dá para pedir agora. NÃO é resposta sozinha: no
@@ -636,8 +708,70 @@ async function decidir(texto, msg, estadoInjetado) {
     };
   }
 
+  // ──────────────────────────────────────────────
+  // PERGUNTA SOBRE O CARDÁPIO É INFORMAÇÃO, NÃO PEDIDO
+  //
+  // Isto vem ANTES do casamento de item de propósito. Sem essa ordem,
+  // "Quais as opções de pizza ?" casava com confiança baixa em "Pizza
+  // Metade/Metade", abria um pedido e pedia para a cliente escolher numa
+  // lista de um item. Ela respondeu "Sim", o pedido travou e o dono foi
+  // chamado — conversa da Priscila, 07/11/2026 23:34.
+  // ──────────────────────────────────────────────
+
+  // "me envia o cardápio", "Cardápio", "Qual cardápio?", "Manda o
+  // cardápio por favor" — quatro vezes nas duas primeiras noites, zero
+  // respostas.
+  if (/\bcardapio\b|\bmenu\b/.test(n)) {
+    return {
+      intencao: "pergunta_cardapio",
+      loja: avisoFechado || undefined,
+      acao: "manda o link do cardápio",
+      mensagem: respostas.cardapio() + (avisoFechado ? `\n\n${textoFechado()}` : ""),
+    };
+  }
+
+  // Pergunta sobre pizza. Regra do dono: manda o cardápio normal e avisa
+  // que as pizzas também estão no link.
+  //
+  // Mas se a massa acabou, a mensagem de esgotado ganha — essa o dono
+  // viu funcionando e aprovou, e dizer "temos pizza sim" com a massa
+  // acabada seria uma piora.
+  if (/\bpizza/.test(n) && ehPergunta(n)) {
+    const massaAcabou = Boolean(estado?.indisponiveis?.massaAcabou);
+    return {
+      intencao: massaAcabou ? "pizza_esgotada" : "pergunta_cardapio",
+      loja: avisoFechado || undefined,
+      acao: massaAcabou
+        ? "avisa que a massa acabou"
+        : "manda o cardápio e avisa que as pizzas estão no mesmo link",
+      mensagem: massaAcabou
+        ? respostas.massaAcabou()
+        : respostas.pizzas() + (avisoFechado ? `\n\n${textoFechado()}` : ""),
+    };
+  }
+
+  // Elogio. Vem ANTES do casamento de item: "Deliciosa batata viu" tem a
+  // palavra "batata" e virava "qual desses? Pequena ou Média?".
+  if (/\b(delicios[ao]|maravilhos[ao]|otim[ao]|excelente|amei|adorei|perfeit[ao]|top|sensacional|muito bo[am])\b/.test(n)
+      && !QUER_PEDIR.test(n)) {
+    return {
+      intencao: "elogio",
+      acao: "agradece o elogio",
+      mensagem: respostas.elogio(),
+    };
+  }
+
+  // "Obrigada", "valeu". O bot chamava o dono para isso.
+  if (/^(obrigad[oa]|valeu|vlw|tmj|brigad[oa]|grat[oa])\b[\s\S]{0,12}$/.test(n)) {
+    return {
+      intencao: "agradecimento_cliente",
+      acao: "responde o agradecimento",
+      mensagem: respostas.disponha(),
+    };
+  }
+
   // 3. Só um cumprimento. 135 conversas abriram assim.
-  if (/^(oi+|ola|alo|opa|bo[am]\s+(dia|tarde|noite)|e\s*ai)[\s!,.]*$/.test(n)) {
+  if (ehSaudacao(n)) {
     return {
       intencao: "saudacao",
       loja: avisoFechado || undefined,
@@ -666,9 +800,16 @@ async function decidir(texto, msg, estadoInjetado) {
     // tomar o pedido. É a dor que o dono quer resolver — hoje ele lê a
     // conversa e digita tudo no OlaClick na mão.
     //
-    // Pergunta pendente também abre pedido: "1 coca" não dá para
-    // cadastrar, mas dá para PERGUNTAR qual — e é o que o dono pediu.
-    const temCerteza = tudo.itens.length > 0 || tudo.perguntas.length > 0
+    // Pergunta pendente abre pedido SÓ quando a pessoa está pedindo.
+    //
+    // "1 coca" não dá para cadastrar, mas dá para perguntar qual — e é o
+    // que o dono pediu. Já "Quais as opções de pizza ?" é pergunta: abrir
+    // pedido ali virou a pior conversa das duas primeiras noites.
+    // O que separa os dois é o sinal de pedido (quantidade, "quero",
+    // "manda") e a ausência de interrogação.
+    const querPedir = QUER_PEDIR.test(n) || /\d/.test(n);
+    const temCerteza = tudo.itens.length > 0
+      || (tudo.perguntas.length > 0 && querPedir && !ehPergunta(n))
       || (achado && achado.confianca === "alta");
 
     if (!avisoFechado && !esgotado && temCerteza) {
@@ -736,7 +877,24 @@ async function decidir(texto, msg, estadoInjetado) {
   const bairro = cardapio.taxaBairro(texto);
   if (bairro) return { intencao: "endereco", bairro: bairro.bairro, taxa: bairro.taxa };
 
-  if (/\b(pix|cartao|dinheiro|debito|credito|troco)\b/.test(n)) {
+  // Falou de Pix fora de um pedido em curso: a resposta é a chave.
+  //
+  // Nas duas primeiras noites isto chamou o dono cinco vezes — "Vai ser
+  // pix viu", "O pix", "Tu tem uma chave Pix de CPF ou celular ?", "O
+  // nome do pix é vitória régia?". A chave já estava aqui, e o bloco que
+  // o bot manda traz o nome junto, que responde as três perguntas.
+  //
+  // Mandar a chave nunca atrapalha: no pior caso o cliente já tinha.
+  if (/\bpix\b/.test(n) && respostas.temPix()) {
+    return {
+      intencao: "pagamento_pix",
+      loja: avisoFechado || undefined,
+      acao: "manda a chave do Pix",
+      mensagem: respostas.pix() + (avisoFechado ? `\n\n${textoFechado()}` : ""),
+    };
+  }
+
+  if (/\b(cartao|dinheiro|debito|credito|troco)\b/.test(n)) {
     return { intencao: "pagamento", loja: avisoFechado || undefined };
   }
   // "vocês estão recebendo pedidos?" caiu em nao_entendi na primeira noite
@@ -749,8 +907,16 @@ async function decidir(texto, msg, estadoInjetado) {
       loja: avisoFechado || undefined,
       acao: avisoFechado
         ? `responde a dúvida e avisa: ${avisoFechado}`
-        : "responde com o que sabe da loja e do cardápio",
-      mensagem: avisoFechado ? textoFechado() : undefined,
+        : "confirma que está aberto e manda o cardápio",
+      // COM A LOJA ABERTA isto devolvia `undefined` e o bot calava.
+      //
+      // "Ainda faz entrega ?", "Ainda consigo fazer pedido?" — a
+      // pergunta é se dá para pedir AGORA, e a resposta é sim. Ficar
+      // calado justamente quando a resposta é boa é o pior jeito de
+      // errar: a pessoa estava com o dinheiro na mão.
+      mensagem: avisoFechado
+        ? textoFechado()
+        : `Estamos abertos sim! 🔥\n\nFunciona até às 23:00. Pedido pelo link 👇\n🔗 ${respostas.LINK}`,
     };
   }
 
@@ -791,6 +957,13 @@ const PODE_RESPONDER = new Set([
   "endereco",             // bairro reconhecido, taxa conhecida
   "consulta_de_local",    // o dono mandando o código do pedido
   "nao_entendi_loja_fechada",
+  // Perguntas simples que o bot deixava sem resposta e passava para o
+  // dono: pediram o cardápio quatro vezes nas duas primeiras noites.
+  "pergunta_cardapio",
+  "pizza_esgotada",
+  "agradecimento_cliente",
+  "elogio",
+  "pagamento_pix",
   // O fluxo de pedido: o bot conduz e so cria depois do "sim".
   "tomando_pedido",
   "confirmando_pedido",

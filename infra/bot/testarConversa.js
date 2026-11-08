@@ -357,6 +357,154 @@ async function ensaiar(titulo, conversa, turnos, estadoLoja = LOJA_ABERTA) {
     { diz: "quero uma pizza meia calabresa meia frango", naoPode: /^1x Calabrese\n\*R\$ 49,00\*/ },
   ]);
 
+  // ──────────────────────────────────────────────
+  // AS CONVERSAS REAIS DAS NOITES DE 06 E 07/11/2026
+  //
+  // Copiadas do diário, palavra por palavra, incluindo o "e" a mais em
+  // "Boa noitee". O dono leu essas noites e resumiu: "o bot tá horrível,
+  // não consegue responder coisas simples". Estava certo.
+  // ──────────────────────────────────────────────
+
+  // A pior delas: pergunta sobre cardápio virava pedido e travava.
+  await ensaiar(
+    "Priscila, 07/11 23:34 — pergunta de pizza NÃO é pedido",
+    "ensaio-priscila@lid",
+    [
+      {
+        diz: "Boa noite \nQuais as opções de pizza ?",
+        esperar: /cardapio|cardápio|pizza/i,
+        naoPode: /qual desses|Metade\/Metade/i,
+        naoPodeCalar: true,
+      },
+      // Antes, este "Sim" caía em TRAVOU e chamava o dono.
+      { diz: "Sim", naoPode: /qual desses/i },
+    ],
+    await lojaEm("saturday", "20:34"),
+  );
+
+  // Com a massa acabada, a mensagem de esgotado tem que ganhar — essa o
+  // dono viu funcionando e aprovou. Não pode virar "temos pizza sim".
+  await ensaiar(
+    "Pergunta de pizza com a massa acabada — avisa que acabou",
+    "ensaio-pizza-fora@lid",
+    [{ diz: "Ta fazendo pizza hoje?", esperar: /acabaram|massa/i, naoPode: /Temos pizza sim|Fazemos pizza sim/i, naoPodeCalar: true }],
+    await lojaEm("saturday", "20:00", { fora: ["Calabrese", "Margherita"], massaAcabou: true }),
+  );
+
+  // Quatro pessoas pediram o cardápio e o bot não respondeu nenhuma.
+  for (const frase of ["me envia o cardápio", "Cardápio", "Qual cardápio?", "Manda o cardápio por favor"]) {
+    await ensaiar(
+      `Cardápio: "${frase}"`,
+      `ensaio-cardapio-${frase.length}@lid`,
+      [{ diz: frase, esperar: /ola\.click|cardápio/i, naoPodeCalar: true }],
+      await lojaEm("saturday", "20:00"),
+    );
+  }
+
+  // Saudações que a regex antiga não aceitava.
+  for (const frase of ["Boa noitee", "Boa noite meu patrão", "boa noite", "Oiii", "opa"]) {
+    await ensaiar(
+      `Saudação: "${frase}"`,
+      `ensaio-saud-${frase.length}@lid`,
+      [{ diz: frase, esperar: /bem-vindo|cardápio|ola\.click/i, naoPodeCalar: true }],
+      await lojaEm("saturday", "20:00"),
+    );
+  }
+
+  await ensaiar(
+    "Agradecimento no fim da conversa",
+    "ensaio-obrigada@lid",
+    [{ diz: "Obrigada", naoPodeCalar: true }],
+    await lojaEm("saturday", "20:00"),
+  );
+
+  // Elogio virava pedido: "Deliciosa batata viu" → "qual desses?
+  // Batata Frita Pequena / Média".
+  await ensaiar(
+    "Elogio não é pedido",
+    "ensaio-elogio@lid",
+    [{ diz: "Deliciosa batata viu", naoPode: /qual desses/i, naoPodeCalar: true }],
+    await lojaEm("saturday", "20:00"),
+  );
+
+  // Perguntas de Pix: a chave responde todas, e ela já estava aqui.
+  for (const frase of ["Vai ser pix viu", "O pix", "Tu tem uma chave Pix de CPF ou celular ?", "O nome do pix é vitória régia?"]) {
+    await ensaiar(
+      `Pix: "${frase}"`,
+      `ensaio-pix-${frase.length}@lid`,
+      [{ diz: frase, esperar: /chave pix/i, naoPodeCalar: true }],
+      await lojaEm("saturday", "20:00"),
+    );
+  }
+
+  // Com a loja ABERTA isto devolvia undefined e o bot calava — justamente
+  // quando a resposta era "sim, pode pedir".
+  for (const frase of ["Ainda faz entrega ?", "Ainda consigo fazer pedido?", "vocês estão recebendo pedido?"]) {
+    await ensaiar(
+      `Loja aberta: "${frase}"`,
+      `ensaio-aberto-${frase.length}@lid`,
+      [{ diz: frase, esperar: /abertos|ola\.click/i, naoPodeCalar: true }],
+      await lojaEm("saturday", "20:00"),
+    );
+  }
+
+  // O que NÃO é do bot continua não sendo. Pastel não existe no cardápio
+  // e o bot respondia "Simple Bruthus - Combo — R$ 38,99. Qual coca?".
+  await ensaiar(
+    "Item que a loja não vende — chama o dono",
+    "ensaio-pastel@lid",
+    [{ diz: "Tem pastel de carne de sol? Qto?", chamaODono: true }],
+    await lojaEm("saturday", "20:00"),
+  );
+
+  // O pedido reenviado pelo botão do OlaClick: 26 nas duas noites, todos
+  // sem resposta porque a forma de pagamento era buscada na API, onde
+  // ainda não existe. Texto real, encurtado.
+  const PEDIDO_BOTAO = (pagamento) => `👋 Venho de https://bruthusburger.com?utm_source=bot
+BR-7110269696
+🗓️ 06/11/2026 ⏰ 19:05
+
+*Tipo de serviço: Delivery*
+
+Nome: Francisco Benício Sousa Abreu
+Telefone: 55 85992086828
+Endereço: Centro, Avenida doutor Aramis Paiva  #201
+
+*📝 Produtos*
+*X1 Duplo Smash Bruthus  R$ 26,99*
+
+Subtotal: R$ 26,99
+Delivery: R$ 2,00
+*Total: R$ 28,99*
+
+*💲 Pagamento*
+Estado do pagamento: Não pago
+*Total a pagar: R$ 28,99*
+${pagamento}
+
+👆 Por favor, envie-nos esta mensagem agora.`;
+
+  await ensaiar(
+    "Pedido pelo botão, PIX — tem que mandar a chave",
+    "ensaio-botao-pix@lid",
+    [{ diz: PEDIDO_BOTAO("PIX 28.99\nPor favor, enviar o comprovante via whatsapp"), esperar: /chave pix|comprovante/i, naoPodeCalar: true }],
+    await lojaEm("saturday", "20:00"),
+  );
+
+  await ensaiar(
+    "Pedido pelo botão, Cartão — agradece, sem chave",
+    "ensaio-botao-card@lid",
+    [{ diz: PEDIDO_BOTAO("Cartão 28.99"), naoPode: /chave pix/i, naoPodeCalar: true }],
+    await lojaEm("saturday", "20:00"),
+  );
+
+  await ensaiar(
+    "Pedido pelo botão, Dinheiro — agradece, sem chave",
+    "ensaio-botao-cash@lid",
+    [{ diz: PEDIDO_BOTAO("Dinheiro 28.99"), naoPode: /chave pix/i, naoPodeCalar: true }],
+    await lojaEm("saturday", "20:00"),
+  );
+
   await conferirHorario();
   console.log(`\npedidos criados no ensaio (nenhum foi para o OlaClick): ${pedidosCriados.length}`);
   console.log(falhas ? `\n${falhas} FALHA(S) — não suba assim.` : "\nTodos os ensaios passaram.");
