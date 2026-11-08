@@ -34,6 +34,7 @@ const painel   = require("./painel");
 const pedidos  = require("./pedidoEmCurso");
 const respostas = require("./respostas");
 const cerebro  = require("./cerebro");
+const modoIA  = require("./modoIA");
 
 // Os módulos compartilhados com o resto do sistema ficam em dois lugares
 // diferentes: no container, copiados para o lado do index.js
@@ -703,7 +704,8 @@ async function decidir(texto, msg, estadoInjetado) {
   // devolve o NÚMERO do item na lista real; item que não existe ou que o
   // dono escondeu é descartado em cerebro.js. Preço quem soma é
   // `precificar`. O pedido no OlaClick quem cria é `criarPedido`.
-  const ia = USAR_IA
+  const iaLigada = USAR_IA && modoIA.ligada();
+  const ia = iaLigada
     ? await cerebro.pensar({
         texto,
         estado,
@@ -711,7 +713,7 @@ async function decidir(texto, msg, estadoInjetado) {
         fora: estado?.indisponiveis?.nomes || [],
         historico: historicoDa(msg.conversa),
       }).catch((e) => ({ erro: e.message }))
-    : { erro: "IA desligada por USAR_IA=0" };
+    : { erro: modoIA.estado().permitida ? "IA pausada pelo Telegram" : "IA desligada por USAR_IA=0" };
 
   if (!ia.erro) {
     const jaTinhaPedido = Boolean(pedidos.pegar(msg.conversa));
@@ -1574,6 +1576,112 @@ app.get("/painel/:segredo", async (req, res) => {
   res.type("html").send(painel.montarHtml(dados, estado));
 });
 
+// ──────────────────────────────────────────────
+// Telegram: o interruptor da IA na mão do dono.
+//
+// POR QUE O WEBHOOK DO TELEGRAM VEM PARA CÁ, E NÃO PARA O RENDER:
+// quem precisa mudar de comportamento é ESTE processo, nesta máquina. O
+// Render não alcança o atendente (ele não tem porta publicada; só o Caddy
+// o enxerga), dorme no plano free e acorda frio em ~50s. Um comando de
+// emergência que depende de acordar outro serviço não é de emergência.
+//
+// E O BOT DE GASTOS, QUE JÁ VIVIA NO RENDER?
+// Continua vivo. O que não é comando de IA é repassado para lá inteiro,
+// como chegou — este endpoint virou a porta da frente, não o novo dono
+// do bot. Se o repasse falhar, o erro vai para o log e o Telegram recebe
+// 200 de qualquer jeito: webhook que devolve erro é reenviado por horas.
+// ──────────────────────────────────────────────
+const TG_WEBHOOK_SEGREDO = process.env.TELEGRAM_WEBHOOK_SEGREDO || process.env.HOOK_SEGREDO || "";
+const RENDER_TELEGRAM = process.env.RENDER_TELEGRAM_URL
+  || "https://bruthus-burger.onrender.com/webhook/telegram";
+
+// Vários nomes para o mesmo comando, de propósito: às 20h de uma sexta
+// ninguém lembra a grafia exata, e um comando que não foi reconhecido
+// viraria uma despesa de R$ 0 no financeiro. Tudo que soa como "desliga
+// a IA" desliga a IA.
+const TG_DESLIGAR = ["/semia", "/iaoff", "/pausaria", "/iapausa", "/pausa"];
+const TG_LIGAR    = ["/comia", "/iaon", "/voltaria", "/iavolta", "/volta"];
+const TG_ESTADO   = ["/ia", "/comoesta"];
+
+function comandoDoTelegram(texto) {
+  const primeiro = String(texto || "").trim().split(" ")[0];
+  return primeiro.split("@")[0].toLowerCase();
+}
+
+app.post("/hooks/telegram/:segredo", async (req, res) => {
+  // Responde ANTES de trabalhar: o Telegram só quer saber que chegou.
+  res.json({ ok: true });
+
+  if (req.params.segredo !== (process.env.HOOK_SEGREDO || "")) return;
+  if (TG_WEBHOOK_SEGREDO && req.get("x-telegram-bot-api-secret-token") !== TG_WEBHOOK_SEGREDO) {
+    console.error("[telegram] segredo do cabeçalho não bateu");
+    return;
+  }
+
+  const m = req.body?.message || req.body?.edited_message;
+  const cmd = comandoDoTelegram(m?.text);
+  const chat = String(m?.chat?.id || "");
+
+  const quer = TG_DESLIGAR.includes(cmd) ? false
+    : TG_LIGAR.includes(cmd) ? true
+      : null;
+  const soOlhar = TG_ESTADO.includes(cmd);
+
+  // Não é comando de IA: é assunto do bot de gastos. Repassa e sai.
+  if (quer === null && !soOlhar) {
+    // O Render dorme no plano free: medi 31,7s para ele acordar de vez.
+    // Um timeout curto aqui perderia a despesa EM SILÊNCIO — e despesa
+    // perdida é número errado no financeiro para sempre. Então espera,
+    // tenta de novo, e se ainda falhar AVISA em vez de engolir.
+    const repassar = () => axios.post(RENDER_TELEGRAM, req.body, { timeout: 70000 });
+    try {
+      await repassar();
+    } catch (e1) {
+      try {
+        await repassar();
+      } catch (e2) {
+        const porque = e2.response?.status || e2.message;
+        console.error("[telegram->render]", porque);
+        await avisarTelegram(`⚠️ *Não entreguei isso ao bot de gastos* (${porque}).\nNÃO foi registrado — manda de novo daqui a um minuto.`);
+      }
+    }
+    return;
+  }
+
+  // Pausar o atendimento da loja não é coisa que um desconhecido faça por
+  // ter achado o bot. Fora do chat do dono: ignora em silêncio, sem nem
+  // confirmar que o comando existe.
+  if (TG_CHAT && chat !== String(TG_CHAT)) {
+    console.error("[telegram] comando de IA recusado, chat", chat);
+    return;
+  }
+
+  const agora = quer === null ? modoIA.estado() : modoIA.definir(quer, "telegram");
+  const linhas = [];
+
+  if (quer !== null) linhas.push(agora.ia ? "✅ *IA religada*" : "⏸️ *IA pausada*");
+  else linhas.push(agora.ia ? "🧠 *IA ligada*" : "⏸️ *IA pausada*");
+
+  linhas.push("");
+  linhas.push(agora.ia
+    ? "Quem entende e escreve para o cliente é a IA. Se ela tiver dúvida, não responde: chama você."
+    : "Responde só a regra escrita à mão: saudação, cardápio, horário, loja fechada e pedido pelo link. Qualquer coisa fora disso ele chama você.");
+
+  if (!agora.permitida) {
+    linhas.push("");
+    linhas.push("_Obs: USAR_IA=0 está no compose. Enquanto estiver lá, a IA fica desligada e este comando não religa._");
+  }
+  if (agora.avisoDeDisco) {
+    linhas.push("");
+    linhas.push(`⚠️ *Não consegui gravar em disco* (${agora.avisoDeDisco}). Vale agora, mas um restart do container desfaz.`);
+  }
+
+  linhas.push("");
+  linhas.push("/semia pausa · /comia religa · /ia mostra como está");
+
+  await avisarTelegram(linhas.join("\n"));
+});
+
 app.get("/saude", async (req, res) => {
   let observadas = 0;
   try { observadas = fs.readFileSync(DIARIO, "utf8").split("\n").filter(Boolean).length; } catch {}
@@ -1586,6 +1694,7 @@ app.get("/saude", async (req, res) => {
     indisponiveis: estado?.indisponiveis?.total,
     cardapio: cardapio.CARDAPIO.itens.length,
     openai: Boolean(OPENAI_KEY),
+    ia: modoIA.ligada() ? "ligada" : "pausada",
   });
 });
 

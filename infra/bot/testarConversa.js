@@ -29,6 +29,7 @@ const os = require("os");
 const caminho = require("path");
 process.env.DIARIO = caminho.join(os.tmpdir(), "ensaio-bot.jsonl");
 process.env.PEDIDOS_EM_CURSO = caminho.join(os.tmpdir(), "ensaio-pedidos.json");
+process.env.MODO_ARQUIVO = caminho.join(os.tmpdir(), "ensaio-modo.json");
 // Ninguém é alertado e nada é enviado durante o ensaio.
 process.env.ALERTAR_DONO = "0";
 process.env.RESPONDER = "0";
@@ -547,6 +548,44 @@ ${pagamento}
     [{ diz: PEDIDO_BOTAO("Dinheiro 28.99"), naoPode: /chave pix/i, naoPodeCalar: true }],
     await lojaEm("saturday", "20:00"),
   );
+
+  // ── O interruptor da IA (/semia e /comia no Telegram) ──
+  // O que importa não é o Telegram responder bonito: é o estado
+  // SOBREVIVER a um restart do container. Pausar às 19h e a IA voltar
+  // sozinha às 21h porque o Docker reiniciou seria pior que não ter
+  // interruptor nenhum — o dono acharia que está pausada.
+  //
+  // Este ensaio mexe em USAR_IA de propósito: a suíte inteira roda com
+  // USAR_IA=0, e com ele ligado NADA deve religar a IA. A hierarquia é
+  // o ponto, não um detalhe.
+  {
+    const antesEnv = process.env.USAR_IA;
+    const recarregar = () => {
+      delete require.cache[require.resolve("./modoIA")];
+      return require("./modoIA");
+    };
+    const casos = [
+      ["USAR_IA=0 manda, e o Telegram não religa", () => {
+        process.env.USAR_IA = "0";
+        return recarregar().definir(true, "ensaio").ia === false;
+      }],
+      ["com a IA permitida, o padrão é ligada", () => {
+        process.env.USAR_IA = "1";
+        return recarregar().estado().ia === true;
+      }],
+      ["/semia pausa", () => recarregar().definir(false, "ensaio").ia === false],
+      ["segue pausada depois de reler do disco (restart)", () => recarregar().ligada() === false],
+      ["/comia religa", () => recarregar().definir(true, "ensaio").ia === true],
+    ];
+    for (const [nome, prova] of casos) {
+      let ok = false;
+      try { ok = prova(); } catch { ok = false; }
+      console.log(`${ok ? "ok   " : "FALHA"} interruptor da IA: ${nome}`);
+      if (!ok) falhas++;
+    }
+    process.env.USAR_IA = antesEnv;
+    recarregar();
+  }
 
   await conferirHorario();
   console.log(`\npedidos criados no ensaio (nenhum foi para o OlaClick): ${pedidosCriados.length}`);
