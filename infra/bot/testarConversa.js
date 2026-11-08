@@ -15,15 +15,58 @@
 // cliente de verdade. Agora não.
 // ──────────────────────────────────────────────
 
-process.env.DIARIO = process.env.DIARIO || require("path").join(require("os").tmpdir(), "ensaio-bot.jsonl");
-process.env.PEDIDOS_EM_CURSO = process.env.PEDIDOS_EM_CURSO
-  || require("path").join(require("os").tmpdir(), "ensaio-pedidos.json");
+// ── CAMINHOS PRÓPRIOS, SEM HERDAR NADA DO AMBIENTE ──
+//
+// Aqui havia `process.env.DIARIO || <temp>`. Parecia cuidado e era o
+// contrário: DENTRO DO CONTAINER a variável já vem definida como
+// /dados/observacao.jsonl, o ensaio manteve esse caminho e o unlink
+// abaixo APAGOU o diário de produção — o registro das noites de 06 e
+// 07/11, que é a única memória do que o bot fez com cliente de verdade.
+// Em 08/11/2026, 15:12, foi exatamente isso que aconteceu.
+//
+// Agora o ensaio IMPÕE o caminho dele e nunca pergunta ao ambiente.
+const os = require("os");
+const caminho = require("path");
+process.env.DIARIO = caminho.join(os.tmpdir(), "ensaio-bot.jsonl");
+process.env.PEDIDOS_EM_CURSO = caminho.join(os.tmpdir(), "ensaio-pedidos.json");
 // Ninguém é alertado e nada é enviado durante o ensaio.
 process.env.ALERTAR_DONO = "0";
 process.env.RESPONDER = "0";
 
+// ── ESTA SUÍTE TESTA A REDE DE SEGURANÇA, NÃO A IA ──
+//
+// Quem responde ao cliente agora é a IA (cerebro.js). Ela não escreve a
+// mesma frase duas vezes, então comparar texto exato aqui daria falha
+// onde não há defeito — e, pior, passaria a depender de rede e de
+// crédito na OpenAI para rodar.
+//
+// Então aqui a IA fica DESLIGADA de propósito: o que estes 42 ensaios
+// guardam é o caminho que roda quando ela falha (sem chave, timeout,
+// JSON torto). Essa rede precisa continuar correta justamente porque
+// ninguém olha para ela quando está tudo bem.
+//
+// A IA é medida em outro lugar, contra as 91 mensagens reais das noites
+// de 06 e 07/11:  node infra/bot/medirIA.js <diario.jsonl>
+process.env.USAR_IA = "0";
+
+// ── PIX FALSO, FIXO ──
+// Quatro ensaios conferem se a chave Pix sai junto com o pedido. Eles
+// liam PIX_CHAVE do ambiente: na VM existe, aqui não — então o mesmo
+// arquivo dava verde lá e 10 falhas aqui, sem nada de errado no código.
+// Teste que muda de resultado conforme a máquina não vale nada. Aqui a
+// chave é sempre esta, e o que se testa é se ela chega ao cliente.
+process.env.PIX_CHAVE = process.env.PIX_CHAVE || "ensaio@bruthus.teste";
+process.env.PIX_NOME  = process.env.PIX_NOME  || "Bruthus Ensaio";
+
 const fs = require("fs");
+// Cinto e suspensório: só apaga dentro da pasta temporária. Se algum dia
+// alguém reintroduzir um caminho vindo de fora, o teste para em vez de
+// destruir arquivo de produção.
 for (const f of [process.env.DIARIO, process.env.PEDIDOS_EM_CURSO]) {
+  if (!f.startsWith(os.tmpdir())) {
+    console.error(`ENSAIO ABORTADO: ${f} não está em ${os.tmpdir()} — não vou apagar isso.`);
+    process.exit(1);
+  }
   try { fs.unlinkSync(f); } catch {} // eslint-disable-line no-empty
 }
 

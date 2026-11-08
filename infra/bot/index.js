@@ -33,6 +33,7 @@ const path    = require("path");
 const painel   = require("./painel");
 const pedidos  = require("./pedidoEmCurso");
 const respostas = require("./respostas");
+const cerebro  = require("./cerebro");
 
 // Os módulos compartilhados com o resto do sistema ficam em dois lugares
 // diferentes: no container, copiados para o lado do index.js
@@ -63,6 +64,9 @@ const EVO_URL      = (process.env.EVOLUTION_API_URL || "http://evolution:8080").
 const EVO_KEY      = process.env.EVOLUTION_API_KEY || "";
 const EVO_INSTANCE = process.env.EVOLUTION_INSTANCE || "bruthus";
 const OPENAI_KEY   = process.env.OPENAI_API_KEY || "";
+// Interruptor da IA. Ligada por padrão; `USAR_IA=0` volta o bot para a
+// regra escrita à mão sem deploy, se ela aprontar no meio de uma noite.
+const USAR_IA      = process.env.USAR_IA !== "0";
 const DIARIO       = process.env.DIARIO || "/dados/observacao.jsonl";
 
 const app = express();
@@ -538,6 +542,30 @@ async function tratarPedidoEmCurso(msg, texto, estado) {
 }
 
 // ──────────────────────────────────────────────
+// Memória curta da conversa, para a IA não responder no vácuo.
+//
+// Sem isto ela não sabe o que ela mesma acabou de perguntar, e um "sim"
+// ou "o de cima" fica sem sentido. Fica na memória do processo de
+// propósito: é contexto de minutos, não histórico para guardar.
+// ──────────────────────────────────────────────
+const HISTORICO = new Map();
+const HIST_MAX = 8;
+const HIST_MS  = 30 * 60 * 1000;
+
+function lembrar(conversa, de, texto) {
+  if (!conversa || !texto) return;
+  const agora = Date.now();
+  const atual = (HISTORICO.get(conversa) || []).filter((h) => agora - h.em < HIST_MS);
+  atual.push({ de, texto: String(texto).slice(0, 600), em: agora });
+  HISTORICO.set(conversa, atual.slice(-HIST_MAX));
+}
+
+function historicoDa(conversa) {
+  const agora = Date.now();
+  return (HISTORICO.get(conversa) || []).filter((h) => agora - h.em < HIST_MS);
+}
+
+// ──────────────────────────────────────────────
 // O que o bot entendeu e o que faria.
 // ──────────────────────────────────────────────
 // `estadoInjetado` existe só para o ensaio de conversa poder fixar a
@@ -655,6 +683,132 @@ async function decidir(texto, msg, estadoInjetado) {
 
   const n = cardapio.normalizar(texto);
   if (!n) return { intencao: msg?.temImagem ? "print_pendente" : "sem_texto" };
+
+  // ──────────────────────────────────────────────
+  // 3. A IA LÊ A MENSAGEM.  ← quem entende o cliente é ela, daqui pra frente.
+  //
+  // O que vinha antes disto (pedido reenviado pelo botão, código BR-,
+  // print) continua no código: é formato fixo, ler é trivial e errar ali
+  // custa caro. O que vem DEPOIS disto é a regra antiga, que agora é só
+  // rede de segurança — se a IA não responder (sem chave, timeout, JSON
+  // torto), o bot não fica mudo.
+  //
+  // POR QUE A INVERSÃO: as regras à mão só acertavam o que eu previ.
+  // "Boa noitee" passava porque eu previ o "e" sobrando; "Boa noitte"
+  // não, porque eu não previ o "t". Em duas noites de operação foram 91
+  // mensagens de cliente e 68 jogadas pro dono. Prever o jeito que cada
+  // pessoa escreve não escala, e a conta disso caía nele.
+  //
+  // O QUE A IA NÃO FAZ: escolher item por nome e inventar preço. Ela
+  // devolve o NÚMERO do item na lista real; item que não existe ou que o
+  // dono escondeu é descartado em cerebro.js. Preço quem soma é
+  // `precificar`. O pedido no OlaClick quem cria é `criarPedido`.
+  const ia = USAR_IA
+    ? await cerebro.pensar({
+        texto,
+        estado,
+        pedido: pedidos.pegar(msg.conversa),
+        fora: estado?.indisponiveis?.nomes || [],
+        historico: historicoDa(msg.conversa),
+      }).catch((e) => ({ erro: e.message }))
+    : { erro: "IA desligada por USAR_IA=0" };
+
+  if (!ia.erro) {
+    const jaTinhaPedido = Boolean(pedidos.pegar(msg.conversa));
+    const temOQueAplicar = ia.itens.length || ia.rua || ia.bairro || ia.pagamento || ia.troco;
+    // Endereço ou pagamento SEM item não abre pedido.
+    //
+    // Na medição de 08/11, "Vai ser pix viu" abria um pedido vazio: não
+    // havia item, `perguntar` não tinha o que perguntar e o cliente
+    // recebia silêncio. Pagamento solto só faz sentido se já existe
+    // pedido em curso — e aí o fluxo de pendência cuida dele.
+    const pedindo = (ia.intencao === "pedido" || ia.intencao === "resposta_ao_bot")
+      && temOQueAplicar && (ia.itens.length > 0 || jaTinhaPedido);
+
+    // A IA entendeu o pedido; o CÓDIGO toma o pedido. É a divisão que
+    // importa: ela nunca chega perto de preço nem do OlaClick.
+    if (pedindo && !avisoFechado && !ia.escalar) {
+      const p = pedidos.abrirOuPegar(msg.conversa);
+      for (const i of ia.itens) {
+        if (!p.itens.some((j) => j.id === i.item.id)) p.itens.push({ ...i.item, qtd: i.qtd });
+      }
+      if (ia.rua && !p.enderecoTexto) p.enderecoTexto = ia.rua;
+      if (ia.bairro && !p.bairro) {
+        // `p.bairro` guarda o OBJETO inteiro ({bairro, taxa, area_id}), e
+        // não o nome: a criação do pedido lê `p.bairro.area_id`. Eu
+        // escrevi o nome aqui primeiro e isso quebraria na hora de criar.
+        //
+        // Bairro fora da tabela de taxa não entra: a taxa sairia errada e
+        // a entrega sai no prejuízo. Sem taxa, o fluxo pergunta de novo.
+        const b = cardapio.taxaBairro(ia.bairro);
+        if (b) {
+          p.bairro = b;
+          const rua = p.enderecoTexto;
+          p.endereco = (rua && !cardapio.normalizar(rua).includes(cardapio.normalizar(b.bairro))
+            ? `${rua}, ${b.bairro}`
+            : (rua || b.bairro)).slice(0, 191);
+        }
+      }
+      if (ia.pagamento && !p.pagamento) p.pagamento = ia.pagamento;
+      if (ia.troco && !p.troco) p.troco = ia.troco;
+      pedidos.guardar(msg.conversa, p);
+
+      const falta = pedidos.oQueFalta(p);
+      return {
+        intencao: "tomando_pedido",
+        porIA: true,
+        modelo: ia.modelo,
+        itens: p.itens.map((i) => `${i.qtd}x ${i.nome}`),
+        falta,
+        acao: `a IA entendeu (${ia.motivo || ia.intencao}); pergunta: ${falta[0]}`,
+        mensagem: pedidos.perguntar(falta, p, pedidos.somar(p, cardapio), cardapio),
+      };
+    }
+
+    // Cobrança de pedido e reclamação continuam sendo do dono, decida a
+    // IA o que quiser. Só ele sabe onde o entregador está, e "já está a
+    // caminho" quando não está custa o cliente.
+    if (ia.intencao === "acompanhar" || ia.intencao === "problema") {
+      return {
+        intencao: ia.intencao === "acompanhar" ? "cobranca_de_pedido" : "pedido_ou_endereco_errado",
+        porIA: true,
+        modelo: ia.modelo,
+        escalar: true,
+        acao: `SEGURA e chama o dono — ${ia.motivo || "só ele resolve isso"}`,
+        mensagem: respostas.vouVerificar(),
+      };
+    }
+
+    // A IA respondeu e passou pela conferência de preço.
+    if (!ia.escalar && ia.resposta) {
+      return {
+        intencao: "ia_respondeu",
+        porIA: true,
+        modelo: ia.modelo,
+        deQue: ia.intencao,
+        loja: avisoFechado || undefined,
+        acao: `a IA respondeu: ${ia.motivo || ia.intencao}`,
+        // Loja fechada: a IA já recebeu a situação no contexto e escreve
+        // a resposta com isso. O texto fixo fica para quando ela falhar.
+        mensagem: ia.resposta,
+      };
+    }
+
+    // Ela mesma disse que não sabe. É o que o dono pediu: não responde,
+    // chama ele. Melhor calar do que responder errado.
+    if (ia.escalar) {
+      return {
+        intencao: "ia_nao_sabe",
+        porIA: true,
+        modelo: ia.modelo,
+        escalar: true,
+        acao: ia.motivo || "a IA não teve certeza; deixa para o dono",
+      };
+    }
+  }
+
+  // ── Daqui para baixo é a regra antiga: só roda se a IA falhou. ──
+  if (ia.erro) console.error("[cerebro]", ia.erro);
 
   // "Cadê meu pedido?" — o bot NÃO responde isso sozinho.
   //
@@ -948,6 +1102,10 @@ async function decidir(texto, msg, estadoInjetado) {
 // ficar quieto e alguém humano aparecer, nunca uma resposta errada.
 // ──────────────────────────────────────────────
 const PODE_RESPONDER = new Set([
+  // A IA entendeu e escreveu a resposta. Só chega aqui depois de passar
+  // pela conferência de preço em cerebro.js: preço que não existe no
+  // cardápio não sai, vira pedido de ajuda.
+  "ia_respondeu",
   "saudacao",             // boas-vindas / ausência / pausado — texto fixo
   "loja_fechada",
   "loja_pausada",
@@ -1210,6 +1368,12 @@ app.post("/webhook/evolution", async (req, res) => {
         console.error("[envio]", envio);
       }
     }
+
+    // Memória curta para a IA: o que a pessoa disse e o que o bot
+    // respondeu. É o que faz um "sim" ou "o primeiro" ter sentido na
+    // mensagem seguinte.
+    lembrar(msg.conversa, "cliente", texto);
+    if (responde && leitura.mensagem) lembrar(msg.conversa, "bot", leitura.mensagem);
 
     registrar({
       decisao: leitura.decisao,
