@@ -13,6 +13,13 @@ const CATEGORIAS_DESPESA = [
   "Custos Fixos", "Taxas / Comissões", "Outros",
 ];
 
+// Categoria onde a conciliação lança comissão de marketplace e taxa de
+// maquineta. Não é despesa de operação: é dinheiro que NUNCA chegou na
+// conta da loja. Ver `somar()` logo abaixo.
+const CATEGORIA_TAXAS = "Taxas / Comissões";
+
+const r2 = (v) => parseFloat(Number(v || 0).toFixed(2));
+
 // ──────────────────────────────────────────────
 // HELPER — linha do banco → objeto para o frontend
 // ──────────────────────────────────────────────
@@ -65,6 +72,73 @@ function resumirCanais(entradas) {
       retencao: parseFloat((((c.receita - c.taxas) / c.receita) * 100).toFixed(1)),
     }))
     .sort((a, b) => b.receita - a.receita);
+}
+
+// ──────────────────────────────────────────────
+// Os totais da tela, a partir dos lançamentos do período.
+//
+// FATURAMENTO É LÍQUIDO, de propósito (decisão do dono, 09/11/2026):
+// "pode mostrar o valor líquido no faturamento, se não quebra a margem
+// com valores irreais". Comissão do iFood e taxa de maquineta saem da
+// receita, porque esse dinheiro nunca entra na conta da loja — deixá-las
+// no topo inflava o faturamento e a margem saía sobre uma venda que não
+// existiu.
+//
+// E por isso elas TAMBÉM saem de `gastos`. É o detalhe que faz a conta
+// fechar: as taxas já são lançadas como despesa pela conciliação, então
+// descontar da receita sem tirar dos gastos as contaria duas vezes e o
+// lucro cairia o valor delas. Descontando dos dois lados, o lucro é
+// exatamente o mesmo de antes — muda só a régua da margem, que agora é
+// sobre o que de fato chega.
+//
+// Exemplo real, semana de 03 a 09/11/2026:
+//   bruto 8.023,95 − taxas 380,23 = líquido 7.643,72
+//   gastos 4.696,34 − 380,23 = 4.316,11
+//   lucro 3.327,61 (igual ao de antes) → margem 43,5% em vez de 41,5%
+// ──────────────────────────────────────────────
+function somar(entradas) {
+  let bruto = 0, taxas = 0, despesas = 0;
+
+  for (const e of entradas) {
+    if (e.tipo === "receita")             { bruto    += e.valor; continue; }
+    if (e.categoria === CATEGORIA_TAXAS)  { taxas    += e.valor; continue; }
+    despesas += e.valor;
+  }
+
+  const faturamento = bruto - taxas;
+  const lucro       = faturamento - despesas;
+
+  return {
+    faturamentoBruto: r2(bruto),
+    taxas:            r2(taxas),
+    faturamento:      r2(faturamento),
+    gastos:           r2(despesas),
+    lucro:            r2(lucro),
+    margem: faturamento > 0 ? parseFloat(((lucro / faturamento) * 100).toFixed(1)) : 0,
+  };
+}
+
+// Mesma regra no gráfico: a taxa abate a receita do dia em que foi
+// lançada, em vez de virar barra de gasto.
+function acumularNoDia(balde, e) {
+  if (!balde) return;
+  if (e.tipo === "receita")            balde.receita += e.valor;
+  else if (e.categoria === CATEGORIA_TAXAS) balde.receita -= e.valor;
+  else                                 balde.despesa += e.valor;
+}
+
+// Top de despesa sem as taxas — elas não estão mais em `gastos`, e
+// listá-las aqui faria a soma da lista passar do total mostrado.
+function topDespesas(entradas) {
+  const cat = {};
+  entradas
+    .filter((e) => e.tipo === "despesa" && e.categoria !== CATEGORIA_TAXAS)
+    .forEach((e) => { cat[e.categoria] = (cat[e.categoria] || 0) + e.valor; });
+
+  return Object.entries(cat)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([categoria, valor]) => ({ categoria, valor: r2(valor) }));
 }
 
 // ──────────────────────────────────────────────
@@ -166,10 +240,7 @@ async function calcularResumo(dias = 7) {
 
   const entradas = rows.map(rowParaObj);
 
-  const faturamento = entradas.filter(e => e.tipo === "receita").reduce((s, e) => s + e.valor, 0);
-  const gastos      = entradas.filter(e => e.tipo === "despesa").reduce((s, e) => s + e.valor, 0);
-  const lucro       = faturamento - gastos;
-  const margem      = faturamento > 0 ? parseFloat(((lucro / faturamento) * 100).toFixed(1)) : 0;
+  const totais = somar(entradas);
 
   // Agrupamento por semana (histórico) ou por dia
   const porDia = {};
@@ -180,7 +251,7 @@ async function calcularResumo(dias = 7) {
       inicio.setDate(d.getDate() - d.getDay());
       const key = inicio.toISOString().slice(0, 10);
       if (!porDia[key]) porDia[key] = { data: key, receita: 0, despesa: 0 };
-      porDia[key][e.tipo === "receita" ? "receita" : "despesa"] += e.valor;
+      acumularNoDia(porDia[key], e);
     });
   } else {
     for (let i = dias - 1; i >= 0; i--) {
@@ -189,33 +260,17 @@ async function calcularResumo(dias = 7) {
       const key = d.toISOString().slice(0, 10);
       porDia[key] = { data: key, receita: 0, despesa: 0 };
     }
-    entradas.forEach(e => {
-      if (porDia[e.data]) {
-        porDia[e.data][e.tipo === "receita" ? "receita" : "despesa"] += e.valor;
-      }
-    });
+    entradas.forEach(e => acumularNoDia(porDia[e.data], e));
   }
-
-  // Top categorias de despesa
-  const catDespesa = {};
-  entradas.filter(e => e.tipo === "despesa").forEach(e => {
-    catDespesa[e.categoria] = (catDespesa[e.categoria] || 0) + e.valor;
-  });
 
   return {
     periodo: tudoHistorico ? "tudo" : dias,
     dataInicio: dataInicioStr,
-    faturamento: parseFloat(faturamento.toFixed(2)),
-    gastos:      parseFloat(gastos.toFixed(2)),
-    lucro:       parseFloat(lucro.toFixed(2)),
-    margem,
+    ...totais,
     totalEntradas: entradas.length,
     grafico: Object.values(porDia).sort((a, b) => a.data.localeCompare(b.data)),
     porCanal: resumirCanais(entradas),
-    topDespesas: Object.entries(catDespesa)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([cat, val]) => ({ categoria: cat, valor: parseFloat(val.toFixed(2)) })),
+    topDespesas: topDespesas(entradas),
   };
 }
 
@@ -268,12 +323,14 @@ async function evolucaoMensal() {
   const { rows } = await pool.query(`
     SELECT
       TO_CHAR(data, 'YYYY-MM') AS mes,
-      SUM(CASE WHEN tipo = 'receita' THEN valor ELSE 0 END) AS faturamento,
-      SUM(CASE WHEN tipo = 'despesa' THEN valor ELSE 0 END) AS gastos
+      SUM(CASE WHEN tipo = 'receita'                   THEN valor
+               WHEN categoria = $1                     THEN -valor
+               ELSE 0 END)                             AS faturamento,
+      SUM(CASE WHEN tipo = 'despesa' AND categoria <> $1 THEN valor ELSE 0 END) AS gastos
     FROM financeiro
     GROUP BY mes
     ORDER BY mes ASC
-  `);
+  `, [CATEGORIA_TAXAS]);
 
   return rows.map(r => ({
     mes:          r.mes,
@@ -304,38 +361,24 @@ async function calcularResumoCustom(dataInicio, dataFim = null) {
 
   const entradas = rows.map(rowParaObj);
 
-  const faturamento = entradas.filter(e => e.tipo === "receita").reduce((s, e) => s + e.valor, 0);
-  const gastos      = entradas.filter(e => e.tipo === "despesa").reduce((s, e) => s + e.valor, 0);
-  const lucro       = faturamento - gastos;
-  const margem      = faturamento > 0 ? parseFloat(((lucro / faturamento) * 100).toFixed(1)) : 0;
+  const totais = somar(entradas);
 
   // Agrupamento por dia
   const porDia = {};
   entradas.forEach(e => {
     if (!porDia[e.data]) porDia[e.data] = { data: e.data, receita: 0, despesa: 0 };
-    porDia[e.data][e.tipo === "receita" ? "receita" : "despesa"] += e.valor;
-  });
-
-  const catDespesa = {};
-  entradas.filter(e => e.tipo === "despesa").forEach(e => {
-    catDespesa[e.categoria] = (catDespesa[e.categoria] || 0) + e.valor;
+    acumularNoDia(porDia[e.data], e);
   });
 
   return {
     periodo: "custom",
     dataInicio,
     dataFim: dataFim || new Date().toISOString().slice(0, 10),
-    faturamento: parseFloat(faturamento.toFixed(2)),
-    gastos:      parseFloat(gastos.toFixed(2)),
-    lucro:       parseFloat(lucro.toFixed(2)),
-    margem,
+    ...totais,
     totalEntradas: entradas.length,
     grafico: Object.values(porDia).sort((a, b) => a.data.localeCompare(b.data)),
     porCanal: resumirCanais(entradas),
-    topDespesas: Object.entries(catDespesa)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([cat, val]) => ({ categoria: cat, valor: parseFloat(val.toFixed(2)) })),
+    topDespesas: topDespesas(entradas),
   };
 }
 

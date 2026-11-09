@@ -133,7 +133,7 @@ async function processarMensagem(msg) {
       const r = await calcularResumo(7);
       await enviar(chatId, [
         "📊 *Resumo — últimos 7 dias*",
-        `📈 Faturamento: R$${Number(r.faturamento).toFixed(2).replace(".", ",")}`,
+        `📈 Faturamento: R$${Number(r.faturamento).toFixed(2).replace(".", ",")} (líquido)`,
         `📉 Gastos:      R$${Number(r.gastos).toFixed(2).replace(".", ",")}`,
         `💵 Lucro:       R$${Number(r.lucro).toFixed(2).replace(".", ",")}`,
         `📊 Margem:      ${r.margem}%`,

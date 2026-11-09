@@ -438,7 +438,12 @@ export default function FinanceiroPage() {
       <div className="rounded-2xl overflow-hidden mb-6" style={{ border: '1px solid #181818', background: '#0b0b0b' }}>
         <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x divide-[#141414]">
           {[
-            { label: 'Faturamento', valor: resumo?.faturamento, cor: '#34d399', pct: pctFat,  invertPct: false },
+            // Líquido: a comissão do iFood e a taxa da maquineta já saem
+            // daqui (e também de Gastos, senão contariam duas vezes). A
+            // linha de baixo mostra de onde veio o desconto, para o número
+            // não parecer que sumiu dinheiro.
+            { label: 'Faturamento', valor: resumo?.faturamento, cor: '#34d399', pct: pctFat,  invertPct: false,
+              nota: resumo?.taxas > 0 ? `líquido — ${fmt(resumo.faturamentoBruto)} menos ${fmt(resumo.taxas)} de taxa` : null },
             { label: 'Gastos',      valor: resumo?.gastos,      cor: '#f87171', pct: pctGast, invertPct: true  },
             { label: 'Lucro',       valor: resumo?.lucro,       cor: resumo?.lucro >= 0 ? '#60a5fa' : '#f87171', pct: pctLucro, invertPct: false },
             { label: 'Margem',      valor: null, custom: `${resumo?.margem ?? '—'}%`,
@@ -467,6 +472,9 @@ export default function FinanceiroPage() {
                 <p className="text-[10px]" style={{ color: '#252525' }}>
                   {periodo === 0 ? 'desde a abertura' : periodo === 'semana' ? fmtRango(getRangoSemana(semanaOffset)) : `últimos ${periodo} dias`}
                 </p>
+              )}
+              {c.nota && !loading && (
+                <p className="text-[9px] mt-1 leading-tight" style={{ color: '#3a3a3a' }}>{c.nota}</p>
               )}
             </div>
           ))}

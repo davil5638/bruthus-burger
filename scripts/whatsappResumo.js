@@ -85,7 +85,7 @@ async function gerarTextoResumo() {
 
   let txt = `🍔 *Bruthus Burger — Resumo Semanal*\n`;
   txt += `📅 ${periodo}\n\n`;
-  txt += `📈 Faturamento: *${fmtBR(resumo.faturamento)}*\n`;
+  txt += `📈 Faturamento: *${fmtBR(resumo.faturamento)}* (líquido)\n`;
   txt += `📉 Gastos:      *${fmtBR(resumo.gastos)}*\n`;
   txt += `${emoji} Lucro:     *${fmtBR(resumo.lucro)}*\n`;
   txt += `📊 Margem:      *${resumo.margem}%*\n`;
